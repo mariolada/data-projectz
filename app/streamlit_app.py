@@ -393,20 +393,29 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
+    daily_path = Path("data/processed/daily.csv")
     reco_path = Path("data/processed/recommendations_daily.csv")
-    flags_path = Path("data/processed/flags_daily.csv")
     daily_ex_path = Path("data/processed/daily_exercise.csv")
     weekly_path = Path("data/processed/weekly.csv")
 
-    # Load files
-    recommendations = None
+    # Load main data files
+    df_metrics = None
+    df_recommendations = None
+    
     try:
-        recommendations = load_csv(reco_path)
+        df_metrics = load_csv(daily_path)  # Tiene: volume, acwr_7_28, sleep_hours, performance_index, etc.
     except FileNotFoundError:
-        st.warning("❌ Faltan archivos. Ejecuta `decision_engine` primero.")
+        st.warning("❌ Falta daily.csv. Ejecuta el `pipeline` primero.")
+        st.stop()
+    
+    try:
+        df_recommendations = load_csv(reco_path)  # Tiene: readiness_score, recommendation, reason_codes
+    except FileNotFoundError:
+        st.warning("❌ Falta recommendations_daily.csv. Ejecuta `decision_engine` primero.")
         st.stop()
 
-    df_daily = recommendations.copy()
+    # Merge: métricas + recomendaciones por fecha
+    df_daily = df_metrics.merge(df_recommendations, on='date', how='left')
     df_daily['date'] = pd.to_datetime(df_daily['date']).dt.date
 
     # Load optional files
@@ -426,27 +435,40 @@ def main():
     st.sidebar.header("⚙️ Configuración")
     view_mode = st.sidebar.radio("Vista", ["📅 Día", "🎯 Modo Hoy", "📊 Semana"])
 
-    # Sidebar: date range filter
+    # Sidebar: date range filter - Solo mostrar en modo Día
     dates = sorted(df_daily['date'].unique())
     if dates:
-        min_date, max_date = dates[0], dates[-1]
+        max_date = dates[-1]
+        min_date = max_date - datetime.timedelta(days=6)  # Última semana (7 días)
+        # Si no hay datos hace 7 días, mostrar todos
+        if min_date < dates[0]:
+            min_date = dates[0]
     else:
         min_date = max_date = datetime.date.today()
 
-    date_range = st.sidebar.date_input("Rango de fechas", value=(min_date, max_date))
-    if isinstance(date_range, tuple) and len(date_range) == 2:
-        start_date, end_date = date_range
+    if view_mode == "📅 Día":
+        st.sidebar.markdown("### 📅 Filtro de fechas")
+        col1, col2 = st.sidebar.columns(2)
+        with col1:
+            start_date = st.date_input("Desde", value=min_date, key="start_date")
+        with col2:
+            end_date = st.date_input("Hasta", value=max_date, key="end_date")
+        df_filtered = df_daily[(df_daily['date'] >= start_date) & (df_daily['date'] <= end_date)].copy()
     else:
-        start_date = end_date = date_range
+        start_date = min_date
+        end_date = max_date
+        df_filtered = df_daily[(df_daily['date'] >= start_date) & (df_daily['date'] <= end_date)].copy()
 
-    df_filtered = df_daily[(df_daily['date'] >= start_date) & (df_daily['date'] <= end_date)].copy()
-
-    # Date selector
+    # Date selector - Por defecto selecciona hoy o la última fecha disponible
     dates_filtered = sorted(df_filtered['date'].unique(), reverse=True)
     today = datetime.date.today()
     default_date = today if today in dates_filtered else (dates_filtered[0] if dates_filtered else None)
-    selected_date = st.sidebar.selectbox("Selecciona fecha", options=dates_filtered, 
-                                        index=dates_filtered.index(default_date) if default_date in dates_filtered else 0) if dates_filtered else None
+    
+    if view_mode == "📅 Día":
+        selected_date = st.sidebar.selectbox("Selecciona fecha", options=dates_filtered, 
+                                            index=dates_filtered.index(default_date) if default_date in dates_filtered else 0) if dates_filtered else None
+    else:
+        selected_date = default_date
 
     # ============== DAY VIEW ==============
     if view_mode == "📅 Día":
@@ -660,6 +682,58 @@ def main():
                     st.success(f"✅ Guardado para {today}")
                     st.info("💡 **Próximo paso:** ejecuta el pipeline para que se regenere el histórico con estos datos.")
                     st.session_state.mood_calculated = False  # Reset after save
+            
+            # Charts - Last 7 days + TODAY
+            st.markdown("---")
+            st.subheader("📈 Tendencia (últimos 7 días + hoy)")
+            
+            # Get last 7 days data, excluding today if it exists
+            today = datetime.date.today()
+            last_7_days = df_filtered[df_filtered['date'] < today].sort_values('date', ascending=True).tail(7).copy()
+            
+            # Create today's row with calculated readiness and form inputs
+            # Solo incluir columnas que existen en last_7_days para mantener coherencia
+            today_row = pd.DataFrame({
+                'date': [today],
+                'readiness_score': [readiness_instant],
+                'volume': [last_7_days['volume'].mean() if 'volume' in last_7_days.columns and len(last_7_days) > 0 else 0],
+                'sleep_hours': [sleep_h],
+                'acwr_7_28': [np.nan]  # Hoy aún no hay datos de entrenamiento, así que ACWR es NaN
+            })
+            
+            # Combine last 7 days + today
+            chart_data = pd.concat([last_7_days, today_row], ignore_index=True)
+            chart_data['date'] = pd.to_datetime(chart_data['date']).dt.date
+            chart_data = chart_data.sort_values('date', ascending=True)
+            
+            if not chart_data.empty:
+                # Readiness Chart with TODAY highlighted
+                col_chart1, col_chart2 = st.columns(2)
+                
+                with col_chart1:
+                    st.write("**Readiness**")
+                    readiness_chart = chart_data.set_index('date')['readiness_score']
+                    st.line_chart(readiness_chart)
+                
+                # Volume Chart
+                with col_chart2:
+                    st.write("**Volumen**")
+                    volume_chart = chart_data.set_index('date')['volume']
+                    st.area_chart(volume_chart)
+                
+                col_chart3, col_chart4 = st.columns(2)
+                
+                # Sleep Chart
+                with col_chart3:
+                    st.write("**Sueño (horas)**")
+                    sleep_chart = chart_data.set_index('date')['sleep_hours']
+                    st.bar_chart(sleep_chart)
+                
+                # ACWR Chart
+                with col_chart4:
+                    st.write("**ACWR (Carga)**")
+                    acwr_chart = chart_data.set_index('date')['acwr_7_28']
+                    st.line_chart(acwr_chart)
 
     # ============== WEEK VIEW ==============
     else:
