@@ -1,0 +1,11 @@
+# Archivos y carpetas ignorados
+__pycache__/
+*.pyc
+*.pyo
+*.sqlite3
+*.db
+.env
+.DS_Store
+.vscode/
+data/
+outputs/
