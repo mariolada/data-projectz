@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import altair as alt
@@ -9,101 +10,52 @@ from pathlib import Path
 import datetime
 import sys
 import json
+
+# ===== IMPORTS DE MÓDULOS REFACTORIZADOS =====
+# Config
+from config import COLORS, READINESS_ZONES, DEFAULT_READINESS_WEIGHTS, DAILY_PATH, USER_PROFILE_PATH
+
+# UI
+from ui.theme import get_theme_css
+from ui.components import render_section_title
+
+# Charts
+from charts.daily_charts import (
+    create_readiness_chart,
+    create_volume_chart,
+    create_sleep_chart,
+    create_acwr_chart,
+    create_performance_chart,
+    create_strain_chart
+)
+from charts.weekly_charts import create_weekly_volume_chart, create_weekly_strain_chart
+
+# Calculations
+from calculations.readiness_calc import (
+    calculate_readiness_from_inputs_v2,
+    calculate_readiness_from_inputs
+)
+from calculations.injury_risk import calculate_injury_risk_score_v2, calculate_injury_risk_score
+from calculations.plans import generate_actionable_plan_v2, generate_actionable_plan
+
+# Data
+from data.loader import load_csv, load_user_profile
+from data.formatters import (
+    get_readiness_zone,
+    get_days_until_acwr,
+    get_confidence_level,
+    format_acwr_display
+)
+
+# ===== IMPORTS EXTERNOS (src) =====
 sys.path.append(str(Path(__file__).parent.parent / 'src'))
 from personalization_engine import (
     calculate_personal_baselines,
+    calculate_personal_adjustment_factors,
     contextualize_readiness,
     detect_fatigue_type,
-    calculate_injury_risk_score,
     suggest_weekly_sequence
 )
-
-
-@st.cache_data
-def load_csv(path: str):
-    p = Path(path)
-    if not p.exists():
-        raise FileNotFoundError(f"No existe: {path}")
-    df = pd.read_csv(p)
-    # normalize date column to Timestamp
-    if 'date' in df.columns:
-        df['date'] = pd.to_datetime(df['date'])
-    return df
-
-
-@st.cache_data
-def load_user_profile(profile_path: str = "data/processed/user_profile.json"):
-    """Carga el perfil personalizado del usuario desde JSON."""
-    p = Path(profile_path)
-    if not p.exists():
-        return {
-            'archetype': {'archetype': 'unknown', 'confidence': 0},
-            'adjustment_factors': {
-                'sleep_weight': 0.25,
-                'performance_weight': 0.25,
-                'acwr_weight': 0.15,
-                'fatigue_sensitivity': 1.0,
-                'recovery_speed': 1.0
-            },
-            'sleep_responsiveness': {'sleep_responsive': None},
-            'insights': ['No hay datos suficientes aún para personalización'],
-            'data_quality': {'total_days': 0}
-        }
-    
-    try:
-        with open(p, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except:
-        return {}
-
-
-
-def get_readiness_zone(readiness):
-    """Retorna (zona, emoji, color) basado en readiness score."""
-    if pd.isna(readiness):
-        return ("N/D", "❓", "#999999")
-    if readiness >= 75:
-        return ("Alta", "🟢", "#00D084")
-    elif readiness >= 55:
-        return ("Media", "🟡", "#FFB81C")
-    else:
-        return ("Muy baja", "🔴", "#FF4444")
-
-
-def get_days_until_acwr(df_daily, selected_date):
-    """Calcula cuántos días de histórico hay hasta la fecha seleccionada."""
-    filtered = df_daily[df_daily['date'] <= selected_date]
-    return len(filtered)
-
-
-def format_acwr_display(acwr, days_available):
-    """Formatea ACWR: muestra valor o 'Pendiente (x/28 días)'."""
-    if pd.isna(acwr) or acwr == '—':
-        return f"Pendiente ({days_available}/28 días)"
-    return f"{round(float(acwr), 3)}"
-
-
-def get_confidence_level(df_daily, selected_date):
-    """Retorna nivel de confianza basado en días de histórico."""
-    filtered = df_daily[df_daily['date'] <= selected_date].copy()
-    days_available = len(filtered)
-    
-    if days_available < 7:
-        return "Baja (pocos datos)", "⚠️"
-    elif days_available < 28:
-        return f"Media ({days_available} días)", "ℹ️"
-    else:
-        return "Alta (>28 días)", "✅"
-    """Retorna nivel de confianza basado en días de histórico."""
-    filtered = df_daily[df_daily['date'] <= selected_date].copy()
-    days_available = len(filtered)
-    
-    if days_available < 7:
-        return "Baja (pocos datos)", "⚠️"
-    elif days_available < 28:
-        return f"Media ({days_available} días)", "ℹ️"
-    else:
-        return "Alta (>28 días)", "✅"
 
 
 def get_anti_fatigue_flag(df_daily, selected_date):
@@ -127,23 +79,6 @@ def get_anti_fatigue_flag(df_daily, selected_date):
     prev_readiness = sorted_df.loc[idx - 1, 'readiness_score']
     
     return pd.notna(current_readiness) and pd.notna(prev_readiness) and current_readiness < 50 and prev_readiness < 50
-
-
-def format_reason_codes(reason_codes_str):
-    """Convierte string de reason codes a lista legible."""
-    if pd.isna(reason_codes_str) or reason_codes_str == '':
-        return []
-    codes = str(reason_codes_str).split('|')
-    
-    code_map = {
-        'LOW_SLEEP': '😴 Sueño insuficiente',
-        'HIGH_ACWR': '📈 Carga aguda muy alta',
-        'PERF_DROP': '📉 Rendimiento en caída',
-        'HIGH_EFFORT': '💪 Esfuerzo muy alto',
-        'FATIGA': '⚠️ Fatiga detectada'
-    }
-    
-    return [code_map.get(c.strip(), c.strip()) for c in codes if c.strip()]
 
 
 def load_daily_exercise_for_date(path, selected_date):
@@ -177,175 +112,6 @@ def get_lift_recommendations(df_exercises, readiness_score, readiness_zone):
     return recs
 
 
-def calculate_readiness_from_inputs(sleep_hours, sleep_quality, fatigue, soreness, stress, motivation, pain_flag):
-    """Calcula readiness instantáneamente desde inputs del usuario (versión legacy)."""
-    
-    # Normalizar inputs a 0-1
-    sleep_hours_score = np.clip((sleep_hours - 6.0) / (7.5 - 6.0), 0, 1)
-    sleep_quality_score = (sleep_quality - 1) / 4
-    
-    # Fatiga: 0 (sin cansancio) → 1, 10 (muy cansado) → 0
-    fatigue_score = 1 - (fatigue / 10)
-    
-    # Soreness: 0 (sin dolor) → 1, 10 (mucho dolor) → 0
-    soreness_score = 1 - (soreness / 10)
-    
-    # Stress: 0 (sin estrés) → 1, 10 (mucho estrés) → 0
-    stress_score = 1 - (stress / 10)
-    
-    # Motivation: 0–10 mapear a 0–1
-    motivation_score = motivation / 10
-    
-    # Pain flag penaliza
-    pain_penalty = 0.3 if pain_flag else 0
-    
-    # Fórmula ponderada
-    readiness_0_1 = (
-        0.25 * sleep_hours_score +
-        0.15 * sleep_quality_score +
-        0.15 * fatigue_score +
-        0.15 * soreness_score +
-        0.15 * stress_score +
-        0.15 * motivation_score
-    ) - pain_penalty
-    
-    readiness_0_1 = np.clip(readiness_0_1, 0, 1)
-    readiness_score = int(round(readiness_0_1 * 100))
-    
-    return readiness_score
-
-
-def calculate_readiness_from_inputs_v2(
-    sleep_hours, sleep_quality, fatigue, soreness, stress, motivation, pain_flag,
-    nap_mins=0, sleep_disruptions=False, energy=7, stiffness=2, 
-    caffeine=0, alcohol=False, sick_flag=False, perceived_readiness=None
-):
-    """Versión mejorada: considera nap, energía, rigidez, cafeína, alcohol, enfermo, y PERCEPCIÓN PERSONAL."""
-    
-    # === PERCEPCIÓN PERSONAL (25% si está presente) ===
-    # Este es el factor clave: cómo TE SIENTES realmente, puede sobreescribir métricas objetivas
-    if perceived_readiness is not None:
-        perceived_score = perceived_readiness / 10
-        perceived_component = 0.25 * perceived_score
-        # Reducimos el peso de otros componentes proporcionalmente
-        base_weight_multiplier = 0.75  # Los demás componentes suman 75%
-    else:
-        perceived_component = 0
-        base_weight_multiplier = 1.0  # Si no hay percepción, pesos originales
-    
-    # === RECUPERACIÓN (30% del score si hay percepción, 40% si no) ===
-    # Sueño base
-    sleep_hours_score = np.clip((sleep_hours - 6.0) / (7.5 - 6.0), 0, 1)
-    sleep_quality_score = (sleep_quality - 1) / 4
-    
-    # Bonus siesta (20-90 min suman)
-    nap_bonus = 0
-    if nap_mins == 20:
-        nap_bonus = 0.05
-    elif nap_mins == 45:
-        nap_bonus = 0.08
-    elif nap_mins == 90:
-        nap_bonus = 0.10
-    
-    # Penalización sueño fragmentado
-    disruption_penalty = 0.15 if sleep_disruptions else 0
-    
-    # Penalización alcohol (afecta recuperación)
-    alcohol_penalty = 0.20 if alcohol else 0
-    
-    sleep_component = base_weight_multiplier * (0.25 * sleep_hours_score + 0.15 * sleep_quality_score + nap_bonus 
-                      - disruption_penalty - alcohol_penalty)
-    
-    # === ESTADO (26% del score si hay percepción, 35% si no) ===
-    fatigue_score = 1 - (fatigue / 10)
-    stress_score = 1 - (stress / 10)
-    energy_score = energy / 10
-    soreness_score = 1 - (soreness / 10)
-    
-    # Rigidez penaliza movilidad (importante para sesiones técnicas)
-    stiffness_penalty = (stiffness / 10) * 0.10
-    
-    state_component = base_weight_multiplier * (0.12 * fatigue_score + 0.08 * stress_score + 
-                      0.10 * energy_score + 0.05 * soreness_score - stiffness_penalty)
-    
-    # === MOTIVACIÓN (11% del score si hay percepción, 15% si no) ===
-    motivation_score = motivation / 10
-    motivation_component = base_weight_multiplier * 0.15 * motivation_score
-    
-    # === PENALIZACIONES FLAGS ===
-    pain_penalty = 0.25 if pain_flag else 0
-    sick_penalty = 0.35 if sick_flag else 0  # Enfermo es muy grave
-    
-    # Cafeína: si es alta, puede estar enmascarando fatiga
-    caffeine_mask = 0
-    if caffeine >= 2 and fatigue >= 6:
-        caffeine_mask = 0.08  # "te sientes bien pero es cafeína"
-    
-    # === FÓRMULA FINAL ===
-    readiness_0_1 = (perceived_component + sleep_component + state_component + motivation_component 
-                    - pain_penalty - sick_penalty - caffeine_mask)
-    
-    readiness_0_1 = np.clip(readiness_0_1, 0, 1)
-    readiness_score = int(round(readiness_0_1 * 100))
-    
-    return readiness_score
-
-
-def generate_actionable_plan(readiness, pain_flag, pain_location, fatigue, soreness, session_goal="fuerza"):
-    """Genera un plan accionable basado en readiness y condiciones."""
-    
-    plan = []
-    rules = []
-    
-    if readiness >= 80:
-        zone = "Alta"
-        emoji = "🟢"
-        reco = "Push day"
-        intensity_rir = "RIR 1–2 (máximo 1–2 reps de reserva)"
-        volume_adjust = "+10% sets en lifts clave"
-    elif readiness >= 55:
-        zone = "Media"
-        emoji = "🟡"
-        reco = "Normal"
-        intensity_rir = "RIR 2–3 (técnica impecable)"
-        volume_adjust = "Mantén volumen, prioriza técnica"
-    else:
-        zone = "Muy baja"
-        emoji = "🔴"
-        reco = "Reduce / Deload"
-        intensity_rir = "RIR 3–5 (conservador)"
-        volume_adjust = "-20% sets, accesorio ligero"
-    
-    plan.append(f"**Recomendación:** {reco}")
-    plan.append(f"**Intensidad:** {intensity_rir}")
-    plan.append(f"**Volumen:** {volume_adjust}")
-    
-    # Reglas concretas
-    if readiness >= 80:
-        rules.append("✅ Busca PRs o máximos hoy")
-        rules.append("✅ Siente libertad de empujar en los 3 últimos sets")
-    elif readiness >= 55:
-        rules.append("⚖️ Mantén intensidad, cuida forma")
-        rules.append("⚖️ Si algo duele, sustituye el ejercicio")
-    else:
-        rules.append("⛔ Evita RIR≤1 hoy")
-        rules.append("⛔ Recorta 1–2 series por ejercicio")
-    
-    # Pain management
-    if pain_flag and pain_location:
-        rules.append(f"🩹 Dolor en {pain_location}: evita movimientos bruscos, sustituye si es necesario")
-    
-    # Fatiga management
-    if fatigue >= 7:
-        rules.append("😴 Fatiga alta: reduce volumen en 20%, alarga descansos")
-    
-    # Soreness management
-    if soreness >= 7:
-        rules.append("🤕 Agujetas: calentamiento largo, movimiento ligero, accesorios >12 reps")
-    
-    return f"{emoji} {zone}", plan, rules
-
-
 def save_mood_to_csv(date, sleep_hours, sleep_quality, fatigue, soreness, stress, motivation, pain_flag, pain_location, readiness):
     """Guarda los datos del "Modo Hoy" a un CSV de histórico (para persistencia manual)."""
     mood_data = {
@@ -373,470 +139,683 @@ def save_mood_to_csv(date, sleep_hours, sleep_quality, fatigue, soreness, stress
     return True
 
 
-def create_readiness_chart(data, title="Readiness"):
-    """Crea gráfica de readiness con estilo gaming y gradient."""
-    fig = go.Figure()
+def render_today_mode(df_daily):
+    """Renderiza el modo interactivo 'Modo Hoy' para calcular readiness al instante."""
+    render_section_title("Modo Hoy — Ready Check", accent="#00D084")
     
-    # Añadir zona de referencia (óptimo)
-    fig.add_hrect(y0=75, y1=100, fillcolor="rgba(0, 208, 132, 0.1)", line_width=0, annotation_text="Alta", annotation_position="right")
-    fig.add_hrect(y0=55, y1=75, fillcolor="rgba(255, 184, 28, 0.1)", line_width=0, annotation_text="Media", annotation_position="right")
-    fig.add_hrect(y0=0, y1=55, fillcolor="rgba(255, 68, 68, 0.1)", line_width=0, annotation_text="Baja", annotation_position="right")
+    # Initialize session state
+    if 'mood_calculated' not in st.session_state:
+        st.session_state.mood_calculated = False
     
-    # Línea principal con gradient
-    x_vals = pd.to_datetime(data.index)
-    fig.add_trace(go.Scatter(
-        x=x_vals,
-        y=data.values,
-        mode='lines+markers',
-        name='Readiness',
-        line=dict(color='#B266FF', width=3, shape='spline'),
-        marker=dict(size=8, color='#B266FF', line=dict(color='#FFFFFF', width=2)),
-        fill='tozeroy',
-        fillcolor='rgba(178, 102, 255, 0.2)',
-        hovertemplate='<b>%{x|%d/%m/%Y}</b><br>Readiness: %{y:.0f}/100<extra></extra>'
-    ))
+    # Create two columns: left for inputs, right for live feedback
+    col_input, col_feedback = st.columns([3, 2])
     
-    fig.update_layout(
-        title=dict(text=title, font=dict(size=16, color='#B266FF', family='Orbitron')),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#E0E0E0'),
-        xaxis=dict(showgrid=True, gridcolor='rgba(178, 102, 255, 0.1)', zeroline=False, tickformat='%d/%m/%Y'),
-        yaxis=dict(showgrid=True, gridcolor='rgba(178, 102, 255, 0.1)', zeroline=False, range=[0, 105]),
-        hovermode='x unified',
-        margin=dict(l=40, r=40, t=40, b=40),
-        height=300
-    )
-    
-    return fig
+    with col_input:
+        st.markdown('<div class="eyebrow" style="margin-bottom:12px;">📋 DATOS DE HOY</div>', unsafe_allow_html=True)
 
-
-def create_volume_chart(data, title="Volumen"):
-    """Crea gráfica de volumen con estilo gaming y gradient."""
-    fig = go.Figure()
-
-    x_vals = pd.to_datetime(data.index)
-    
-    fig.add_trace(go.Scatter(
-        x=x_vals,
-        y=data.values,
-        mode='lines',
-        name='Volumen',
-        line=dict(color='#00D084', width=0),
-        fill='tozeroy',
-        fillcolor='rgba(0, 208, 132, 0.3)',
-        hovertemplate='<b>%{x|%d/%m/%Y}</b><br>Volumen: %{y:,.0f} kg<extra></extra>'
-    ))
-    
-    # Añadir línea superior para efecto
-    fig.add_trace(go.Scatter(
-        x=x_vals,
-        y=data.values,
-        mode='lines+markers',
-        name='Volumen',
-        line=dict(color='#00D084', width=3, shape='spline'),
-        marker=dict(size=6, color='#00D084'),
-        showlegend=False,
-        hovertemplate='<b>%{x|%d/%m/%Y}</b><br>Volumen: %{y:,.0f} kg<extra></extra>'
-    ))
-    
-    fig.update_layout(
-        title=dict(text=title, font=dict(size=16, color='#00D084', family='Orbitron')),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#E0E0E0'),
-        xaxis=dict(showgrid=True, gridcolor='rgba(0, 208, 132, 0.1)', zeroline=False, tickformat='%d/%m/%Y'),
-        yaxis=dict(showgrid=True, gridcolor='rgba(0, 208, 132, 0.1)', zeroline=False),
-        hovermode='x unified',
-        margin=dict(l=40, r=40, t=40, b=40),
-        height=300
-    )
-    
-    return fig
-
-
-def create_sleep_chart(data, title="Sueño"):
-    """Crea gráfica de sueño con línea+área estilo gaming (igual que readiness)."""
-    fig = go.Figure()
-    
-    # Zona óptima de sueño
-    fig.add_hrect(y0=7, y1=9, fillcolor="rgba(0, 208, 132, 0.1)", line_width=0)
-    
-    colors = ['#FFB81C' if float(val) < 7 else '#00D084' for val in data.values]
-
-    x_vals = pd.to_datetime(data.index)
-    fig.add_trace(go.Scatter(
-        x=x_vals,
-        y=data.values,
-        mode='lines+markers',
-        name='Sueño',
-        line=dict(color='#4ECDC4', width=3, shape='spline'),
-        marker=dict(size=8, color=colors, line=dict(color='#FFFFFF', width=2)),
-        fill='tozeroy',
-        fillcolor='rgba(78, 205, 196, 0.18)',
-        hovertemplate='<b>%{x|%d/%m/%Y}</b><br>Sueño: %{y:.1f} h<extra></extra>'
-    ))
-    
-    fig.update_layout(
-        title=dict(text=title, font=dict(size=16, color='#4ECDC4', family='Orbitron')),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#E0E0E0'),
-        xaxis=dict(showgrid=True, gridcolor='rgba(78, 205, 196, 0.10)', zeroline=False, tickformat='%d/%m/%Y'),
-        yaxis=dict(showgrid=True, gridcolor='rgba(255, 184, 28, 0.1)', zeroline=False, range=[0, max(data.max() * 1.1, 10)]),
-        hovermode='x unified',
-        margin=dict(l=40, r=40, t=40, b=40),
-        height=300
-    )
-    
-    return fig
-
-
-def create_acwr_chart(data, title="ACWR (Carga)"):
-    """Crea gráfica de ACWR con zonas de riesgo."""
-    fig = go.Figure()
-    
-    # Zonas de ACWR
-    fig.add_hrect(y0=0.8, y1=1.3, fillcolor="rgba(0, 208, 132, 0.1)", line_width=0, annotation_text="Óptimo", annotation_position="right")
-    fig.add_hrect(y0=1.3, y1=1.5, fillcolor="rgba(255, 184, 28, 0.1)", line_width=0)
-    fig.add_hrect(y0=1.5, y1=2.5, fillcolor="rgba(255, 68, 68, 0.1)", line_width=0, annotation_text="Riesgo", annotation_position="right")
-    
-    # Línea óptima
-    fig.add_hline(y=1.0, line_dash="dash", line_color="rgba(255, 255, 255, 0.3)", annotation_text="1.0")
-    
-    x_vals = pd.to_datetime(data.index)
-    fig.add_trace(go.Scatter(
-        x=x_vals,
-        y=data.values,
-        mode='lines+markers',
-        name='ACWR',
-        line=dict(color='#FF6B6B', width=3, shape='spline'),
-        marker=dict(size=8, color='#FF6B6B', line=dict(color='#FFFFFF', width=2)),
-        hovertemplate='<b>%{x|%d/%m/%Y}</b><br>ACWR: %{y:.2f}<extra></extra>'
-    ))
-    
-    fig.update_layout(
-        title=dict(text=title, font=dict(size=16, color='#FF6B6B', family='Orbitron')),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#E0E0E0'),
-        xaxis=dict(showgrid=True, gridcolor='rgba(255, 107, 107, 0.1)', zeroline=False, tickformat='%d/%m/%Y'),
-        yaxis=dict(showgrid=True, gridcolor='rgba(255, 107, 107, 0.1)', zeroline=False, range=[0, max(data.max() * 1.2, 2.0) if data.max() > 0 else 2.0]),
-        hovermode='x unified',
-        margin=dict(l=40, r=40, t=40, b=40),
-        height=300
-    )
-    
-    return fig
-
-
-def create_performance_chart(data, title="Performance Index"):
-    """Crea gráfica de performance index con zona objetivo."""
-    fig = go.Figure()
-    
-    # Zona objetivo
-    fig.add_hrect(y0=0.99, y1=1.01, fillcolor="rgba(0, 208, 132, 0.1)", line_width=0)
-    
-    # Línea baseline
-    fig.add_hline(y=1.0, line_dash="dash", line_color="rgba(255, 255, 255, 0.3)", annotation_text="Baseline")
-    
-    fig.add_trace(go.Scatter(
-        x=data.index,
-        y=data.values,
-        mode='lines+markers',
-        name='Performance',
-        line=dict(color='#4ECDC4', width=3, shape='spline'),
-        marker=dict(size=8, color='#4ECDC4', line=dict(color='#FFFFFF', width=2)),
-        fill='tozeroy',
-        fillcolor='rgba(78, 205, 196, 0.2)',
-        hovertemplate='<b>%{x}</b><br>Performance: %{y:.3f}<extra></extra>'
-    ))
-    
-    fig.update_layout(
-        title=dict(text=title, font=dict(size=16, color='#4ECDC4', family='Orbitron')),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#E0E0E0'),
-        xaxis=dict(showgrid=True, gridcolor='rgba(78, 205, 196, 0.1)', zeroline=False),
-        yaxis=dict(showgrid=True, gridcolor='rgba(78, 205, 196, 0.1)', zeroline=False),
-        hovermode='x unified',
-        margin=dict(l=40, r=40, t=40, b=40),
-        height=300
-    )
-    
-    return fig
-
-
-def create_strain_chart(data, title="Strain"):
-    """Gráfica de strain con escala libre para valores altos."""
-    fig = go.Figure()
-    max_val = data.max() if len(data) > 0 else 0
-    y_max = max(max_val * 1.2, 1.0)
-    fig.add_trace(go.Scatter(
-        x=data.index,
-        y=data.values,
-        mode='lines+markers',
-        name='Strain',
-        line=dict(color='#FF6B6B', width=3, shape='spline'),
-        marker=dict(size=8, color='#FF6B6B', line=dict(color='#FFFFFF', width=2)),
-        fill='tozeroy',
-        fillcolor='rgba(255, 107, 107, 0.18)',
-        hovertemplate='<b>%{x}</b><br>Strain: %{y:,.0f}<extra></extra>'
-    ))
-    fig.update_layout(
-        title=dict(text=title, font=dict(size=16, color='#FF6B6B', family='Orbitron')),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#E0E0E0'),
-        xaxis=dict(showgrid=True, gridcolor='rgba(255, 107, 107, 0.12)', zeroline=False),
-        yaxis=dict(showgrid=True, gridcolor='rgba(255, 107, 107, 0.12)', zeroline=False, range=[0, y_max]),
-        hovermode='x unified',
-        margin=dict(l=40, r=40, t=40, b=40),
-        height=300
-    )
-    return fig
-
-
-def create_weekly_volume_chart(data, title="Volumen Semanal"):
-    """Bar chart semanal para ver claro un único punto o pocos puntos."""
-    fig = go.Figure()
-    x = [pd.to_datetime(d).strftime("%d/%m/%Y") for d in data.index]  # Spanish date format
-    fig.add_trace(go.Bar(
-        x=x,
-        y=data.values,
-        marker_color='#00D084',
-        marker_line=dict(color='#FFFFFF', width=1),
-        hovertemplate='<b>%{x}</b><br>Volumen: %{y:,.0f} kg<extra></extra>'
-    ))
-    fig.update_layout(
-        title=dict(text=title, font=dict(size=16, color='#00D084', family='Orbitron')),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#E0E0E0'),
-        xaxis=dict(type='category', showgrid=False),
-        yaxis=dict(showgrid=True, gridcolor='rgba(0, 208, 132, 0.12)', zeroline=False),
-        bargap=0.6,
-        hovermode='x unified',
-        margin=dict(l=40, r=40, t=40, b=40),
-        height=300
-    )
-    return fig
-
-
-def create_weekly_strain_chart(data, title="Strain"):
-    """Bar chart semanal para strain, útil con muestras cortas."""
-    fig = go.Figure()
-    x = [pd.to_datetime(d).strftime("%d/%m/%Y") for d in data.index]  # Spanish date format
-    fig.add_trace(go.Bar(
-        x=x,
-        y=data.values,
-        marker_color='#FF6B6B',
-        marker_line=dict(color='#FFFFFF', width=1),
-        hovertemplate='<b>%{x}</b><br>Strain: %{y:,.0f}<extra></extra>'
-    ))
-    fig.update_layout(
-        title=dict(text=title, font=dict(size=16, color='#FF6B6B', family='Orbitron')),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#E0E0E0'),
-        xaxis=dict(type='category', showgrid=False),
-        yaxis=dict(showgrid=True, gridcolor='rgba(255, 107, 107, 0.12)', zeroline=False),
-        bargap=0.6,
-        hovermode='x unified',
-        margin=dict(l=40, r=40, t=40, b=40),
-        height=300
-    )
-    return fig
-
-
-def render_section_title(text, accent="#B266FF"):
-    """Renderiza títulos de sección con el mismo look & feel de las gráficas."""
-    st.markdown(f"""
-    <div class="section-title" style="--accent: {accent};">
-        <div class="section-pill"></div>
-        <span>{text}</span>
-    </div>
-    """, unsafe_allow_html=True)
-
-
-def calculate_injury_risk_score_v2(
-    readiness_score, acwr, sleep_hours, performance_index, effort_level,
-    pain_flag=False, pain_severity=0, stiffness=0, sick_flag=False, 
-    last_hard=False, baselines=None, days_high_strain=0
-):
-    """Versión mejorada con pain_severity, stiffness, sick_flag."""
-    # calculate_injury_risk_score ya está importado al inicio del archivo
-    
-    # Usar función base
-    base_risk = calculate_injury_risk_score(
-        readiness_score, acwr, sleep_hours, performance_index, effort_level,
-        pain_flag, baselines, days_high_strain
-    )
-    
-    # Añadir factores nuevos
-    extra_score = 0
-    extra_factors = []
-    
-    # Pain severity (más severo = más riesgo)
-    if pain_severity >= 7:
-        extra_score += 15
-        extra_factors.append(f'Dolor severo ({pain_severity}/10)')
-    elif pain_severity >= 5:
-        extra_score += 8
-        extra_factors.append(f'Dolor moderado ({pain_severity}/10)')
-    
-    # Stiffness (rigidez alta = movilidad limitada)
-    if stiffness >= 7:
-        extra_score += 10
-        extra_factors.append(f'Rigidez articular alta ({stiffness}/10)')
-    
-    # Sick flag (enfermo = riesgo altísimo)
-    if sick_flag:
-        extra_score += 25
-        extra_factors.append('⚠️ Estado de enfermedad detectado')
-    
-    # Last hard session (fatiga acumulada)
-    if last_hard:
-        extra_score += 8
-        extra_factors.append('Último entreno muy exigente (48h)')
-    
-    # Combinar
-    new_score = min(base_risk['score'] + extra_score, 100)
-    
-    # Re-clasificar
-    if new_score >= 60:
-        level = 'high'
-        emoji = '🔴'
-        action = 'DELOAD OBLIGATORIO. Reduce volumen -30%, evita máximos.'
-    elif new_score >= 35:
-        level = 'medium'
-        emoji = '🟡'
-        action = 'Precaución. Entrena pero sin buscar máximos. Foco en técnica.'
-    else:
-        level = 'low'
-        emoji = '🟢'
-        action = 'Bajo riesgo. Puedes entrenar normal.'
-    
-    return {
-        'risk_level': level,
-        'score': new_score,
-        'emoji': emoji,
-        'factors': base_risk['factors'] + extra_factors,
-        'confidence': base_risk['confidence'],
-        'action': action
-    }
-
-
-def generate_actionable_plan_v2(
-    readiness, pain_flag, pain_zone, pain_severity, pain_type,
-    fatigue, soreness, stiffness, sick_flag, session_goal, fatigue_analysis
-):
-    """Versión mejorada: genera plan ultra-específico con pain_zone y fatigue_type."""
-    
-    plan = []
-    rules = []
-    zone_display = ""
-    
-    # Override si enfermo
-    if sick_flag:
-        zone_display = "ENFERMO - NO ENTRENAR"
-        plan.append("🤒 **Estado**: Enfermo detectado")
-        plan.append("⛔ **Recomendación**: DESCANSO TOTAL hasta recuperación")
-        plan.append("💊 Prioriza: hidratación, sueño, nutrición")
-        rules.append("❌ NO entrenar bajo ninguna circunstancia")
-        rules.append("❌ Evita ejercicio hasta estar 100% sano")
-        return zone_display, plan, rules
-    
-    # Clasificar readiness
-    if readiness >= 80:
-        zone_display = "🟢 ALTA"
-        reco = "Push day - busca PRs"
-        intensity_rir = "RIR 1–2"
-        volume_adjust = "+10% sets"
-    elif readiness >= 55:
-        zone_display = "🟡 MEDIA"
-        reco = "Normal - mantén técnica"
-        intensity_rir = "RIR 2–3"
-        volume_adjust = "Volumen estándar"
-    else:
-        zone_display = "🔴 BAJA"
-        reco = "Deload - reduce carga"
-        intensity_rir = "RIR 3–5"
-        volume_adjust = "-20% sets"
-    
-    plan.append(f"**Zona**: {zone_display}")
-    plan.append(f"**Recomendación base**: {reco}")
-    plan.append(f"**Intensidad**: {intensity_rir}")
-    plan.append(f"**Volumen**: {volume_adjust}")
-    
-    # Adaptar por tipo de fatiga
-    plan.append("")
-    plan.append(f"**Tipo de fatiga**: {fatigue_analysis['type'].upper()}")
-    plan.append(f"**Split recomendado**: {fatigue_analysis['target_split'].upper()}")
-    
-    # Dolor localizado - RECOMENDACIONES MUY ESPECÍFICAS
-    if pain_flag and pain_zone:
-        plan.append("")
-        plan.append(f"🩹 **Dolor detectado**: {pain_zone} ({pain_severity}/10, {pain_type})")
+        mode = st.radio("Modo", ["Rápido", "Preciso"], horizontal=True, key="input_mode")
         
-        # Mapear zona → ejercicios evitar/OK
-        avoid_movements = []
-        ok_movements = []
+        # === RECUPERACIÓN (SUEÑO) ===
+        with st.expander("💤 Sueño & Recuperación", expanded=True):
+            sleep_h = st.slider("Horas de sueño anoche", 4.0, 12.0, 7.5, 0.5, 
+                               help="Tiempo total de sueño", key="input_sleep_h")
+            sleep_q = st.select_slider("Calidad del sueño", options=[1,2,3,4,5], value=3,
+                                       format_func=lambda x: {1:"😴 Muy malo", 2:"😕 Malo", 3:"😐 Regular", 4:"🙂 Bueno", 5:"😊 Excelente"}[x],
+                                       key="input_sleep_q")
+            if mode == "Preciso":
+                nap_mins = st.selectbox("Siesta", [0, 20, 45, 90], index=0, help="Minutos de siesta", key="input_nap")
+                sleep_disruptions = st.checkbox("Sueño fragmentado (3+ despertares)", value=False, key="input_disruptions")
+            else:
+                nap_mins = 0
+                sleep_disruptions = False
         
-        if pain_zone in ["Hombro"]:
-            avoid_movements = ["Press banca", "Press militar", "Fondos", "Dominadas"]
-            ok_movements = ["Sentadilla", "Peso muerto", "Curl piernas", "Prensa"]
-        elif pain_zone in ["Codo", "Muñeca"]:
-            avoid_movements = ["Press banca agarre cerrado", "Curl", "Extensiones tríceps"]
-            ok_movements = ["Pierna completa", "Sentadilla", "Peso muerto (trap bar)"]
-        elif pain_zone in ["Espalda baja"]:
-            avoid_movements = ["Peso muerto convencional", "Buenos días", "Sentadilla baja"]
-            ok_movements = ["Prensa", "Extensiones cuádriceps", "Curl femoral", "Press banca"]
-        elif pain_zone in ["Rodilla"]:
-            avoid_movements = ["Sentadilla profunda", "Extensiones", "Saltos"]
-            ok_movements = ["Tren superior completo", "Curl femoral (con precaución)"]
-        elif pain_zone in ["Tobillo"]:
-            avoid_movements = ["Sentadilla", "Peso muerto", "Gemelos de pie"]
-            ok_movements = ["Tren superior", "Prensa (ángulo reducido)"]
+        # === ESTADO FÍSICO ===
+        with st.expander("💪 Estado Físico & Mental", expanded=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                perceived = st.slider("¿Cómo te sientes hoy? (0-10)", 0, 10, 7,
+                                    help="Tu intuición general sobre tu estado", key="input_perceived")
+                fatigue = st.slider("Fatiga/Cansancio (0-10)", 0, 10, 3, key="input_fatigue")
+                stress = st.slider("Estrés mental (0-10)", 0, 10, 3, key="input_stress")
+            
+            with col2:
+                if mode == "Preciso":
+                    soreness = st.slider("Agujetas/DOMS (0-10)", 0, 10, 2, key="input_soreness")
+                else:
+                    soreness = 2
+                motivation = st.slider("Motivación (0-10)", 0, 10, 7, key="input_motivation")
+                energy = st.slider("Nivel de energía (0-10)", 0, 10, 7, key="input_energy")
+
+        if mode == "Preciso":
+            col_adv1, col_adv2, col_adv3 = st.columns(3)
+            with col_adv1:
+                stiffness = st.slider("Rigidez articular", 0, 10, 2, help="Movilidad limitada", key="input_stiffness")
+            with col_adv2:
+                caffeine = st.selectbox("Cafeína (últimas 6h)", [0,1,2,3], index=0, key="input_caffeine")
+            with col_adv3:
+                alcohol = st.checkbox("Alcohol anoche", value=False, key="input_alcohol")
         else:
-            avoid_movements = ["Movimientos que generen dolor"]
-            ok_movements = ["Patrones opuestos a la zona afectada"]
+            stiffness = 2
+            caffeine = 0
+            alcohol = False
         
-        plan.append(f"❌ **Evita hoy**: {', '.join(avoid_movements)}")
-        plan.append(f"✅ **Puedes hacer**: {', '.join(ok_movements)}")
+        # === BANDERAS ROJAS ===
+        pain_flag = False
+        pain_location = ""
+        pain_zone = None
+        pain_severity = 0
+        pain_type = None
+        sick_flag = False
+        last_hard = False
+        session_goal = "fuerza"
+        time_available = 60
+
+        if mode == "Preciso":
+            with st.expander("⚠️ Alertas & Dolor", expanded=False):
+                pain_flag = st.checkbox("¿Tienes dolor/molestias hoy?", value=False, key="input_pain")
+                if pain_flag:
+                    zones = ["Hombro", "Codo", "Muñeca", "Espalda alta", "Espalda baja", "Cadera", "Rodilla", "Tobillo", "Otra"]
+                    pain_zone = st.selectbox("Zona", zones, index=6, key="input_pain_zone")
+                    pain_severity = st.slider("Severidad", 0, 10, 5, key="input_pain_sev")
+                    pain_type = st.selectbox("Tipo", ["Punzante", "Molestia", "Rigidez", "Ardor"], index=1, key="input_pain_type")
+                    pain_location = st.text_input("Detalle", value="", key="input_pain_loc")
+                sick_flag = st.checkbox("¿Te sientes enfermo/a? (resfriado, malestar...)", value=False, key="input_sick")
+                last_hard = st.checkbox("Último entreno muy exigente (48h)", value=False, key="input_last_hard")
+                session_goal = st.selectbox("Objetivo de hoy", ["fuerza","hipertrofia","técnica","cardio","descanso"], index=0, key="input_goal")
+                time_available = st.number_input("Minutos disponibles", min_value=0, max_value=180, value=60, step=5, key="input_time")
         
-        if pain_severity >= 7:
-            plan.append(f"⚠️ **Severidad alta**: considera fisio o valoración médica")
+        # === BOTÓN CALCULAR ===
+        st.markdown("<br>", unsafe_allow_html=True)
+        calculate_btn = st.button("🚀 CALCULAR MI READINESS", type="primary", use_container_width=True)
+        
+        if calculate_btn:
+            st.session_state.mood_calculated = True
+            st.session_state.mood_mode = mode
+            st.session_state.mood_sleep_h = sleep_h
+            st.session_state.mood_sleep_q = sleep_q
+            st.session_state.mood_perceived = perceived
+            st.session_state.mood_fatigue = fatigue
+            st.session_state.mood_stress = stress
+            st.session_state.mood_soreness = soreness
+            st.session_state.mood_motivation = motivation
+            st.session_state.mood_energy = energy
+            st.session_state.mood_pain_flag = pain_flag
+            st.session_state.mood_pain_location = pain_location
+            st.session_state.mood_sick_flag = sick_flag
+            st.session_state.mood_nap_mins = nap_mins
+            st.session_state.mood_sleep_disruptions = sleep_disruptions
+            st.session_state.mood_stiffness = stiffness
+            st.session_state.mood_caffeine = caffeine
+            st.session_state.mood_alcohol = alcohol
+            st.session_state.mood_pain_zone = pain_zone
+            st.session_state.mood_pain_severity = pain_severity
+            st.session_state.mood_pain_type = pain_type
+            st.session_state.mood_last_hard = last_hard
+            st.session_state.mood_session_goal = session_goal
+            st.session_state.mood_time_available = time_available
     
-    # Rigidez articular
-    if stiffness >= 7:
-        plan.append("")
-        plan.append(f"🦴 **Rigidez alta** ({stiffness}/10): añade +15 min calentamiento")
-        plan.append("🔥 Foam roll + movilidad dinámica obligatoria")
+    # === PANEL DE FEEDBACK EN VIVO ===
+    with col_feedback:
+        if st.session_state.get('mood_calculated', False):
+            # Retrieve values
+            sleep_h = st.session_state.mood_sleep_h
+            sleep_q = st.session_state.mood_sleep_q
+            perceived = st.session_state.mood_perceived
+            fatigue = st.session_state.mood_fatigue
+            stress = st.session_state.mood_stress
+            soreness = st.session_state.mood_soreness
+            motivation = st.session_state.mood_motivation
+            energy = st.session_state.mood_energy
+            pain_flag = st.session_state.mood_pain_flag
+            pain_location = st.session_state.mood_pain_location
+            sick_flag = st.session_state.mood_sick_flag
+            mode = st.session_state.get('mood_mode', 'Rápido')
+            nap_mins = st.session_state.get('mood_nap_mins', 0)
+            sleep_disruptions = st.session_state.get('mood_sleep_disruptions', False)
+            stiffness = st.session_state.get('mood_stiffness', 2)
+            caffeine = st.session_state.get('mood_caffeine', 0)
+            alcohol = st.session_state.get('mood_alcohol', False)
+            pain_zone = st.session_state.get('mood_pain_zone')
+            pain_severity = st.session_state.get('mood_pain_severity', 0)
+            pain_type = st.session_state.get('mood_pain_type')
+            last_hard = st.session_state.get('mood_last_hard', False)
+            session_goal = st.session_state.get('mood_session_goal', 'fuerza')
+            time_available = st.session_state.get('mood_time_available', 60)
+            
+            # Calculate readiness (base)
+            readiness_raw = calculate_readiness_from_inputs_v2(
+                sleep_h, sleep_q, fatigue, soreness, stress, motivation, pain_flag,
+                nap_mins=nap_mins, sleep_disruptions=sleep_disruptions, energy=energy, 
+                stiffness=stiffness, caffeine=caffeine, alcohol=alcohol, sick_flag=sick_flag,
+                perceived_readiness=perceived
+            )
+
+            # Personal adjustments only in precise mode
+            baselines = calculate_personal_baselines(df_daily) if mode == "Preciso" else {}
+            if mode == "Preciso":
+                adj_factors = calculate_personal_adjustment_factors(df_daily)
+                recovery_boost = (adj_factors.get('recovery_speed', 1.0) - 1.0) * 8
+                fatigue_penalty = (adj_factors.get('fatigue_sensitivity', 1.0) - 1.0) * 10
+                readiness = np.clip(readiness_raw + recovery_boost - fatigue_penalty, 0, 100)
+                readiness_context = contextualize_readiness(int(readiness), baselines) if baselines and '_data_quality' in baselines else None
+            else:
+                readiness = readiness_raw
+                readiness_context = None
+            
+            zone, emoji, color = get_readiness_zone(readiness)
+            
+            # Display readiness circle
+            circle_color = {"Alta": "#00D084", "Media": "#FFB81C", "Baja": "#FF6B6B"}.get(zone, "#9CA3AF")
+            context_html = f"<div style='color:#9CA3AF; font-size:0.9rem;'>Contexto personal: {readiness_context[0]}</div>" if readiness_context else ""
+
+            gauge_html = f"""
+<div class="hero" style="display:flex; flex-direction:column; align-items:center; text-align:center; padding:20px; gap:6px;">
+    <div class="eyebrow">READINESS SCORE</div>
+    <div style="position: relative; width: 130px; height: 130px; margin: 15px auto;">
+        <svg width="130" height="130" viewBox="0 0 130 130">
+            <circle cx="65" cy="65" r="55" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="10"/>
+            <circle cx="65" cy="65" r="55" fill="none" stroke="{circle_color}" stroke-width="10" stroke-dasharray="{readiness * 3.45} 345" stroke-linecap="round" transform="rotate(-90 65 65)"/>
+        </svg>
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center;">
+            <div style="font-size:2.8rem; font-weight:800; color:{circle_color};">{int(readiness)}</div>
+            <div style="font-size:0.75rem; color:#9CA3AF; margin-top:-5px;">/ 100</div>
+        </div>
+    </div>
+    <div style="font-size: 1.3rem; font-weight: 700; color: {circle_color}; margin-top:6px;">{emoji} ZONA {zone.upper()}</div>
+    <div class="sub" style="margin-top:2px;">Zona: <strong>{zone}</strong></div>
+    {context_html}
+</div>
+"""
+            st.markdown(gauge_html, unsafe_allow_html=True)
+            
+            # Generate plan
+            # Fatigue analysis solo en preciso
+            if mode == "Preciso":
+                fatigue_analysis = detect_fatigue_type(
+                    sleep_h, sleep_q, stress, fatigue, soreness, pain_flag, pain_location, baselines,
+                    readiness_instant=readiness
+                )
+                perf_vals = df_daily['performance_index'].dropna() if 'performance_index' in df_daily.columns else pd.Series()
+                last_perf = perf_vals.iloc[-1] if len(perf_vals) > 0 else 1.0
+                acwr_vals = df_daily['acwr_7_28'].dropna() if 'acwr_7_28' in df_daily.columns else pd.Series()
+                last_acwr = acwr_vals.iloc[-1] if len(acwr_vals) > 0 else 1.0
+                injury_risk = calculate_injury_risk_score_v2(
+                    readiness, last_acwr, sleep_h, last_perf,
+                    effort_level=max(stress, fatigue),
+                    pain_flag=pain_flag, pain_severity=pain_severity, stiffness=stiffness,
+                    sick_flag=sick_flag, last_hard=last_hard, baselines=baselines, days_high_strain=0
+                )
+                zone_display, plan, rules = generate_actionable_plan_v2(
+                    readiness, pain_flag, pain_zone, pain_severity, pain_type,
+                    fatigue, soreness, stiffness, sick_flag, session_goal, fatigue_analysis
+                )
+            else:
+                fatigue_analysis = None
+                injury_risk = None
+                zone_display, plan, rules = generate_actionable_plan(
+                    readiness, pain_flag, pain_location, fatigue, soreness
+                )
+
+            # Seleccionar nivel de detalle
+            plan_lines = plan if mode == "Preciso" else plan[:3]
+            rule_lines = rules if mode == "Preciso" else rules[:2]
+
+            # Tarjeta estilizada para el plan del día
+            def _clean_line(txt: str) -> str:
+                s = str(txt).strip()
+                # remove leading markdown bullets and common emoji markers
+                for prefix in ["- ", "• ", "🟢 ", "🟡 ", "🔴 ", "✅ ", "⚠️ ", "⛔ ", "🤒 ", "🩹 ", "🦴 ", "🔥 ", "💊 "]:
+                    if s.startswith(prefix):
+                        s = s[len(prefix):].strip()
+                s = s.replace("**", "")
+                return s
+
+            def _as_list(items):
+                if not items:
+                    return "<div style='color:#9CA3AF;'>Sin datos</div>"
+                rows = []
+                for itm in items:
+                    safe_txt = _clean_line(itm)
+                    if not safe_txt:
+                        continue
+                    rows.append(f"<div style='margin-bottom:6px;'>• {safe_txt}</div>")
+                return "".join(rows)
+
+            st.markdown("---")
+            render_section_title("Plan de Entrenamiento", accent="#FFB81C")
+            zone_color = {"Alta": "#00D084", "Media": "#FFB81C", "Baja": "#FF6B6B"}.get(zone, "#9CA3AF")
+
+            summary_html = ""
+            if mode == "Preciso":
+                summary_html = f"""
+<div style='margin-top:12px; padding:12px; border-radius:12px; background:linear-gradient(135deg, rgba(0,208,132,0.20), rgba(78,205,196,0.08)); border:1px solid rgba(0,208,132,0.35); box-shadow:0 8px 20px rgba(0,208,132,0.18);'>
+<div style='display:flex; flex-wrap:wrap; gap:10px;'>
+<span style='color:{zone_color}; font-weight:900; letter-spacing:0.05em;'>Zona: {zone_display}</span>
+<span style='color:#FFB81C; font-weight:800; text-transform:uppercase;'>Fatiga: {(fatigue_analysis.get('type','fresh')).upper() if fatigue_analysis else 'FRESH'}</span>
+<span style='color:#E5E7EB; font-weight:800; text-transform:uppercase;'>Split: {(fatigue_analysis.get('target_split','N/A')).upper() if fatigue_analysis else 'N/A'}</span>
+<span style='color:#9CA3AF; font-weight:700;'>Intensidad: {fatigue_analysis.get('intensity_hint','RIR 2–3') if fatigue_analysis else 'RIR 2–3'}</span>
+</div>
+</div>
+"""
+
+            plan_html = f"""
+<div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 18px; box-shadow: 0 8px 24px rgba(0,0,0,0.25);">
+<div class="eyebrow" style="color: #FFB81C; margin-bottom: 10px;">PLAN DE HOY ({mode.upper()})</div>
+{summary_html}
+<div style="margin-top: 12px; color: #E5E7EB; line-height: 1.6;">{_as_list(plan_lines)}</div>
+<div style="margin-top: 12px; color: #9CA3AF; font-weight: 700;">Reglas clave</div>
+<div style="margin-top: 6px; color: #CBD5E1; line-height: 1.6;">{_as_list(rule_lines)}</div>
+</div>
+"""
+
+            st.markdown(plan_html, unsafe_allow_html=True)
+
+            if mode == "Preciso" and injury_risk is not None:
+                risk_color = {"low": "#00D084", "medium": "#FFB81C", "high": "#FF6B6B"}.get(injury_risk['risk_level'], "#9CA3AF")
+                factors_html = "".join([f"<div>• {_clean_line(f)}</div>" for f in injury_risk.get('factors', [])])
+                render_section_title("Riesgo de Lesión", accent="#FF6B6B")
+                st.markdown(f"""
+                <div class="hero" style="border-left: 4px solid {risk_color};">
+                    <div style="display:flex; align-items:center; gap:16px;">
+                        <div style="width:60px; height:60px; border-radius:50%; background:{risk_color}; opacity:0.85;"></div>
+                        <div>
+                            <div class="eyebrow">NIVEL DE RIESGO</div>
+                            <h2 style="color:{risk_color}; margin:4px 0; text-transform:uppercase;">{injury_risk['risk_level']}</h2>
+                            <div class="sub">Score: {injury_risk['score']:.0f}/100 • {injury_risk['confidence']}</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:12px; color:#E5E7EB;">{_clean_line(injury_risk['action'])}</div>
+                    <div style="margin-top:8px; color:#9CA3AF; font-size:0.9rem;">{factors_html}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            if mode == "Preciso" and fatigue_analysis is not None:
+                render_section_title("Análisis de Fatiga", accent="#4ECDC4")
+                st.markdown(f"""
+                <div class="hero">
+                    <div class="eyebrow">TIPO DE FATIGA DETECTADA</div>
+                    <h2 style="color:#4ECDC4; margin:4px 0;">{fatigue_analysis.get('type','').upper()}</h2>
+                    <div class="sub">{_clean_line(fatigue_analysis.get('reason',''))}</div>
+                    <div style="margin-top:10px; color:#FFB81C; font-weight:600;">Split recomendado: {fatigue_analysis.get('target_split','').upper()}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Reset button
+            if st.button("🔄 Nueva Evaluación", use_container_width=True):
+                st.session_state.mood_calculated = False
+                st.rerun()
+        else:
+            st.info("👈 Completa los datos en el panel izquierdo y presiona el botón para calcular tu readiness.")
+
+
+def render_day_view(df_filtered, selected_date, user_profile, daily_ex_path):
+    """Renderiza la vista diaria completa con métricas, gráficas y recomendaciones."""
+    try:
+        selected_date_label = pd.to_datetime(selected_date).strftime('%d/%m/%Y')
+    except Exception:
+        selected_date_label = selected_date
+    render_section_title(f"Panel Diario — {selected_date_label}", accent="#B266FF")
     
-    # === REGLAS BASE (siempre visibles) ===
-    rules.append("✅ Calienta progresivamente (5-10 min mínimo)")
-    rules.append("✅ Respeta RIR indicado, no lo fuerces")
-    rules.append("✅ Hidratación constante durante sesión")
+    if selected_date is None:
+        st.info("No hay datos para mostrar.")
+        return
+        
+    row = df_filtered[df_filtered['date'] == selected_date]
+    if row.empty:
+        st.warning(f"No hay datos para {selected_date_label}")
+        return
     
-    # Reglas específicas según condiciones
-    if pain_flag and pain_severity >= 5:
-        rules.append(f"❌ STOP inmediato si dolor {pain_zone} empeora durante ejercicio")
-        rules.append("✅ Movilidad suave post-sesión (15 min)")
+    row = row.iloc[0]
+    readiness = row['readiness_score']
+    zona, emoji, color = get_readiness_zone(readiness)
+    days_available = get_days_until_acwr(df_filtered, selected_date)
+    conf_text, conf_icon = get_confidence_level(df_filtered, selected_date)
     
-    if fatigue >= 8:
-        rules.append("⚠️ Fatiga muy alta: reduce volumen -30% mínimo")
-        rules.append("⚠️ Si empiezas a notar mareo/náusea, termina sesión")
+    anti_fatigue = get_anti_fatigue_flag(df_filtered, selected_date)
     
-    if stiffness >= 7:
-        rules.append("🧊 Considera terapia de frío/calor pre-sesión")
-        rules.append("⚠️ No fuerces ROM (rango de movimiento) limitado")
+    # Hero card con métricas
+    col_hero_left, col_hero_right = st.columns([2, 1])
+    with col_hero_left:
+        anti_fatigue_badge = '<div class="badge coral">⚠️ Anti-Fatigue</div>' if anti_fatigue else ''
+        st.markdown(f"""
+        <div class="hero">
+            <div>
+                <div class="eyebrow">Readiness Score</div>
+                <h1 style="margin: 4px 0;">{emoji} {int(readiness)}/100</h1>
+                <div class="sub">Zona: <strong>{zona}</strong></div>
+            </div>
+            <div class="badge-row">
+                <div class="badge purple">{conf_icon} {conf_text}</div>
+                {anti_fatigue_badge}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
     
-    if readiness < 55:
-        rules.append("⚠️ Prioriza técnica sobre carga hoy")
-        rules.append("✅ Reduce tempo (más lento = menos estrés CNS)")
+    with col_hero_right:
+        acwr = row['acwr_7_28']
+        acwr_display = format_acwr_display(acwr, days_available)
+        perf_index = row.get('performance_index', None)
+        perf_display = f"{perf_index:.3f}" if pd.notna(perf_index) else "—"
+        
+        st.markdown(f"""
+        <div style="background: rgba(255,255,255,0.04); padding: 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="color: #9CA3AF; font-size: 0.9em;">ACWR</span>
+                <span style="color: #FFB81C; font-weight: 700;">{acwr_display}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: #9CA3AF; font-size: 0.9em;">Performance</span>
+                <span style="color: #4ECDC4; font-weight: 700;">{perf_display}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
     
-    return zone_display, plan, rules
+    # Desglose de métricas
+    render_section_title("Desglose", accent="#FFB81C")
+    c1, c2, c3, c4 = st.columns(4)
+    sleep_hours = row.get('sleep_hours', None)
+    c1.metric("💤 Sueño (h)", f"{sleep_hours:.1f}" if pd.notna(sleep_hours) else "—")
+    sleep_quality = row.get('sleep_quality', None)
+    c2.metric("🎯 Calidad sueño", f"{int(sleep_quality)}/5" if pd.notna(sleep_quality) else "—")
+    fatigue = row.get('fatigue', None)
+    c3.metric("😴 Fatiga", f"{int(fatigue)}/10" if pd.notna(fatigue) else "—")
+    soreness = row.get('soreness', None)
+    c4.metric("🤕 Soreness", f"{int(soreness)}/10" if pd.notna(soreness) else "—")
+    
+    c5, c6, c7, c8 = st.columns(4)
+    stress = row.get('stress', None)
+    c5.metric("😰 Estrés", f"{int(stress)}/10" if pd.notna(stress) else "—")
+    motivation = row.get('motivation', None)
+    c6.metric("🔥 Motivación", f"{int(motivation)}/10" if pd.notna(motivation) else "—")
+    effort = row.get('effort_level', None)
+    c7.metric("💪 Esfuerzo", f"{int(effort)}/10" if pd.notna(effort) else "—")
+    pain = "Sí" if row.get('pain_flag', False) else "No"
+    c8.metric("⚠️ Dolor", pain)
+    
+    # Razones readiness
+    reasons = row.get('reason_codes', '')
+    if pd.notna(reasons) and reasons != '':
+        from data.formatters import format_reason_codes
+        reason_list = format_reason_codes(reasons)
+        if reason_list:
+            st.info("**Razones de readiness baja:** " + " • ".join(reason_list))
+    
+    # Injury Risk
+    render_section_title("🩹 Riesgo de Lesión", accent="#FF6B6B")
+    baselines = calculate_personal_baselines(df_filtered)
+    pain_flag = row.get('pain_flag', False)
+    days_high = 0  # placeholder
+    
+    sleep_hours = row.get('sleep_hours', None)
+    injury_risk = calculate_injury_risk_score(
+        readiness, acwr if pd.notna(acwr) else 1.0,
+        sleep_hours if pd.notna(sleep_hours) else 7.0, 
+        perf_index if pd.notna(perf_index) else 1.0,
+        effort if pd.notna(effort) else 5,
+        pain_flag, baselines, days_high
+    )
+    
+    col_risk1, col_risk2 = st.columns([1, 2])
+    with col_risk1:
+        risk_color_map = {'low': '#00D084', 'medium': '#FFB81C', 'high': '#FF6B6B'}
+        risk_color = risk_color_map.get(injury_risk['risk_level'], '#9CA3AF')
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, rgba(255,107,107,0.12), rgba(0,0,0,0.05)); padding: 18px; border-radius: 10px; border: 1px solid rgba(255,107,107,0.25); text-align: center;">
+            <div style="font-size: 3em; margin-bottom: 8px;">{injury_risk['emoji']}</div>
+            <div style="color: {risk_color}; font-weight: 700; font-size: 1.3em; text-transform: uppercase; letter-spacing: 0.05em;">{injury_risk['risk_level'].upper()}</div>
+            <div style="color: #9CA3AF; margin-top: 6px;">Score: {injury_risk['score']}/100</div>
+            <div style="color: #9CA3AF; font-size: 0.85em; margin-top: 4px;">{injury_risk['confidence']}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_risk2:
+        st.markdown(f"**Acción recomendada:** {injury_risk['action']}")
+        if injury_risk['factors']:
+            st.markdown("**Factores de riesgo detectados:**")
+            for factor in injury_risk['factors']:
+                st.markdown(f"- {factor}")
+    
+    # Plan accionable
+    render_section_title("📋 Plan de Entrenamiento", accent="#00D084")
+    
+    pain_location = row.get('pain_location', None) if pain_flag else None
+    fatigue = row.get('fatigue', 5)  # Default moderado
+    soreness = row.get('soreness', 3)  # Default bajo
+    zone_display, plan, rules = generate_actionable_plan(
+        readiness, pain_flag, pain_location,
+        fatigue if pd.notna(fatigue) else 5,
+        soreness if pd.notna(soreness) else 3
+    )
+    
+    col_plan1, col_plan2 = st.columns([1, 1])
+    with col_plan1:
+        st.markdown("### 🎯 Recomendación")
+        for line in plan:
+            st.markdown(line)
+    
+    with col_plan2:
+        st.markdown("### ⚖️ Reglas de Hoy")
+        for rule in rules:
+            st.markdown(f"- {rule}")
+    
+    # Lifts del día
+    if daily_ex_path:
+        df_lifts = load_daily_exercise_for_date(daily_ex_path, selected_date)
+        if not df_lifts.empty:
+            render_section_title("🏋️ Levantamientos del Día", accent="#B266FF")
+            recs = get_lift_recommendations(df_lifts, readiness, zona)
+            if recs:
+                for rec in recs:
+                    st.markdown(rec)
+            
+            with st.expander("📊 Ver detalle de lifts"):
+                # Verificar qué columnas existen
+                available_cols = []
+                for col in ['exercise', 'sets', 'reps', 'weight', 'volume']:
+                    if col in df_lifts.columns:
+                        available_cols.append(col)
+                
+                if available_cols:
+                    st.dataframe(df_lifts[available_cols], use_container_width=True)
+                else:
+                    st.dataframe(df_lifts, use_container_width=True)
+    
+    # Gráficas de tendencias
+    render_section_title("📈 Tendencias (últimos 7 días)", accent="#4ECDC4")
+    
+    chart_data = df_filtered[df_filtered['date'] <= selected_date].tail(7).copy()
+    if not chart_data.empty:
+        col_chart1, col_chart2 = st.columns(2)
+        with col_chart1:
+            readiness_chart = chart_data.set_index('date')['readiness_score']
+            fig = create_readiness_chart(readiness_chart, "Readiness")
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col_chart2:
+            sleep_chart = chart_data.set_index('date')['sleep_hours']
+            fig = create_sleep_chart(sleep_chart, "Sueño")
+            st.plotly_chart(fig, use_container_width=True)
+        
+        col_chart3, col_chart4 = st.columns(2)
+        with col_chart3:
+            if 'volume_total' in chart_data.columns:
+                volume_chart = chart_data.set_index('date')['volume_total']
+                fig = create_volume_chart(volume_chart, "Volumen")
+                st.plotly_chart(fig, use_container_width=True)
+        
+        with col_chart4:
+            acwr_chart = chart_data.set_index('date')['acwr_7_28']
+            fig = create_acwr_chart(acwr_chart, "ACWR (Carga)")
+            st.plotly_chart(fig, use_container_width=True)
+
+
+def render_week_view(df_filtered, df_weekly, user_profile):
+    """Renderiza la vista semanal con métricas macro y planificación."""
+    render_section_title("Semana — Macro", accent="#4ECDC4")
+    
+    if df_weekly is None:
+        st.info("No hay datos semanales disponibles.")
+        return
+        
+    df_weekly['week_start'] = pd.to_datetime(df_weekly['week_start']).dt.date
+    max_week = df_weekly['week_start'].max()
+    start_week = max_week - datetime.timedelta(weeks=12)
+    df_weekly_filtered = df_weekly[df_weekly['week_start'] >= start_week].copy()
+    
+    if df_weekly_filtered.empty:
+        st.info("No hay datos semanales disponibles.")
+        return
+    
+    df_weekly_display = df_weekly_filtered.sort_values('week_start', ascending=False).copy()
+    
+    if 'readiness_score' in df_filtered.columns:
+        readiness_by_week = df_filtered.groupby(pd.to_datetime(df_filtered['date']).dt.to_period('W').dt.start_time)['readiness_score'].mean().reset_index()
+        readiness_by_week.columns = ['week_start', 'avg_readiness']
+        readiness_by_week['week_start'] = readiness_by_week['week_start'].dt.date
+        df_weekly_display = df_weekly_display.merge(readiness_by_week, on='week_start', how='left')
+    
+    # Verificar qué columnas existen
+    available_cols = ['week_start']
+    optional_cols = ['volume_total', 'sets_total', 'strain', 'acwr_7_28', 'avg_readiness']
+    for col in optional_cols:
+        if col in df_weekly_display.columns:
+            available_cols.append(col)
+    
+    if len(available_cols) > 1:
+        st.dataframe(df_weekly_display[available_cols].head(12), use_container_width=True)
+    else:
+        st.warning("No hay suficientes columnas disponibles en los datos semanales.")
+    
+    render_section_title("📊 Tendencias Semanales", accent="#FFB81C")
+    col_w1, col_w2 = st.columns(2)
+    
+    with col_w1:
+        if 'volume_total' in df_weekly_display.columns:
+            weekly_volume = df_weekly_display.set_index('week_start')['volume_total'].tail(12)
+            fig = create_weekly_volume_chart(weekly_volume, "Volumen Semanal")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Columna 'volume_total' no disponible")
+    
+    with col_w2:
+        if 'strain' in df_weekly_display.columns:
+            weekly_strain = df_weekly_display.set_index('week_start')['strain'].tail(12)
+            fig = create_weekly_strain_chart(weekly_strain, "Strain Semanal")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Columna 'strain' no disponible")
+    
+    render_section_title("🧠 Personalización & Insights", accent="#B266FF")
+    
+    archetype = user_profile.get('archetype', {}).get('archetype', 'unknown')
+    confidence = user_profile.get('archetype', {}).get('confidence', 0)
+    
+    col_p1, col_p2 = st.columns([1, 2])
+    with col_p1:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, rgba(178,102,255,0.15), rgba(0,0,0,0.05)); padding: 16px; border-radius: 10px; border: 1px solid rgba(178,102,255,0.3); text-align: center;">
+            <div style="font-size: 2.5em; margin-bottom: 8px;">🧬</div>
+            <div style="color: #B266FF; font-weight: 700; font-size: 1.2em; text-transform: uppercase;">{archetype}</div>
+            <div style="color: #9CA3AF; margin-top: 6px;">Confianza: {confidence:.0%}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_p2:
+        insights = user_profile.get('insights', [])
+        if insights:
+            st.markdown("**Insights personalizados:**")
+            for insight in insights[:5]:
+                st.markdown(f"- {insight}")
+        else:
+            st.info("No hay insights suficientes aún. Más datos = mejor personalización.")
+    
+    render_section_title("🔮 Análisis de Fatiga & Planificación", accent="#4ECDC4")
+    
+    baselines = calculate_personal_baselines(df_filtered)
+    latest_row = df_filtered.iloc[-1] if not df_filtered.empty else None
+    
+    if latest_row is not None:
+        fatigue_analysis = detect_fatigue_type(
+            latest_row['readiness_score'],
+            latest_row['sleep_hours'],
+            latest_row.get('performance_index', 1.0),
+            latest_row['fatigue'],
+            latest_row['motivation'],
+            baselines
+        )
+        
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            st.markdown(f"""
+            **Tipo de fatiga:** {fatigue_analysis['type'].upper()}  
+            **Confianza:** {fatigue_analysis['confidence']}  
+            **Severidad:** {fatigue_analysis['severity']}
+            """)
+        
+        with col_f2:
+            st.markdown("**Indicadores detectados:**")
+            for indicator in fatigue_analysis['indicators']:
+                st.markdown(f"- {indicator}")
+        
+        st.markdown("**Split recomendado:**")
+        split = fatigue_analysis['target_split'].upper()
+        split_emoji = {"UPPER": "💪", "LOWER": "🦵", "REST": "😴", "LIGHT": "🚶"}.get(split, "🏋️")
+        st.markdown(f"{split_emoji} **{split}** — {fatigue_analysis['reasoning']}")
+        
+        weekly_plan = suggest_weekly_sequence(df_filtered, baselines)
+        if weekly_plan:
+            render_section_title("📅 Plan Semanal Sugerido", accent="#00D084")
+            st.markdown("**Secuencia óptima para los próximos 7 días:**")
+            for day_plan in weekly_plan:
+                day_num = day_plan.get('day', '?')
+                split_type = day_plan.get('split', 'rest').upper()
+                intensity = day_plan.get('intensity', 'moderate')
+                reason = day_plan.get('reason', '')
+                
+                day_emoji = {"UPPER": "💪", "LOWER": "🦵", "FULL": "🏋️", "REST": "😴", "LIGHT": "🚶"}.get(split_type, "🏋️")
+                st.markdown(f"**Día {day_num}:** {day_emoji} {split_type} ({intensity}) — {reason}")
+    
+    render_section_title("📚 Contexto & Educación", accent="#FFB81C")
+    
+    with st.expander("ℹ️ ¿Qué es ACWR?"):
+        st.markdown("""
+**ACWR (Acute:Chronic Workload Ratio)** compara tu carga de trabajo reciente (7 días) con tu carga crónica (28 días).
+
+- **ACWR < 0.8:** Subcarga → riesgo de pérdida de forma.
+- **ACWR 0.8–1.3:** Zona óptima → progreso seguro.
+- **ACWR > 1.3:** Sobrecarga → riesgo de lesión.
+
+**Cómo usarlo:** Si tu ACWR está >1.5, considera reducir volumen 10-20% esta semana.
+        """)
+    
+    with st.expander("🧬 ¿Qué son los arquetipos?"):
+        st.markdown("""
+El sistema analiza tus patrones de recuperación y los clasifica en arquetipos:
+
+- **Sleep Responsive:** Te recuperas principalmente con sueño de calidad.
+- **High Capacity:** Toleras mucho volumen sin fatiga excesiva.
+- **Fragile:** Necesitas más días de recuperación entre sesiones intensas.
+- **Balanced:** Respondes de forma estándar a todos los factores.
+
+**Beneficio:** El dashboard ajusta las recomendaciones según tu arquetipo detectado.
+        """)
+    
+    with st.expander("⚠️ Errores comunes en gestión de carga"):
+        st.markdown("""
+**1. Ignorar el readiness score:**  
+Entrenar duro con readiness <50 aumenta el riesgo de lesión 3-4x.
+
+**2. No respetar descargas:**  
+Semanas de descarga (40-60% volumen) cada 3-4 semanas son esenciales.
+
+**3. Subir volumen >10% por semana:**  
+El cuerpo necesita adaptarse gradualmente. Incrementos bruscos = lesión.
+
+**Errores comunes:** Ignorar descargas → acumulación innecesaria de fatiga.
+        """)
+    
+    st.markdown("---")
+    st.caption("🔄 La app muestra datos ya procesados. Ejecuta el pipeline para recalcular.")
 
 
 def main():
@@ -1381,1266 +1360,26 @@ def main():
     today = datetime.date.today()
     default_date = today if today in dates_filtered else (dates_filtered[0] if dates_filtered else None)
     
-    if view_mode == "📅 Día":
+    if view_mode == "Día":
         selected_date = st.sidebar.selectbox("Selecciona fecha", options=dates_filtered, 
                                             index=dates_filtered.index(default_date) if default_date in dates_filtered else 0) if dates_filtered else None
     else:
         selected_date = default_date
 
-    # ============== DAY VIEW ==============
-    if view_mode == "📅 Día":
-        try:
-            selected_date_label = pd.to_datetime(selected_date).strftime('%d/%m/%Y')
-        except Exception:
-            selected_date_label = selected_date
-        render_section_title(f"Panel Diario — {selected_date_label}", accent="#B266FF")
-        
-        if selected_date is None:
-            st.info("No hay datos para mostrar.")
-        else:
-            row = df_filtered[df_filtered['date'] == selected_date]
-            if row.empty:
-                st.info("No hay datos para la fecha seleccionada.")
-            else:
-                r = row.iloc[0]
-                readiness = r.get('readiness_score', None)
-                zone, emoji, color = get_readiness_zone(readiness)
-                
-                # ALERTS
-                alerts = []
-                if get_anti_fatigue_flag(df_daily, selected_date):
-                    alerts.append("⚠️ **Consecutivos de alta exigencia**: considera descanso parcial hoy")
-                if pd.notna(r.get('sleep_hours', None)) and r['sleep_hours'] < 6.5:
-                    alerts.append("😴 **Sueño bajo**: reduce volumen hoy")
-                if pd.notna(r.get('acwr_7_28', None)) and r['acwr_7_28'] > 1.5:
-                    alerts.append("📈 **Carga aguda muy alta**: evita máximos hoy")
-                
-                for alert in alerts:
-                    st.warning(alert)
-                
-                # READINESS WITH ZONE
-                col1, col2, col3, col4 = st.columns([1.5, 1.2, 1.2, 1.2])
-                
-                with col1:
-                    readiness_text = f"{emoji} {int(readiness) if pd.notna(readiness) else 'N/D'}/100"
-                    st.markdown(f"### {readiness_text}")
-                    st.markdown(f"*{zone}*")
-                
-                perf = r.get('performance_index', None)
-                acwr = r.get('acwr_7_28', None)
-                sleep_h = r.get('sleep_hours', None)
-                
-                with col2:
-                    st.metric("Performance", f"{round(perf, 3)}" if pd.notna(perf) else "—")
-                with col3:
-                    days_avail = get_days_until_acwr(df_daily, selected_date)
-                    acwr_display = format_acwr_display(acwr, days_avail)
-                    st.metric("ACWR", acwr_display)
-                with col4:
-                    st.metric("Sueño", f"{round(sleep_h, 1)}h" if pd.notna(sleep_h) else "—")
-                
-                # CONFIDENCE PANEL
-                conf_text, conf_emoji = get_confidence_level(df_daily, selected_date)
-                st.info(f"{conf_emoji} **Confianza del modelo:** {conf_text}")
-                
-                # RECOMMENDATION
-                render_section_title("Recomendación", accent="#FFB81C")
-                reco = r.get('recommendation', 'N/D')
-                action = r.get('action_intensity', 'N/D')
-                st.markdown(f"### {reco} — {action}")
-                
-                # REASON CODES AS BULLETS
-                reason_codes = r.get('reason_codes', '')
-                reasons = format_reason_codes(reason_codes)
-                if reasons:
-                    st.write("**Por qué:**")
-                    for reason in reasons:
-                        st.write(f"• {reason}")
-                
-                explanation = r.get('explanation', '')
-                if explanation and explanation != '':
-                    st.write(f"**Detalles:** {explanation}")
-                
-                # LIFT RECOMMENDATIONS
-                if df_exercises is not None:
-                    df_lifts = load_daily_exercise_for_date(daily_ex_path, selected_date)
-                    if not df_lifts.empty:
-                        render_section_title("Qué hacer hoy", accent="#00D084")
-                        st.write("**Lifts clave - plan accionable:**")
-                        lift_recs = get_lift_recommendations(df_lifts, readiness, zone)
-                        for rec in lift_recs:
-                            st.markdown(rec)
-                        
-                        # Expander con explicación
-                        with st.expander("Cómo interpretar estas recomendaciones"):
-                            st.write("""
-- **Intensidad**: porcentaje de carga o reps en reserva (RIR)
-- **Volumen**: sets totales en el lift principal
-- **RIR**: repeticiones que podrías hacer más (RIR2 = 2 reps más hasta fallo)
+    # === CARGAR PERFIL PERSONALIZADO ===
+    user_profile = load_user_profile()
 
-**Zona Alta (Readiness ≥75)**: tu cuerpo está listo, busca progreso
-**Zona Media (55–74)**: mantén técnica impecable, evita máximos
-**Zona Muy Baja (<55)**: técnica y movimiento, descarga obligatoria
-                            """)
-
-
-    # ============== MODE TODAY (INSTANT) ==============
+    # ============== ROUTING TO VIEWS ==============
+    if view_mode == "Día":
+        render_day_view(df_filtered, selected_date, user_profile, daily_ex_path if daily_ex_path.exists() else None)
+    
+    elif view_mode == "Semana":
+        render_week_view(df_filtered, df_weekly, user_profile)
+    
     elif view_mode == "Modo Hoy":
-        # === GAMING-DARK THEME + CUSTOM COMPONENTS ===
-        st.markdown(
-            """
-            <style>
-            /* Gaming-dark theme */
-            .stApp {
-                background: linear-gradient(135deg, #0a0e27 0%, #1a1a2e 100%);
-            }
-            
-            /* Mode Toggle */
-            .mode-toggle-container {
-                background: rgba(178, 102, 255, 0.08);
-                border-radius: 16px;
-                padding: 8px;
-                margin: 20px 0;
-                border: 2px solid rgba(178, 102, 255, 0.3);
-                box-shadow: 0 0 20px rgba(178, 102, 255, 0.15);
-            }
-            
-            /* Section cards */
-            .input-section {
-                background: rgba(255, 255, 255, 0.03);
-                border-radius: 12px;
-                padding: 20px;
-                margin: 16px 0;
-                border-left: 4px solid;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-                transition: all 0.3s ease;
-            }
-            .input-section:hover {
-                box-shadow: 0 6px 30px rgba(0, 0, 0, 0.4);
-                transform: translateY(-2px);
-            }
-            .section-recovery { border-left-color: #00D084; }
-            .section-state { border-left-color: #B266FF; }
-            .section-flags { border-left-color: #FF6B6B; }
-            
-            /* Section titles */
-            .section-header {
-                font-size: 1.3rem;
-                font-weight: 700;
-                margin-bottom: 12px;
-                letter-spacing: 0.5px;
-            }
-            .section-recovery .section-header { color: #00D084; }
-            .section-state .section-header { color: #B266FF; }
-            .section-flags .section-header { color: #FF6B6B; }
-            
-            /* Live feedback panel */
-            .live-feedback {
-                position: sticky;
-                top: 20px;
-                background: linear-gradient(135deg, rgba(0, 208, 132, 0.1) 0%, rgba(78, 205, 196, 0.1) 100%);
-                border: 2px solid rgba(0, 208, 132, 0.3);
-                border-radius: 16px;
-                padding: 20px;
-                margin: 20px 0;
-                box-shadow: 0 8px 32px rgba(0, 208, 132, 0.2);
-            }
-            
-            /* Readiness circle */
-            .readiness-circle {
-                width: 120px;
-                height: 120px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin: 0 auto 16px;
-                font-size: 2.5rem;
-                font-weight: 800;
-                background: conic-gradient(from 0deg, #00D084 var(--progress), rgba(0, 208, 132, 0.1) var(--progress));
-                box-shadow: 0 0 30px rgba(0, 208, 132, 0.4);
-                animation: pulse-glow 2s ease-in-out infinite;
-            }
-            @keyframes pulse-glow {
-                0%, 100% { box-shadow: 0 0 30px rgba(0, 208, 132, 0.4); }
-                50% { box-shadow: 0 0 50px rgba(0, 208, 132, 0.6); }
-            }
-            
-            /* Action button */
-            .action-button {
-                background: linear-gradient(90deg, #00D084 0%, #4ECDC4 100%);
-                color: #0b0b0b;
-                font-weight: 800;
-                font-size: 1.2rem;
-                padding: 18px 32px;
-                border-radius: 12px;
-                border: none;
-                width: 100%;
-                cursor: pointer;
-                box-shadow: 0 6px 20px rgba(0, 208, 132, 0.4);
-                transition: all 0.3s ease;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-            }
-            .action-button:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 8px 30px rgba(0, 208, 132, 0.6);
-            }
-            
-            /* Slider dynamic colors */
-            .stSlider > div > div > div[data-baseweb="slider"] > div:first-child {
-                background: linear-gradient(90deg, #FF6B6B 0%, #FFB81C 50%, #00D084 100%) !important;
-            }
-            
-            /* Compact output card */
-            .compact-card {
-                background: linear-gradient(135deg, rgba(178, 102, 255, 0.1) 0%, rgba(0, 208, 132, 0.1) 100%);
-                border: 2px solid rgba(178, 102, 255, 0.3);
-                border-radius: 16px;
-                padding: 24px;
-                margin: 20px 0;
-                box-shadow: 0 8px 32px rgba(178, 102, 255, 0.2);
-            }
-            
-            /* Badges enhanced */
-            .badge-dynamic {
-                display: inline-block;
-                padding: 6px 14px;
-                border-radius: 20px;
-                font-size: 0.85rem;
-                font-weight: 600;
-                margin: 4px;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-            }
-            .badge-green { background: rgba(0, 208, 132, 0.2); color: #00D084; border: 1px solid #00D084; }
-            .badge-yellow { background: rgba(255, 184, 28, 0.2); color: #FFB81C; border: 1px solid #FFB81C; }
-            .badge-red { background: rgba(255, 107, 107, 0.2); color: #FF6B6B; border: 1px solid #FF6B6B; }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
-        
-        # === HEADER ===
-        st.markdown(
-            """
-            <div style='text-align:center;margin:20px 0 40px'>
-                <h1 style='font-size:2.5rem;font-weight:800;background:linear-gradient(90deg,#00D084,#4ECDC4);
-                -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px'>
-                    Ready Check
-                </h1>
-                <p style='color:#B266FF;font-size:1.1rem;font-weight:600'>
-                    Tu puntuación y plan personalizado en segundos
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        
-        # UI helpers
-        def _badge(text:str, level:str):
-            cls = {"ok":"badge-green","mid":"badge-yellow","low":"badge-red"}.get(level,"badge-yellow")
-            st.markdown(f"<span class='badge-dynamic {cls}'>{text}</span>", unsafe_allow_html=True)
-        
-        def _sleep_h_level(h:float):
-            if h >= 7.5: return ("Excelente", "ok")
-            if h >= 6.5: return ("Moderado", "mid")
-            return ("Crítico", "low")
-        def _sleep_q_level(q:int):
-            mapping = {1:("Muy malo","low"),2:("Malo","mid"),3:("Regular","mid"),4:("Bueno","ok"),5:("Perfecto","ok")}
-            return mapping.get(q,("Regular","mid"))
-        def _fatigue_level(x:int):
-            if x <= 3: return ("Baja","ok")
-            if x <= 6: return ("Media","mid")
-            return ("Alta","low")
-        def _stress_level(x:int):
-            if x <= 3: return ("Bajo","ok")
-            if x <= 6: return ("Medio","mid")
-            return ("Alto","low")
-        def _soreness_level(x:int):
-            if x <= 2: return ("Ligera","ok")
-            if x <= 5: return ("Moderada","mid")
-            return ("Alta","low")
-        def _energy_level(x:int):
-            if x >= 7: return ("Alta","ok")
-            if x >= 4: return ("Media","mid")
-            return ("Baja","low")
-        def _perceived_level(val):
-            if val >= 8: return ("Me siento genial", "ok")
-            elif val >= 6: return ("Me siento bien", "mid")
-            elif val >= 4: return ("Regular", "mid")
-            else: return ("Me siento mal", "low")
-        
-        # === CARGAR PERFIL PERSONALIZADO ===
-        user_profile = load_user_profile()
-        
-        # Mostrar insights personalizados si hay
-        if user_profile.get('insights') and user_profile['data_quality'].get('total_days', 0) > 7:
-            with st.expander("Tu Perfil Personal", expanded=False):
-                col_arch, col_sleep = st.columns(2)
-                
-                with col_arch:
-                    archetype = user_profile.get('archetype', {})
-                    if archetype.get('confidence', 0) > 0.5:
-                        st.markdown(f"**Arquetipo:** {archetype.get('archetype', '?').upper()}")
-                        st.caption(f"{archetype.get('reason', '')}")
-                        st.caption(f"Confianza: {archetype.get('confidence', 0):.0%}")
-                
-                with col_sleep:
-                    sleep_resp = user_profile.get('sleep_responsiveness', {})
-                    if sleep_resp.get('sleep_responsive') is not None:
-                        st.markdown(f"**Sueño te afecta:** {'Mucho ✅' if sleep_resp['sleep_responsive'] else 'Poco ⚠️'}")
-                        st.caption(f"Correlación: {sleep_resp.get('correlation', 0):.2f}")
-                
-                # Mostrar insights clave
-                st.markdown("**Insights:**")
-                for insight in user_profile.get('insights', []):
-                    st.write(f"• {insight}")
-                
-                # Mostrar adjustment factors
-                factors = user_profile.get('adjustment_factors', {})
-                if factors:
-                    st.markdown("**Factores de personalización:**")
-                    col_f1, col_f2, col_f3 = st.columns(3)
-                    with col_f1:
-                        st.metric("Sleep Weight", f"{factors.get('sleep_weight', 0.25):.2f}", 
-                                 delta=f"{factors.get('sleep_weight', 0.25) - 0.25:+.2f} vs default")
-                    with col_f2:
-                        st.metric("Performance Weight", f"{factors.get('performance_weight', 0.25):.2f}",
-                                 delta=f"{factors.get('performance_weight', 0.25) - 0.25:+.2f} vs default")
-                    with col_f3:
-                        st.metric("Fatigue Sensitivity", f"{factors.get('fatigue_sensitivity', 1.0):.2f}x",
-                                 delta=f"{factors.get('fatigue_sensitivity', 1.0) - 1.0:+.2f}x vs normal")
-        
-        # === MODE TOGGLE (PILL STYLE) ===
-        col_toggle, col_reset = st.columns([4, 1])
-        with col_toggle:
-            mode = st.radio(
-                "Modo",
-                ["Rápido", "Preciso"],
-                horizontal=True,
-                label_visibility="collapsed",
-                key="mode_toggle"
-            )
-        
-        with col_reset:
-            if st.button("🔄"):
-                for key in list(st.session_state.keys()):
-                    if key.startswith('mood_'):
-                        del st.session_state[key]
-                st.rerun()
-        
-        quick_mode = mode == "Rápido"
-        
-        # === INPUTS ORGANIZADOS POR SECCIONES ===
-        st.markdown("<div style='margin-top:32px'></div>", unsafe_allow_html=True)
-        
-        # SECCIÓN A: RECUPERACIÓN (siempre visible)
-        st.markdown(
-            """
-            <div class='input-section section-recovery'>
-                <div class='section-header'>A. RECUPERACIÓN</div>
-                <p style='color:rgba(255,255,255,0.6);font-size:0.95rem;margin-bottom:16px'>
-                    Sueño y descanso
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        col_rec1, col_rec2, col_rec3 = st.columns(3)
-        
-        with col_rec1:
-            sleep_h = st.number_input("Horas de sueño ⏰", min_value=0.0, max_value=12.0, value=st.session_state.get('mood_sleep_h', 7.5), step=0.5,
-                                     help="Horas totales de sueño en las últimas 24h", key="input_sleep_h")
-            st.caption("Más horas = mejor recuperación")
-            txt, lvl = _sleep_h_level(sleep_h)
-            _badge(txt, lvl)
-        
-        with col_rec2:
-            sleep_q = st.slider("Calidad del sueño", 1, 5, st.session_state.get('mood_sleep_q', 4), 
-                               help="1=Muy malo (despertares constantes), 5=Perfecto", key="input_sleep_q")
-            quality_labels = {1: "Horrible", 2: "Malo", 3: "Regular", 4: "Bueno", 5: "Perfecto"}
-            st.caption("Fatiga alta puede reducir tu readiness")
-            txt, lvl = _sleep_q_level(sleep_q)
-            _badge(txt, lvl)
-            
-        with col_rec3:
-            if not quick_mode:
-                nap_mins = st.selectbox("Siesta hoy", [0, 20, 45, 90], 
-                                       index=[0, 20, 45, 90].index(st.session_state.get('mood_nap_mins', 0)),
-                                       help="Minutos de siesta. 20=power nap, 90=ciclo completo", key="input_nap")
-                sleep_disruptions = st.checkbox("Sueño fragmentado (3+ despertares)", 
-                                               value=st.session_state.get('mood_sleep_disruptions', False), key="input_disruptions")
-            else:
-                nap_mins = 0
-                sleep_disruptions = False
-            
-        # === BLOQUE B: ESTADO (SENSACIONES) ===
-        st.markdown(
-            """
-            <div class='input-section section-state'>
-                <div class='section-header'>B. ESTADO</div>
-                <p style='color:rgba(255,255,255,0.6);font-size:0.95rem;margin-bottom:16px'>
-                    Cómo te sientes ahora mismo
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        
-        # PERCEPCIÓN PERSONAL (siempre visible, input clave)
-        st.markdown("**● Sensación Personal** — Tu intuición sobre readiness hoy")
-        perceived_readiness = st.slider(
-            "De 0 (fatal) a 10 (increíble)", 0, 10, 
-            st.session_state.get('mood_perceived_readiness', 7),
-            help="Tu percepción general HOY. Puede no coincidir con métricas objetivas (ej: dormiste poco pero te sientes bien). Esto tiene un peso del 25% en el cálculo.",
-            key="input_perceived_readiness"
-        )
-        txt, lvl = _perceived_level(perceived_readiness)
-        _badge(txt, lvl)
-        st.write("")
-        
-        col_st1, col_st2, col_st3, col_st4 = st.columns(4)
-        
-        with col_st1:
-            fatigue = st.slider("Fatiga/Cansancio", 0, 10, st.session_state.get('mood_fatigue', 3), 
-                               help="0=Fresco, 5=Normal, >=7 afecta rendimiento", key="input_fatigue")
-            txt, lvl = _fatigue_level(fatigue)
-            _badge(txt, lvl)
-        
-        with col_st2:
-            stress = st.slider("Estrés mental", 0, 10, st.session_state.get('mood_stress', 3), 
-                              help="0=Relajado, >=7 suele bajar rendimiento en básicos", key="input_stress")
-            txt, lvl = _stress_level(stress)
-            _badge(txt, lvl)
-        
-        with col_st3:
-            soreness = st.slider("Agujetas/DOMS", 0, 10, st.session_state.get('mood_soreness', 2), 
-                                help="Dolor muscular general post-entreno", key="input_soreness")
-            txt, lvl = _soreness_level(soreness)
-            _badge(txt, lvl)
-        
-        with col_st4:
-            if not quick_mode:
-                energy = st.slider("Energía general", 0, 10, st.session_state.get('mood_energy', 7), 
-                                  help="Sensación de vitalidad (a veces 'fatiga' no captura todo)", key="input_energy")
-                txt, lvl = _energy_level(energy)
-                _badge(txt, lvl)
-            else:
-                energy = 10 - fatigue  # Derivar del fatigue
-            
-        # Fila 2 de Estado (solo modo completo)
-        if not quick_mode:
-            col_st5, col_st6, col_st7, col_st8 = st.columns(4)
-            
-            with col_st5:
-                motivation = st.slider("Motivación/Ganas", 0, 10, st.session_state.get('mood_motivation', 7), 
-                                      help="0=Ninguna, 10=Máxima", key="input_motivation")
-                st.caption(f"🔥 {motivation}/10")
-            
-            with col_st6:
-                stiffness = st.slider("Rigidez articular", 0, 10, st.session_state.get('mood_stiffness', 2), 
-                                     help="Movilidad limitada, calentar costará más", key="input_stiffness")
-                st.caption(f"🦴 {stiffness}/10")
-            
-            with col_st7:
-                caffeine = st.selectbox("Cafeína (últimas 6h)", [0, 1, 2, 3], 
-                                       index=st.session_state.get('mood_caffeine', 0),
-                                       help="Cafés/energéticos consumidos", key="input_caffeine")
-                st.caption(f"☕ {caffeine} dosis")
-            
-            with col_st8:
-                alcohol = st.checkbox("Alcohol anoche", 
-                                     value=st.session_state.get('mood_alcohol', False),
-                                     help="Consumo de alcohol en las últimas 12-24h", key="input_alcohol")
-        else:
-            motivation = 7
-            stiffness = 2
-            caffeine = 0
-            alcohol = False
-            
-        # === BLOQUE C: FLAGS (BANDERAS ROJAS) ===
-        st.markdown(
-            """
-            <div class='input-section section-flags'>
-                <div class='section-header'>C. FLAGS / BANDERAS ROJAS</div>
-                <p style='color:rgba(255,255,255,0.6);font-size:0.95rem;margin-bottom:16px'>
-                    ⚠️ Señales que afectan tu capacidad de entrenar
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        
-        col_flag1, col_flag2, col_flag3 = st.columns(3)
-        
-        with col_flag1:
-            st.write("**🩹 Dolor localizado**")
-            pain_flag = st.checkbox("Tengo dolor localizado", value=st.session_state.get('mood_pain_flag', False), key="pain_checkbox")
-                
-            if pain_flag:
-                zones = ["Hombro", "Codo", "Muñeca", "Espalda alta", "Espalda baja", "Cadera", "Rodilla", "Tobillo", "Otra"]
-                pain_zone = st.selectbox("Zona", zones, 
-                                        index=zones.index(st.session_state.get('mood_pain_zone', 'Hombro')) if st.session_state.get('mood_pain_zone') in zones else 0,
-                                        key="pain_zone_select")
-                sides = ["Izquierdo", "Derecho", "Ambos"]
-                pain_side = st.radio("Lado", sides, horizontal=True,
-                                    index=sides.index(st.session_state.get('mood_pain_side', 'Izquierdo')) if st.session_state.get('mood_pain_side') in sides else 0,
-                                    key="pain_side_radio")
-                pain_severity = st.slider("Severidad", 0, 10, st.session_state.get('mood_pain_severity', 5), key="pain_severity_slider",
-                                         help="0=Molestia, 5=Duele pero puedo, 10=No puedo moverlo")
-                types = ["Punzante", "Molestia", "Rigidez", "Ardor"]
-                pain_type = st.selectbox("Tipo", types,
-                                        index=types.index(st.session_state.get('mood_pain_type', 'Punzante')) if st.session_state.get('mood_pain_type') in types else 0,
-                                        key="pain_type_select")
-                
-                # Generar pain_location descriptivo
-                pain_location = f"{pain_zone} {pain_side.lower()} ({pain_type}, {pain_severity}/10)"
-            else:
-                pain_zone = None
-                pain_side = None
-                pain_severity = 0
-                pain_type = None
-                pain_location = ""
-            
-        with col_flag2:
-            st.write("**🤒 Estado general**")
-            sick_flag = st.checkbox("Enfermo/resfriado", 
-                                   value=st.session_state.get('mood_sick_flag', False),
-                                   help="Fiebre, tos, malestar general", key="input_sick")
-            last_hard = st.checkbox("Último entreno muy exigente", 
-                                   value=st.session_state.get('mood_last_hard', False),
-                                   help="Sesión de alta intensidad/volumen en últimas 48h", key="input_lasthard")
-        
-        with col_flag3:
-            if not quick_mode:
-                st.write("**Objetivo de hoy**")
-                goals = ["fuerza", "hipertrofia", "técnica", "cardio", "descanso"]
-                session_goal = st.selectbox("", goals,
-                                           index=goals.index(st.session_state.get('mood_session_goal', 'fuerza')) if st.session_state.get('mood_session_goal') in goals else 0,
-                                           key="session_goal_select")
-                time_available = st.number_input("Minutos disponibles", 
-                                                min_value=0, max_value=180, value=st.session_state.get('mood_time_available', 60), step=5,
-                                                key="time_avail_input")
-            else:
-                session_goal = "fuerza"
-                time_available = 60
-            
-        # === ACTION BUTTON ===
-        st.markdown("<div style='margin:40px 0 20px'></div>", unsafe_allow_html=True)
-        st.markdown(
-            """
-            <div style='text-align:center'>
-                <p style='color:rgba(255,255,255,0.5);font-size:0.9rem;margin-bottom:12px'>
-                    Obtén tu puntuación y plan personalizado
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        submitted = st.button(
-            "⚡ CALCULAR READINESS & PLAN",
-            use_container_width=True,
-            key="submit_readiness",
-            type="primary",
-        )
-        
-        # Persist inputs immediately on button click
-        if submitted:
-            st.session_state.mood_sleep_h = sleep_h
-            st.session_state.mood_sleep_q = sleep_q
-            st.session_state.mood_nap_mins = nap_mins
-            st.session_state.mood_sleep_disruptions = sleep_disruptions
-            st.session_state.mood_perceived_readiness = perceived_readiness
-            st.session_state.mood_fatigue = fatigue
-            st.session_state.mood_soreness = soreness
-            st.session_state.mood_stress = stress
-            st.session_state.mood_energy = energy
-            st.session_state.mood_motivation = motivation
-            st.session_state.mood_stiffness = stiffness
-            st.session_state.mood_caffeine = caffeine
-            st.session_state.mood_alcohol = alcohol
-            st.session_state.mood_pain_flag = pain_flag
-            st.session_state.mood_pain_location = pain_location
-            st.session_state.mood_pain_zone = pain_zone
-            st.session_state.mood_pain_side = pain_side
-            st.session_state.mood_pain_severity = pain_severity
-            st.session_state.mood_pain_type = pain_type
-            st.session_state.mood_sick_flag = sick_flag
-            st.session_state.mood_last_hard = last_hard
-            st.session_state.mood_session_goal = session_goal
-            st.session_state.mood_time_available = time_available
-            st.session_state.mood_calculated = True
-        
-        # Gráficas históricas (mostrar SOLO si aún no se ha calculado)
-        # IMPORTANTE: Usar df_daily, NO df_filtered, para mostrar los últimos 7 días completos
-        if not st.session_state.get('mood_calculated', False):
-            st.markdown("---")
-            render_section_title("Tendencia histórica (últimos 7 días)", accent="#4ECDC4")
-            
-            # Get last 7 days data (sin incluir hoy)
-            today = datetime.date.today()
-            last_7_days = df_daily[df_daily['date'] < today].sort_values('date', ascending=True).tail(7).copy()
-            
-            if not last_7_days.empty:
-                col_hist1, col_hist2 = st.columns(2)
-                
-                with col_hist1:
-                    if 'readiness_score' in last_7_days.columns:
-                        readiness_hist = last_7_days.set_index('date')['readiness_score']
-                        fig = create_readiness_chart(readiness_hist, "Readiness")
-                        st.plotly_chart(fig, use_container_width=True)
-                
-                with col_hist2:
-                    if 'volume' in last_7_days.columns:
-                        volume_hist = last_7_days.set_index('date')['volume']
-                        fig = create_volume_chart(volume_hist, "Volumen")
-                        st.plotly_chart(fig, use_container_width=True)
-                
-                col_hist3, col_hist4 = st.columns(2)
-                
-                with col_hist3:
-                    if 'sleep_hours' in last_7_days.columns:
-                        sleep_hist = last_7_days.set_index('date')['sleep_hours']
-                        fig = create_sleep_chart(sleep_hist, "Sueño (horas)")
-                        st.plotly_chart(fig, use_container_width=True)
-                
-                with col_hist4:
-                    if 'acwr_7_28' in last_7_days.columns:
-                        acwr_hist = last_7_days.set_index('date')['acwr_7_28']
-                        fig = create_acwr_chart(acwr_hist, "ACWR (Carga)")
-                        st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("📅 No hay datos históricos disponibles aún.")
-        # Inputs already persisted above if submitted
-        
-        # Show results if calculated
-        if st.session_state.get('mood_calculated', False):
-            # Retrieve from session_state
-            sleep_h = st.session_state.mood_sleep_h
-            sleep_q = st.session_state.mood_sleep_q
-            nap_mins = st.session_state.get('mood_nap_mins', 0)
-            sleep_disruptions = st.session_state.get('mood_sleep_disruptions', False)
-            perceived_readiness = st.session_state.get('mood_perceived_readiness', 7)
-            fatigue = st.session_state.mood_fatigue
-            soreness = st.session_state.mood_soreness
-            stress = st.session_state.mood_stress
-            energy = st.session_state.get('mood_energy', 7)
-            motivation = st.session_state.get('mood_motivation', 7)
-            stiffness = st.session_state.get('mood_stiffness', 2)
-            caffeine = st.session_state.get('mood_caffeine', 0)
-            alcohol = st.session_state.get('mood_alcohol', False)
-            pain_flag = st.session_state.mood_pain_flag
-            pain_location = st.session_state.mood_pain_location
-            pain_zone = st.session_state.get('mood_pain_zone')
-            pain_severity = st.session_state.get('mood_pain_severity', 0)
-            pain_type = st.session_state.get('mood_pain_type')
-            sick_flag = st.session_state.get('mood_sick_flag', False)
-            last_hard = st.session_state.get('mood_last_hard', False)
-            session_goal = st.session_state.mood_session_goal
-            time_available = st.session_state.get('mood_time_available', 60)
-            
-            st.markdown("<div style='margin:40px 0 20px'></div>", unsafe_allow_html=True)
-            
-            # Calculate readiness
-            readiness_instant = calculate_readiness_from_inputs_v2(
-                sleep_h, sleep_q, fatigue, soreness, stress, motivation, pain_flag,
-                nap_mins, sleep_disruptions, energy, stiffness, caffeine, alcohol, sick_flag,
-                perceived_readiness=perceived_readiness
-            )
-            
-            # Get zone
-            zone, emoji, _ = get_readiness_zone(readiness_instant)
-            
-            # === PERSONALIZATION ENGINE ===
-            # 1. Calculate personal baselines
-            baselines = calculate_personal_baselines(df_daily)
-            readiness_context, readiness_rec, readiness_delta = contextualize_readiness(readiness_instant, baselines)
-            
-            # 2. Detect fatigue type (central vs peripheral) - ahora recibe readiness para coordinación
-            fatigue_analysis = detect_fatigue_type(
-                sleep_h, sleep_q, stress, fatigue, soreness, pain_flag, pain_location, baselines,
-                readiness_instant=readiness_instant
-            )
-            
-            # 3. Calculate injury risk - ahora considera pain_severity, stiffness, sick
-            # Obtener último performance_index válido (con fallback a 1.0 si no hay datos)
-            perf_vals = df_daily['performance_index'].dropna() if 'performance_index' in df_daily.columns else pd.Series()
-            last_perf = perf_vals.iloc[-1] if len(perf_vals) > 0 else 1.0
-            
-            # Obtener último acwr válido (con fallback a 1.0 si no hay datos)
-            acwr_vals = df_daily['acwr_7_28'].dropna() if 'acwr_7_28' in df_daily.columns else pd.Series()
-            last_acwr = acwr_vals.iloc[-1] if len(acwr_vals) > 0 else 1.0
-            
-            injury_risk = calculate_injury_risk_score_v2(
-                readiness_instant, last_acwr, sleep_h, last_perf, 
-                effort_level=max(stress, fatigue),
-                pain_flag=pain_flag,
-                pain_severity=pain_severity,
-                stiffness=stiffness,
-                sick_flag=sick_flag,
-                last_hard=last_hard,
-                baselines=baselines,
-                days_high_strain=0
-            )
-            
-            # Generate plan - ahora con pain_zone, pain_type, sick_flag
-            zone_display, plan, rules = generate_actionable_plan_v2(
-                readiness_instant, pain_flag, pain_zone, pain_severity, pain_type, 
-                fatigue, soreness, stiffness, sick_flag, session_goal, fatigue_analysis
-            )
-            
-            # Display results - TWO MODES
-            st.markdown("---")
-            
-            if quick_mode:
-                # ===== MODO RÁPIDO: Output compacto =====
-                render_section_title("Tu Readiness HOY", accent="#00D084")
-                
-                # Extract clean zone text and emoji
-                if readiness_instant >= 75:
-                    zone_text = "ALTA"
-                    zone_emoji = "🟢"
-                elif readiness_instant >= 55:
-                    zone_text = "MEDIA"
-                    zone_emoji = "🟡"
-                else:
-                    zone_text = "BAJA"
-                    zone_emoji = "🔴"
-                
-                # Animated readiness circle
-                circle_color = "#00D084" if readiness_instant >= 75 else "#FFB81C" if readiness_instant >= 50 else "#FF6B6B"
-                
-                # Escape all text variables to prevent HTML breaking
-                import html
-                fatigue_type_safe = html.escape(str(fatigue_analysis.get('type', '')))
-                fatigue_reason_safe = html.escape(str(fatigue_analysis.get('reason', '')))
-                split_safe = html.escape(str(fatigue_analysis.get('target_split', '')).upper())
-                
-                # Build risk line separately
-                risk_html = ""
-                if injury_risk['risk_level'] != 'low':
-                    risk_level_safe = html.escape(str(injury_risk['risk_level']).upper())
-                    risk_score = injury_risk['score']
-                    risk_html = f"<br><strong style='color:#B266FF;'>Riesgo:</strong> {risk_level_safe} ({risk_score:.0f}/100)"
-                
-                circle_html = f"""
-                <div style="display:flex; align-items:center; gap:30px; margin:30px 0;">
-                    <div style="position:relative; width:140px; height:140px;">
-                        <svg width="140" height="140" viewBox="0 0 140 140">
-                            <circle cx="70" cy="70" r="60" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="12"/>
-                            <circle cx="70" cy="70" r="60" fill="none" stroke="{circle_color}" stroke-width="12" 
-                                    stroke-dasharray="{readiness_instant * 3.77} 377" 
-                                    stroke-linecap="round" 
-                                    transform="rotate(-90 70 70)"
-                                    style="transition: stroke-dasharray 1s ease;"/>
-                        </svg>
-                        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center;">
-                            <div style="font-size:2.5rem; font-weight:800; color:{circle_color};">{readiness_instant}</div>
-                            <div style="font-size:0.85rem; color:#aaa; margin-top:-8px;">/ 100</div>
-                        </div>
-                    </div>
-                    <div style="flex:1;">
-                        <div style="font-size:1.3rem; font-weight:700; color:#eaeaea; margin-bottom:10px;">
-                            {zone_emoji} {zone_text}
-                        </div>
-                        <div style="font-size:0.95rem; color:#bbb; line-height:1.6;">
-                            <strong style="color:{circle_color};">Fatiga {fatigue_type_safe}:</strong> {fatigue_reason_safe}<br>
-                            <strong style="color:#4ECDC4;">Hoy:</strong> {split_safe}{risk_html}
-                        </div>
-                    </div>
-                </div>
-                """
-                st.markdown(circle_html, unsafe_allow_html=True)
-                
-                # Brief recommendation card
-                def _clean_line(s: str) -> str:
-                    s = str(s).strip()
-                    if s.startswith("- ") or s.startswith("• "):
-                        s = s[2:].strip()
-                    s = s.replace("**", "")
-                    return s
-                
-                plan_clean = [s for s in (_clean_line(p) for p in plan[:3]) if s]  # Top 3 actions only
-                compact_card = f"""
-                <div style="border-radius:12px; padding:20px; background:linear-gradient(135deg, rgba(0,208,132,0.1), rgba(78,205,196,0.1)); 
-                            border:1px solid rgba(0,208,132,0.3);">
-                    <div style="font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#00D084; margin-bottom:12px;">
-                        ⚡ Acción Rápida
-                    </div>
-                    <div style="font-size:0.95rem; color:#eaeaea; line-height:1.8;">
-                        {'<br>'.join(['• ' + l for l in plan_clean])}
-                    </div>
-                </div>
-                """
-                st.markdown(compact_card, unsafe_allow_html=True)
-                
-            else:
-                # ===== MODO PRECISO: Output completo con gráficos =====
-                render_section_title("Tu Readiness HOY", accent="#00D084")
-                
-                col_result1, col_result2, col_result3 = st.columns([2, 1.5, 1.5])
-                with col_result1:
-                    readiness_text = f"{emoji} {readiness_instant}/100"
-                    st.markdown(f"# {readiness_text}")
-                with col_result2:
-                    st.write("")
-                    render_section_title("Contexto Personal", accent="#00D084")
-                    # Mostrar delta visual
-                    if baselines.get('readiness', {}).get('p50'):
-                        p50 = baselines['readiness']['p50']
-                        p75 = baselines['readiness']['p75']
-                        delta = readiness_instant - p50
-                        
-                        if delta >= 0:
-                            delta_color = "🟢"
-                        else:
-                            delta_color = "🔴"
-                        
-                        st.markdown(f"**Tu media:** {p50:.0f} | **Alto (p75):** {p75:.0f}")
-                        st.markdown(f"{delta_color} **Hoy:** {delta:+.0f} vs media")
-                        
-                        # Barra de comparación visual
-                        progress_val = max(0, min(100, (readiness_instant / 100)))
-                        st.progress(progress_val)
-                        
-                        # Nota sobre comparación si hay suficientes datos
-                        n_days = baselines.get('readiness', {}).get('n', 0)
-                        if n_days < 14:
-                            st.caption(f"⏳ Basado en {n_days} días (más historia = mejor contexto)")
-                    else:
-                        st.write("⏳ *Necesita más historia*")
-                        st.caption("(Mínimo 7 días para calcular tu baseline)")
-                with col_result3:
-                    st.write("")
-                    render_section_title("Riesgo de Lesión", accent="#FF6B6B")
-                    st.write(f"{injury_risk['emoji']} **{injury_risk['risk_level'].upper()}**")
-                    st.caption(f"Score: {injury_risk['score']:.0f}/100\n({injury_risk['confidence']} confianza)")
-                
-                # Show injury risk factors if not low
-                if injury_risk['risk_level'] != 'low':
-                    st.warning(f"⚠️ **{injury_risk['action']}**")
-                    with st.expander("Factores de riesgo"):
-                        for factor in injury_risk['factors']:
-                            st.write(f"• {factor}")
-                
-                # Advice Cards (compact UI)
-                st.markdown("---")
-                render_section_title("Consejos de hoy", accent="#FFB81C")
-
-                def render_card(title: str, lines: list[str], accent: str = "#4ECDC4"):
-                    card_style = (
-                        "border-radius:12px; padding:16px; margin-bottom:12px; "
-                        "background-color: rgba(255,255,255,0.03); "
-                        "border-left: 4px solid " + accent + ";"
-                    )
-                    title_style = (
-                        "display:flex; align-items:center; gap:8px; "
-                        "font-weight:700; text-transform:uppercase; letter-spacing:0.5px; "
-                        f"color:{accent}; margin-bottom:10px;"
-                    )
-                    # filter out empty/whitespace lines to avoid blank bullets
-                    safe_lines = [str(l).strip() for l in lines if str(l).strip()]
-                    bullet_html = "".join([f"<div>• {l}</div>" for l in safe_lines])
-                    st.markdown(
-                        f"<div style='{card_style}'>"
-                        f"<div style='{title_style}'><span style='width:14px;height:3px;background:{accent};display:inline-block;border-radius:2px'></span>{title}</div>"
-                        f"<div style='font-size:0.95rem;color:#eaeaea;'>" + bullet_html + "</div>"
-                        + "</div>",
-                        unsafe_allow_html=True,
-                    )
-
-                def _clean_line(s: str) -> str:
-                    s = str(s).strip()
-                    # remove leading markdown bullets
-                    if s.startswith("- ") or s.startswith("• "):
-                        s = s[2:].strip()
-                    # remove bold markers
-                    s = s.replace("**", "")
-                    return s
-
-                col_a, col_b = st.columns(2)
-
-                with col_a:
-                    fatigue_lines = [
-                        f"Diagnóstico: {fatigue_analysis['reason']}",
-                        f"Split recomendado: {fatigue_analysis['target_split'].upper()}",
-                    ]
-                    if 'intensity_hint' in fatigue_analysis:
-                        fatigue_lines.append(f"Intensidad sugerida: {fatigue_analysis['intensity_hint']}")
-                    fatigue_lines.append("Acciones específicas:")
-                    fatigue_lines.extend(fatigue_analysis.get('recommendations', []))
-                    render_card(
-                        f"Tipo de Fatiga: {fatigue_analysis['type'].upper()}",
-                        fatigue_lines,
-                        accent="#FFB81C",
-                    )
-
-                with col_b:
-                    plan_clean = [s for s in (_clean_line(p) for p in plan) if s]
-                    render_card("Plan accionable", plan_clean, accent="#FFB81C")
-
-                rules_clean = [s for s in (_clean_line(r) for r in rules) if s]
-                render_card("Reglas de hoy", rules_clean, accent="#FF6B6B")
-            
-            # Save option (only in precise mode)
-            if not quick_mode:
-                st.markdown("---")
-                col_save1, col_save2 = st.columns([3, 1])
-                with col_save1:
-                    st.write("**Guardar este día en el histórico** para que el motor lo aprenda y recalcule tendencias.")
-                with col_save2:
-                    if st.button("💾 Guardar", use_container_width='stretch'):
-                        today = datetime.date.today()
-                        save_mood_to_csv(
-                            today, sleep_h, sleep_q, fatigue, soreness, stress, motivation,
-                            pain_flag, pain_location, readiness_instant
-                    )
-                    st.success(f"✅ Guardado para {today}")
-                    st.info("💡 **Próximo paso:** ejecuta el pipeline para que se regenere el histórico con estos datos.")
-                    st.session_state.mood_calculated = False  # Reset after save
-            
-            # Charts - Last 7 days + TODAY
-            st.markdown("---")
-            render_section_title("Predicción con tu readiness hoy", accent="#00D084")
-            
-            # Get last 7 days data, excluding today if it exists
-            # IMPORTANTE: Usar df_daily, NO df_filtered, para mostrar datos completos
-            today = datetime.date.today()
-            last_7_days_pred = df_daily[df_daily['date'] < today].sort_values('date', ascending=True).tail(7).copy()
-            
-            # Create today's row with calculated readiness and form inputs
-            # Solo incluir columnas que existen en last_7_days_pred para mantener coherencia
-            today_row = pd.DataFrame({
-                'date': [today],
-                'readiness_score': [readiness_instant],
-                'volume': [np.nan],  # Hoy aún no hay volumen registrado; se apunta tras entrenar
-                'sleep_hours': [sleep_h],
-                'acwr_7_28': [np.nan]  # Hoy aún no hay datos de entrenamiento, así que ACWR es NaN
-            })
-            
-            # Combine last 7 days + today
-            chart_data = pd.concat([last_7_days_pred, today_row], ignore_index=True)
-            chart_data['date'] = pd.to_datetime(chart_data['date'])
-            chart_data = chart_data.sort_values('date', ascending=True)
-            
-            if not chart_data.empty:
-                # Readiness Chart with TODAY highlighted
-                col_chart1, col_chart2 = st.columns(2)
-                
-                with col_chart1:
-                    readiness_chart = chart_data.set_index('date')['readiness_score']
-                    fig = create_readiness_chart(readiness_chart, "Readiness")
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                # Volume Chart
-                with col_chart2:
-                    volume_chart = chart_data.set_index('date')['volume']
-                    fig = create_volume_chart(volume_chart, "Volumen")
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                col_chart3, col_chart4 = st.columns(2)
-                
-                # Sleep Chart
-                with col_chart3:
-                    sleep_chart = chart_data.set_index('date')['sleep_hours']
-                    fig = create_sleep_chart(sleep_chart, "Sueño (horas)")
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                # ACWR Chart
-                with col_chart4:
-                    acwr_chart = chart_data.set_index('date')['acwr_7_28']
-                    fig = create_acwr_chart(acwr_chart, "ACWR (Carga)")
-                    st.plotly_chart(fig, use_container_width=True)
-
-    # ============== WEEK VIEW ==============
-    else:
-        render_section_title("Semana — Macro", accent="#4ECDC4")
-        
-        if df_weekly is not None:
-            df_weekly['week_start'] = pd.to_datetime(df_weekly['week_start']).dt.date
-            # Use last 12 weeks for weekly view instead of daily 7-day filter
-            max_week = df_weekly['week_start'].max()
-            start_week = max_week - datetime.timedelta(weeks=12)
-            df_weekly_filtered = df_weekly[df_weekly['week_start'] >= start_week].copy()
-            
-            if df_weekly_filtered.empty:
-                st.info("No hay datos semanales disponibles.")
-            else:
-                # Calcular readiness promedio por semana desde df_daily
-                df_weekly_display = df_weekly_filtered.sort_values('week_start', ascending=False).copy()
-                
-                if 'readiness_score' in df_daily.columns:
-                    df_daily_copy = df_daily.copy()
-                    df_daily_copy['date'] = pd.to_datetime(df_daily_copy['date'])
-                    df_daily_copy['week_start'] = df_daily_copy['date'] - pd.to_timedelta(df_daily_copy['date'].dt.dayofweek, unit='D')
-                    
-                    weekly_readiness = df_daily_copy.groupby('week_start')['readiness_score'].mean().reset_index()
-                    weekly_readiness.columns = ['week_start', 'readiness_avg']
-                    
-                    # Convertir week_start a string para hacer match
-                    weekly_readiness['week_start'] = pd.to_datetime(weekly_readiness['week_start']).astype(str)
-                    df_weekly_display['week_start_str'] = pd.to_datetime(df_weekly_display['week_start']).astype(str)
-                    
-                    # Merge con la tabla semanal
-                    df_weekly_display = df_weekly_display.merge(
-                        weekly_readiness,
-                        left_on='week_start_str',
-                        right_on='week_start',
-                        how='left'
-                    )
-                    df_weekly_display = df_weekly_display.drop('week_start_str', axis=1)
-                else:
-                    df_weekly_display['readiness_avg'] = None
-                
-                df_weekly_display = df_weekly_display.rename(columns={
-                    'week_start': 'Semana (inicio)',
-                    'days': 'Días',
-                    'volume_week': 'Volumen',
-                    'effort_week_mean': 'Esfuerzo medio',
-                    'rir_week_mean': 'RIR medio',
-                    'monotony': 'Monotonía',
-                    'strain': 'Strain',
-                    'readiness_avg': 'Readiness'
-                })
-                if 'Semana (inicio)' in df_weekly_display.columns:
-                    df_weekly_display['Semana (inicio)'] = (
-                        pd.to_datetime(df_weekly_display['Semana (inicio)'], errors='coerce')
-                        .dt.strftime('%d/%m/%Y')
-                    )
-                for col in ['Volumen', 'Strain']:
-                    if col in df_weekly_display.columns:
-                        df_weekly_display[col] = df_weekly_display[col].round(0).astype('Int64')
-                for col in ['Esfuerzo medio', 'RIR medio', 'Monotonía', 'Readiness']:
-                    if col in df_weekly_display.columns:
-                        df_weekly_display[col] = df_weekly_display[col].round(1)
-                if 'Días' in df_weekly_display.columns:
-                    df_weekly_display['Días'] = df_weekly_display['Días'].astype('Int64')
-                st.dataframe(df_weekly_display, use_container_width=True)
-                
-                # Charts
-                col1, col2 = st.columns(2)
-                with col1:
-                    if 'volume_week' in df_weekly_filtered.columns:
-                        vol_data = df_weekly_filtered.set_index('week_start')['volume_week'].sort_index()
-                        fig = create_weekly_volume_chart(vol_data, "Volumen Semanal")
-                        st.plotly_chart(fig, use_container_width=True)
-                
-                with col2:
-                    if 'strain' in df_weekly_filtered.columns:
-                        strain_data = df_weekly_filtered.set_index('week_start')['strain'].sort_index()
-                        fig = create_weekly_strain_chart(strain_data, "Strain")
-                        st.plotly_chart(fig, use_container_width=True)
-                
-                # === READINESS SEMANAL ===
-                st.markdown("---")
-                col3, col4 = st.columns(2)
-                
-                with col3:
-                    # Calcular readiness promedio por semana desde df_daily
-                    if 'readiness_score' in df_daily.columns:
-                        df_daily_copy = df_daily.copy()
-                        df_daily_copy['date'] = pd.to_datetime(df_daily_copy['date'])
-                        df_daily_copy['week_start'] = df_daily_copy['date'] - pd.to_timedelta(df_daily_copy['date'].dt.dayofweek, unit='D')
-                        
-                        weekly_readiness = df_daily_copy.groupby('week_start')['readiness_score'].mean().sort_index()
-                        
-                        if not weekly_readiness.empty:
-                            fig = go.Figure()
-                            fig.add_trace(go.Scatter(
-                                x=weekly_readiness.index,
-                                y=weekly_readiness.values,
-                                mode='lines+markers',
-                                name='Readiness Promedio',
-                                line=dict(color='#B266FF', width=3),
-                                marker=dict(size=8)
-                            ))
-                            fig.add_hline(y=65, line_dash="dash", line_color="orange", annotation_text="Óptimo")
-                            fig.update_layout(
-                                title="Readiness Promedio Semanal",
-                                xaxis_title="Semana",
-                                yaxis_title="Readiness (0-100)",
-                                template="plotly_dark",
-                                hovermode='x unified',
-                                height=350
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-                
-                with col4:
-                    # Esfuerzo promedio semanal
-                    if 'effort_week_mean' in df_weekly_filtered.columns:
-                        effort_data = df_weekly_filtered.set_index('week_start')['effort_week_mean'].sort_index()
-                        
-                        fig = go.Figure()
-                        fig.add_trace(go.Bar(
-                            x=effort_data.index,
-                            y=effort_data.values,
-                            name='Esfuerzo',
-                            marker=dict(color='#FF6B6B')
-                        ))
-                        fig.update_layout(
-                            title="Esfuerzo Promedio Semanal",
-                            xaxis_title="Semana",
-                            yaxis_title="Esfuerzo",
-                            template="plotly_dark",
-                            height=350
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                
-                # === WEEKLY SUGGESTION ===
-                render_section_title("📋 Secuencia Sugerida (Próxima Semana)", accent="#00D084")
-                last_week = df_weekly_filtered.sort_values('week_start', ascending=False).iloc[0]
-                last_7_strain = [last_week['strain']]
-                last_7_monotony = last_week.get('monotony', 0.5)
-                last_readiness_mean = df_daily['readiness_score'].dropna().mean() if 'readiness_score' in df_daily.columns else 65
-                
-                # Calcular strain_p75 desde df_weekly para baselines correctos
-                baselines_weekly = {}
-                if 'strain' in df_weekly_filtered.columns:
-                    strain_series = df_weekly_filtered['strain'].dropna()
-                    if len(strain_series) >= 4:  # mínimo 4 semanas
-                        baselines_weekly['_strain_p75'] = float(strain_series.quantile(0.75))
-                        baselines_weekly['_strain_p50'] = float(strain_series.quantile(0.5))
-                
-                weekly_suggestion = suggest_weekly_sequence(
-                    last_7_strain,
-                    last_7_monotony,
-                    last_readiness_mean,
-                    baselines=baselines_weekly
-                )
-                
-                st.write(f"**Razonamiento:** {weekly_suggestion['reasoning']}")
-                
-                # Show sequence as timeline
-                cols = st.columns(7)
-                for i, day_plan in enumerate(weekly_suggestion['sequence']):
-                    with cols[i]:
-                        st.markdown(f"""
-                        <div style="text-align: center; padding: 8px; border: 1px solid #B266FF; border-radius: 4px; background: rgba(178,102,255,0.1);">
-                            <b>{day_plan['day']}</b><br>
-                            <span style="font-size:0.8em; color:#00D084;">{day_plan['type'].upper()}</span><br>
-                            <span style="font-size:0.7em; color:#E0E0E0;">{day_plan['description']}</span>
-                        </div>
-                        """, unsafe_allow_html=True)
-        else:
-            st.info("Archivo weekly.csv no disponible.")
-
-    # ============== HISTORICAL TABLE ==============
-    render_section_title("Histórico", accent="#B266FF")
-    hist_cols = ['date', 'readiness_score', 'recommendation', 'action_intensity', 'reason_codes']
-    hist_cols_existing = [c for c in hist_cols if c in df_filtered.columns]
-    
-    display_df = df_filtered[hist_cols_existing].sort_values('date', ascending=False).reset_index(drop=True)
-    display_df = display_df.fillna('—')
-
-    if 'date' in display_df.columns:
-        display_df['date'] = (
-            pd.to_datetime(display_df['date'], errors='coerce')
-            .dt.strftime('%d/%m/%Y')
-            .fillna(display_df['date'].astype(str))
-        )
-    
-    # Apply conditional formatting BEFORE converting to string
-    def color_readiness(val):
-        if pd.isna(val) or val == '—':
-            return ''
-        try:
-            val_num = float(val)
-            if val_num >= 75:
-                return 'background-color: #00D084'
-            elif val_num >= 55:
-                return 'background-color: #FFB81C'
-            else:
-                return 'background-color: #FF4444'
-        except:
-            return ''
-    
-    # Apply styling with numeric values (avoid deprecated applymap)
-    styled = display_df.style.map(color_readiness, subset=['readiness_score']) if 'readiness_score' in display_df.columns else display_df.style
-    
-    # Format readiness_score without decimals AFTER styling
-    if 'readiness_score' in display_df.columns:
-        display_df['readiness_score'] = display_df['readiness_score'].apply(
-            lambda x: f"{int(float(x))}" if isinstance(x, (int, float)) and x == x else '—'
-        )
-        # Recreate styled with formatted values
-        styled = display_df.style.map(color_readiness, subset=['readiness_score'])
-    
-    st.dataframe(styled, use_container_width=True)
-    # ============== CHARTS ==============
-    # Solo mostrar esta sección si NO estamos en Modo Hoy (para evitar duplicación)
-    if view_mode != "Modo Hoy":
-        render_section_title("Gráficas", accent="#FF6B6B")
-        col1, col2 = st.columns(2)
-
-        with col1:
-            if 'readiness_score' in df_filtered.columns:
-                rts = df_filtered.set_index('date')['readiness_score'].sort_index()
-                fig = create_readiness_chart(rts, "Readiness")
-                st.plotly_chart(fig, use_container_width=True)
-                
-                with st.expander("❓ ¿Qué significa Readiness?"):
-                    st.write("""
-**Qué mide:** Tu preparación hoy (0–100) combinando sueño, rendimiento reciente y señales de carga/fatiga.
-
-**Tendencia deseable:** Que oscile, pero con media estable.
-
-**Interpretación rápida:**
-- **80+:** Buen momento para empujar (intensidad alta, nuevos máximos)
-- **65–79:** Normal, entrena como siempre
-- **50–64:** Recorta volumen, mantén intensidad
-- **<50:** Descarga/descanso obligatorio
-
-**Cómo usarlo:** Guía la agresividad del entrenamiento, NO tu motivación.
-
-**Errores comunes:** Perseguir 90+ todos los días → suele acabar en fatiga.
-                    """)
-
-        with col2:
-            if 'performance_index' in df_filtered.columns:
-                pi = df_filtered.set_index('date')['performance_index'].sort_index()
-                fig = create_performance_chart(pi, "Performance Index")
-                st.plotly_chart(fig, use_container_width=True)
-                
-                with st.expander("❓ ¿Qué significa Performance Index?"):
-                    st.write("""
-**Qué mide:** Tu rendimiento relativo en lifts clave respecto a tu baseline (1.00 = normal).
-
-**Tendencia deseable:** Ligeramente ascendente a largo plazo con pequeñas caídas.
-
-**Interpretación rápida:**
-- **1.01+:** Progreso, estás mejorando
-- **0.99–1.01:** Mantenimiento, todo OK
-- **<0.98 + esfuerzo alto:** Posible fatiga acumulada
-
-**Cómo usarlo:** Mira 7 días, no el día aislado.
-
-**Errores comunes:** Leer una caída puntual como "estoy peor" sin contexto.
-                    """)
-
-        if 'volume' in df_filtered.columns:
-            vol = df_filtered.set_index('date')['volume'].sort_index()
-            fig = create_volume_chart(vol, "Volumen")
-            st.plotly_chart(fig, use_container_width=True)
-            
-            with st.expander("❓ ¿Qué significa Volumen?"):
-                st.write("""
-**Qué mide:** Carga total (sets × reps × kg). Es tu "trabajo acumulado".
-
-**Tendencia deseable:** Subidas en bloques + descargas periódicas.
-
-**Interpretación rápida:**
-- **Picos bruscos:** Riesgo de fatiga/lesión
-- **Progresión gradual:** Adaptaciones positivas
-- **Descensos:** Descargas planeadas (bien) o fatiga (revisar)
-
-**Regla práctica:** Volumen alto ≠ mejor si el rendimiento cae y el sueño empeora.
-
-**Errores comunes:** Ignorar descargas → acumulación innecesaria de fatiga.
-                """)
-
-        st.markdown("---")
-        st.caption("🔄 La app muestra datos ya procesados. Ejecuta el pipeline para recalcular.")
+        render_today_mode(df_daily)
 
 
 if __name__ == '__main__':
     main()
+
