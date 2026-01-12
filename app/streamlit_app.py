@@ -981,20 +981,85 @@ def main():
             letter-spacing: 0.03em;
         }
         
-        /* Button styling */
-        button, .stButton>button {
-            border-radius: 8px;
-            background: linear-gradient(135deg, var(--green) 0%, #00c070 100%);
-            color: #0B0E11;
-            border: none;
-            font-weight: 800;
-            letter-spacing: 0.04em;
-            transition: 0.25s ease;
+        /* CTA button styling (Streamlit primary button) */
+        div[data-testid="stButton"] > button[data-testid="stBaseButton-primary"],
+        button[data-testid="stBaseButton-primary"] {
+            width: 100% !important;
+            min-height: 56px !important;
+            border-radius: 14px !important;
+            background: linear-gradient(135deg, #00D084 0%, #00c070 100%) !important;
+            color: #0B0E11 !important;
+            border: none !important;
+            font-weight: 900 !important;
+            letter-spacing: 0.06em !important;
+            text-transform: uppercase !important;
+            font-size: 1.02rem !important;
+            transition: 0.25s ease !important;
+        }
+
+        div[data-testid="stButton"] > button[data-testid="stBaseButton-primary"]:hover,
+        button[data-testid="stBaseButton-primary"]:hover {
+            box-shadow: 0 0 18px rgba(0, 208, 132, 0.55) !important;
+            transform: translateY(-1px) !important;
+            background: linear-gradient(135deg, #00e094 0%, #00d080 100%) !important;
         }
         
-        button:hover, .stButton>button:hover {
-            box-shadow: 0 0 18px rgba(0, 208, 132, 0.55);
-            transform: translateY(-1px);
+        /* Radio Toggle Pill Styling */
+        div[data-testid="stRadio"] > div {
+            display: inline-flex;
+            gap: 8px;
+            padding: 6px;
+            border-radius: 9999px;
+            background: rgba(10,25,41,0.8);
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+        
+        /* Hide radio circles */
+        div[role="radiogroup"] input { 
+            display: none; 
+        }
+        
+        /* Each option as pill button */
+        div[role="radiogroup"] label {
+            cursor: pointer;
+            padding: 14px 32px;
+            border-radius: 9999px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 2px solid rgba(255,255,255,0.1);
+            box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset;
+        }
+        
+        /* Inactive colors by position */
+        div[role="radiogroup"] label:nth-child(1) { 
+            color: rgba(111, 231, 255, 0.5); 
+        }
+        div[role="radiogroup"] label:nth-child(2) { 
+            color: rgba(255, 106, 213, 0.5); 
+        }
+        
+        /* Active state with aria-checked */
+        div[role="radio"][aria-checked="true"] {
+            color: #fff !important;
+            border-color: transparent !important;
+        }
+        
+        div[role="radiogroup"] label:nth-child(1) div[role="radio"][aria-checked="true"] {
+            background: linear-gradient(135deg, #00D084 0%, #4ECDC4 100%);
+            color: #0a1929 !important;
+            box-shadow: 0 4px 15px rgba(0,208,132,0.3);
+        }
+        
+        div[role="radiogroup"] label:nth-child(2) div[role="radio"][aria-checked="true"] {
+            background: linear-gradient(135deg, #B266FF 0%, #9D4EDD 100%);
+            color: #fff !important;
+            box-shadow: 0 4px 15px rgba(178,102,255,0.3);
+        }
+        
+        /* Hover */
+        div[role="radiogroup"] label:hover { 
+            border-color: rgba(255,255,255,0.25); 
         }
         
         /* Divider */
@@ -1315,27 +1380,160 @@ def main():
 
     # ============== MODE TODAY (INSTANT) ==============
     elif view_mode == "Modo Hoy":
-        render_section_title("Modo Hoy — Ready Check", accent="#B266FF")
-        st.write("Introduce cómo te sientes **ahora mismo** y obtén recomendaciones instantáneas.")
-        
-        # UI helpers: badges + button styling
+        # === GAMING-DARK THEME + CUSTOM COMPONENTS ===
         st.markdown(
             """
             <style>
-            .badge {display:inline-block;padding:2px 8px;border-radius:8px;font-size:0.8rem;margin-left:6px}
-            .badge-green{background:#00D08420;color:#00D084;border:1px solid #00D084}
-            .badge-yellow{background:#FFB81C20;color:#FFB81C;border:1px solid #FFB81C}
-            .badge-red{background:#FF6B6B20;color:#FF6B6B;border:1px solid #FF6B6B}
-            div[data-testid="stFormSubmitButton"] button, .stButton>button{
-              background:linear-gradient(90deg,#00D084,#4ECDC4);color:#0b0b0b;font-weight:700;border:0;border-radius:8px}
+            /* Gaming-dark theme */
+            .stApp {
+                background: linear-gradient(135deg, #0a0e27 0%, #1a1a2e 100%);
+            }
+            
+            /* Mode Toggle */
+            .mode-toggle-container {
+                background: rgba(178, 102, 255, 0.08);
+                border-radius: 16px;
+                padding: 8px;
+                margin: 20px 0;
+                border: 2px solid rgba(178, 102, 255, 0.3);
+                box-shadow: 0 0 20px rgba(178, 102, 255, 0.15);
+            }
+            
+            /* Section cards */
+            .input-section {
+                background: rgba(255, 255, 255, 0.03);
+                border-radius: 12px;
+                padding: 20px;
+                margin: 16px 0;
+                border-left: 4px solid;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+                transition: all 0.3s ease;
+            }
+            .input-section:hover {
+                box-shadow: 0 6px 30px rgba(0, 0, 0, 0.4);
+                transform: translateY(-2px);
+            }
+            .section-recovery { border-left-color: #00D084; }
+            .section-state { border-left-color: #B266FF; }
+            .section-flags { border-left-color: #FF6B6B; }
+            
+            /* Section titles */
+            .section-header {
+                font-size: 1.3rem;
+                font-weight: 700;
+                margin-bottom: 12px;
+                letter-spacing: 0.5px;
+            }
+            .section-recovery .section-header { color: #00D084; }
+            .section-state .section-header { color: #B266FF; }
+            .section-flags .section-header { color: #FF6B6B; }
+            
+            /* Live feedback panel */
+            .live-feedback {
+                position: sticky;
+                top: 20px;
+                background: linear-gradient(135deg, rgba(0, 208, 132, 0.1) 0%, rgba(78, 205, 196, 0.1) 100%);
+                border: 2px solid rgba(0, 208, 132, 0.3);
+                border-radius: 16px;
+                padding: 20px;
+                margin: 20px 0;
+                box-shadow: 0 8px 32px rgba(0, 208, 132, 0.2);
+            }
+            
+            /* Readiness circle */
+            .readiness-circle {
+                width: 120px;
+                height: 120px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 16px;
+                font-size: 2.5rem;
+                font-weight: 800;
+                background: conic-gradient(from 0deg, #00D084 var(--progress), rgba(0, 208, 132, 0.1) var(--progress));
+                box-shadow: 0 0 30px rgba(0, 208, 132, 0.4);
+                animation: pulse-glow 2s ease-in-out infinite;
+            }
+            @keyframes pulse-glow {
+                0%, 100% { box-shadow: 0 0 30px rgba(0, 208, 132, 0.4); }
+                50% { box-shadow: 0 0 50px rgba(0, 208, 132, 0.6); }
+            }
+            
+            /* Action button */
+            .action-button {
+                background: linear-gradient(90deg, #00D084 0%, #4ECDC4 100%);
+                color: #0b0b0b;
+                font-weight: 800;
+                font-size: 1.2rem;
+                padding: 18px 32px;
+                border-radius: 12px;
+                border: none;
+                width: 100%;
+                cursor: pointer;
+                box-shadow: 0 6px 20px rgba(0, 208, 132, 0.4);
+                transition: all 0.3s ease;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+            .action-button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 30px rgba(0, 208, 132, 0.6);
+            }
+            
+            /* Slider dynamic colors */
+            .stSlider > div > div > div[data-baseweb="slider"] > div:first-child {
+                background: linear-gradient(90deg, #FF6B6B 0%, #FFB81C 50%, #00D084 100%) !important;
+            }
+            
+            /* Compact output card */
+            .compact-card {
+                background: linear-gradient(135deg, rgba(178, 102, 255, 0.1) 0%, rgba(0, 208, 132, 0.1) 100%);
+                border: 2px solid rgba(178, 102, 255, 0.3);
+                border-radius: 16px;
+                padding: 24px;
+                margin: 20px 0;
+                box-shadow: 0 8px 32px rgba(178, 102, 255, 0.2);
+            }
+            
+            /* Badges enhanced */
+            .badge-dynamic {
+                display: inline-block;
+                padding: 6px 14px;
+                border-radius: 20px;
+                font-size: 0.85rem;
+                font-weight: 600;
+                margin: 4px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            }
+            .badge-green { background: rgba(0, 208, 132, 0.2); color: #00D084; border: 1px solid #00D084; }
+            .badge-yellow { background: rgba(255, 184, 28, 0.2); color: #FFB81C; border: 1px solid #FFB81C; }
+            .badge-red { background: rgba(255, 107, 107, 0.2); color: #FF6B6B; border: 1px solid #FF6B6B; }
             </style>
             """,
             unsafe_allow_html=True,
         )
         
+        # === HEADER ===
+        st.markdown(
+            """
+            <div style='text-align:center;margin:20px 0 40px'>
+                <h1 style='font-size:2.5rem;font-weight:800;background:linear-gradient(90deg,#00D084,#4ECDC4);
+                -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px'>
+                    Ready Check
+                </h1>
+                <p style='color:#B266FF;font-size:1.1rem;font-weight:600'>
+                    Tu puntuación y plan personalizado en segundos
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        
+        # UI helpers
         def _badge(text:str, level:str):
             cls = {"ok":"badge-green","mid":"badge-yellow","low":"badge-red"}.get(level,"badge-yellow")
-            st.markdown(f"<span class='badge {cls}'>{text}</span>", unsafe_allow_html=True)
+            st.markdown(f"<span class='badge-dynamic {cls}'>{text}</span>", unsafe_allow_html=True)
         
         def _sleep_h_level(h:float):
             if h >= 7.5: return ("Excelente", "ok")
@@ -1407,21 +1605,41 @@ def main():
                         st.metric("Fatigue Sensitivity", f"{factors.get('fatigue_sensitivity', 1.0):.2f}x",
                                  delta=f"{factors.get('fatigue_sensitivity', 1.0) - 1.0:+.2f}x vs normal")
         
-        # Modo toggle
-        col_mode, col_reset = st.columns([3, 1])
-        with col_mode:
-            input_mode = st.radio("", ["▸ Modo Rápido (20s)", "▸ Modo Completo"], horizontal=True, key="input_mode_selector")
+        # === MODE TOGGLE (PILL STYLE) ===
+        col_toggle, col_reset = st.columns([4, 1])
+        with col_toggle:
+            mode = st.radio(
+                "Modo",
+                ["Rápido", "Preciso"],
+                horizontal=True,
+                label_visibility="collapsed",
+                key="mode_toggle"
+            )
+        
         with col_reset:
-            if st.button("🔄 Reset"):
+            if st.button("🔄"):
                 for key in list(st.session_state.keys()):
                     if key.startswith('mood_'):
                         del st.session_state[key]
                 st.rerun()
         
-        quick_mode = "Rápido" in input_mode
+        quick_mode = mode == "Rápido"
         
-        # === BLOQUE A: RECUPERACIÓN ===
-        render_section_title("A. Recuperación", accent="#00D084")
+        # === INPUTS ORGANIZADOS POR SECCIONES ===
+        st.markdown("<div style='margin-top:32px'></div>", unsafe_allow_html=True)
+        
+        # SECCIÓN A: RECUPERACIÓN (siempre visible)
+        st.markdown(
+            """
+            <div class='input-section section-recovery'>
+                <div class='section-header'>A. RECUPERACIÓN</div>
+                <p style='color:rgba(255,255,255,0.6);font-size:0.95rem;margin-bottom:16px'>
+                    Sueño y descanso
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
         col_rec1, col_rec2, col_rec3 = st.columns(3)
         
         with col_rec1:
@@ -1451,11 +1669,20 @@ def main():
                 sleep_disruptions = False
             
         # === BLOQUE B: ESTADO (SENSACIONES) ===
-        st.write("")
-        render_section_title("B. Estado", accent="#FFB81C")
+        st.markdown(
+            """
+            <div class='input-section section-state'>
+                <div class='section-header'>B. ESTADO</div>
+                <p style='color:rgba(255,255,255,0.6);font-size:0.95rem;margin-bottom:16px'>
+                    Cómo te sientes ahora mismo
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
         
-        # PERCEPCIÓN PERSONAL (nuevo input clave)
-        st.markdown("**● Sensación Personal** — Cómo te sientes realmente")
+        # PERCEPCIÓN PERSONAL (siempre visible, input clave)
+        st.markdown("**● Sensación Personal** — Tu intuición sobre readiness hoy")
         perceived_readiness = st.slider(
             "De 0 (fatal) a 10 (increíble)", 0, 10, 
             st.session_state.get('mood_perceived_readiness', 7),
@@ -1526,10 +1753,17 @@ def main():
             alcohol = False
             
         # === BLOQUE C: FLAGS (BANDERAS ROJAS) ===
-        st.write("")
-        render_section_title("C. Flags / Banderas Rojas", accent="#FF6B6B")
-        alert_card = "border-radius:12px;padding:12px;margin-bottom:8px;background:rgba(255,107,107,0.06);border-left:4px solid #FF6B6B;"
-        st.markdown(f"<div style='{alert_card}'>⚠️ Revisa estas señales antes de decidir la intensidad.</div>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class='input-section section-flags'>
+                <div class='section-header'>C. FLAGS / BANDERAS ROJAS</div>
+                <p style='color:rgba(255,255,255,0.6);font-size:0.95rem;margin-bottom:16px'>
+                    ⚠️ Señales que afectan tu capacidad de entrenar
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
         
         col_flag1, col_flag2, col_flag3 = st.columns(3)
         
@@ -1585,9 +1819,24 @@ def main():
                 session_goal = "fuerza"
                 time_available = 60
             
-        # Nota: se elimina la vista previa en tiempo real; se mostrará solo tras calcular
-        st.caption("Pulsa calcular para ver tu puntuación y plan")
-        submitted = st.button("▸ Calcular Readiness & Plan", use_container_width=True, type="primary")
+        # === ACTION BUTTON ===
+        st.markdown("<div style='margin:40px 0 20px'></div>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div style='text-align:center'>
+                <p style='color:rgba(255,255,255,0.5);font-size:0.9rem;margin-bottom:12px'>
+                    Obtén tu puntuación y plan personalizado
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        submitted = st.button(
+            "⚡ CALCULAR READINESS & PLAN",
+            use_container_width=True,
+            key="submit_readiness",
+            type="primary",
+        )
         
         # Persist inputs immediately on button click
         if submitted:
@@ -1660,10 +1909,6 @@ def main():
         
         # Show results if calculated
         if st.session_state.get('mood_calculated', False):
-            # === MINI RESUMEN PRE-CÁLCULO ===
-            st.markdown("---")
-            render_section_title("Resumen de tus inputs", accent="#FFB81C")
-            
             # Retrieve from session_state
             sleep_h = st.session_state.mood_sleep_h
             sleep_q = st.session_state.mood_sleep_q
@@ -1688,48 +1933,9 @@ def main():
             session_goal = st.session_state.mood_session_goal
             time_available = st.session_state.get('mood_time_available', 60)
             
-            # Chips de resumen
-            chips = []
+            st.markdown("<div style='margin:40px 0 20px'></div>", unsafe_allow_html=True)
             
-            # Sueño
-            if sleep_h >= 7.5:
-                chips.append(f"Sueño: {sleep_h}h (OK)")
-            elif sleep_h >= 6.5:
-                chips.append(f"Sueño: {sleep_h}h (Regular)")
-            else:
-                chips.append(f"Sueño: {sleep_h}h (Bajo)")
-            
-            # Fatiga
-            if fatigue <= 4:
-                chips.append(f"Fatiga: {fatigue}/10")
-            else:
-                chips.append(f"Fatiga: {fatigue}/10 (Alta)")
-            
-            # Estrés
-            if stress <= 4:
-                chips.append(f"Estrés: {stress}/10")
-            else:
-                chips.append(f"Estrés: {stress}/10 (Alto)")
-            
-            # Dolor
-            if pain_flag:
-                chips.append(f"Dolor: {pain_zone} ({pain_severity}/10)")
-            else:
-                chips.append("Dolor: No")
-            
-            # Enfermo
-            if sick_flag:
-                chips.append("Enfermo: Sí")
-            
-            # Alcohol
-            if alcohol:
-                chips.append("Alcohol: Sí (anoche)")
-            
-            st.markdown(" • ".join(chips))
-            
-            st.markdown("---")
-            
-            # Calculate readiness (ahora con nuevos factores + PERCEPCIÓN PERSONAL)
+            # Calculate readiness
             readiness_instant = calculate_readiness_from_inputs_v2(
                 sleep_h, sleep_q, fatigue, soreness, stress, motivation, pain_flag,
                 nap_mins, sleep_disruptions, energy, stiffness, caffeine, alcohol, sick_flag,
@@ -1777,125 +1983,211 @@ def main():
                 fatigue, soreness, stiffness, sick_flag, session_goal, fatigue_analysis
             )
             
-            # Display results
+            # Display results - TWO MODES
             st.markdown("---")
-            render_section_title("Tu Readiness HOY", accent="#00D084")
             
-            col_result1, col_result2, col_result3 = st.columns([2, 1.5, 1.5])
-            with col_result1:
-                readiness_text = f"{emoji} {readiness_instant}/100"
-                st.markdown(f"# {readiness_text}")
-            with col_result2:
-                st.write("")
-                render_section_title("Contexto Personal", accent="#00D084")
-                # Mostrar delta visual
-                if baselines.get('readiness', {}).get('p50'):
-                    p50 = baselines['readiness']['p50']
-                    p75 = baselines['readiness']['p75']
-                    delta = readiness_instant - p50
-                    
-                    if delta >= 0:
-                        delta_color = "🟢"
-                    else:
-                        delta_color = "🔴"
-                    
-                    st.markdown(f"**Tu media:** {p50:.0f} | **Alto (p75):** {p75:.0f}")
-                    st.markdown(f"{delta_color} **Hoy:** {delta:+.0f} vs media")
-                    
-                    # Barra de comparación visual
-                    progress_val = max(0, min(100, (readiness_instant / 100)))
-                    st.progress(progress_val)
-                    
-                    # Nota sobre comparación si hay suficientes datos
-                    n_days = baselines.get('readiness', {}).get('n', 0)
-                    if n_days < 14:
-                        st.caption(f"⏳ Basado en {n_days} días (más historia = mejor contexto)")
+            if quick_mode:
+                # ===== MODO RÁPIDO: Output compacto =====
+                render_section_title("Tu Readiness HOY", accent="#00D084")
+                
+                # Extract clean zone text and emoji
+                if readiness_instant >= 75:
+                    zone_text = "ALTA"
+                    zone_emoji = "🟢"
+                elif readiness_instant >= 55:
+                    zone_text = "MEDIA"
+                    zone_emoji = "🟡"
                 else:
-                    st.write("⏳ *Necesita más historia*")
-                    st.caption("(Mínimo 7 días para calcular tu baseline)")
-            with col_result3:
-                st.write("")
-                render_section_title("Riesgo de Lesión", accent="#FF6B6B")
-                st.write(f"{injury_risk['emoji']} **{injury_risk['risk_level'].upper()}**")
-                st.caption(f"Score: {injury_risk['score']:.0f}/100\n({injury_risk['confidence']} confianza)")
+                    zone_text = "BAJA"
+                    zone_emoji = "🔴"
+                
+                # Animated readiness circle
+                circle_color = "#00D084" if readiness_instant >= 75 else "#FFB81C" if readiness_instant >= 50 else "#FF6B6B"
+                
+                # Escape all text variables to prevent HTML breaking
+                import html
+                fatigue_type_safe = html.escape(str(fatigue_analysis.get('type', '')))
+                fatigue_reason_safe = html.escape(str(fatigue_analysis.get('reason', '')))
+                split_safe = html.escape(str(fatigue_analysis.get('target_split', '')).upper())
+                
+                # Build risk line separately
+                risk_html = ""
+                if injury_risk['risk_level'] != 'low':
+                    risk_level_safe = html.escape(str(injury_risk['risk_level']).upper())
+                    risk_score = injury_risk['score']
+                    risk_html = f"<br><strong style='color:#B266FF;'>Riesgo:</strong> {risk_level_safe} ({risk_score:.0f}/100)"
+                
+                circle_html = f"""
+                <div style="display:flex; align-items:center; gap:30px; margin:30px 0;">
+                    <div style="position:relative; width:140px; height:140px;">
+                        <svg width="140" height="140" viewBox="0 0 140 140">
+                            <circle cx="70" cy="70" r="60" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="12"/>
+                            <circle cx="70" cy="70" r="60" fill="none" stroke="{circle_color}" stroke-width="12" 
+                                    stroke-dasharray="{readiness_instant * 3.77} 377" 
+                                    stroke-linecap="round" 
+                                    transform="rotate(-90 70 70)"
+                                    style="transition: stroke-dasharray 1s ease;"/>
+                        </svg>
+                        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center;">
+                            <div style="font-size:2.5rem; font-weight:800; color:{circle_color};">{readiness_instant}</div>
+                            <div style="font-size:0.85rem; color:#aaa; margin-top:-8px;">/ 100</div>
+                        </div>
+                    </div>
+                    <div style="flex:1;">
+                        <div style="font-size:1.3rem; font-weight:700; color:#eaeaea; margin-bottom:10px;">
+                            {zone_emoji} {zone_text}
+                        </div>
+                        <div style="font-size:0.95rem; color:#bbb; line-height:1.6;">
+                            <strong style="color:{circle_color};">Fatiga {fatigue_type_safe}:</strong> {fatigue_reason_safe}<br>
+                            <strong style="color:#4ECDC4;">Hoy:</strong> {split_safe}{risk_html}
+                        </div>
+                    </div>
+                </div>
+                """
+                st.markdown(circle_html, unsafe_allow_html=True)
+                
+                # Brief recommendation card
+                def _clean_line(s: str) -> str:
+                    s = str(s).strip()
+                    if s.startswith("- ") or s.startswith("• "):
+                        s = s[2:].strip()
+                    s = s.replace("**", "")
+                    return s
+                
+                plan_clean = [s for s in (_clean_line(p) for p in plan[:3]) if s]  # Top 3 actions only
+                compact_card = f"""
+                <div style="border-radius:12px; padding:20px; background:linear-gradient(135deg, rgba(0,208,132,0.1), rgba(78,205,196,0.1)); 
+                            border:1px solid rgba(0,208,132,0.3);">
+                    <div style="font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#00D084; margin-bottom:12px;">
+                        ⚡ Acción Rápida
+                    </div>
+                    <div style="font-size:0.95rem; color:#eaeaea; line-height:1.8;">
+                        {'<br>'.join(['• ' + l for l in plan_clean])}
+                    </div>
+                </div>
+                """
+                st.markdown(compact_card, unsafe_allow_html=True)
+                
+            else:
+                # ===== MODO PRECISO: Output completo con gráficos =====
+                render_section_title("Tu Readiness HOY", accent="#00D084")
+                
+                col_result1, col_result2, col_result3 = st.columns([2, 1.5, 1.5])
+                with col_result1:
+                    readiness_text = f"{emoji} {readiness_instant}/100"
+                    st.markdown(f"# {readiness_text}")
+                with col_result2:
+                    st.write("")
+                    render_section_title("Contexto Personal", accent="#00D084")
+                    # Mostrar delta visual
+                    if baselines.get('readiness', {}).get('p50'):
+                        p50 = baselines['readiness']['p50']
+                        p75 = baselines['readiness']['p75']
+                        delta = readiness_instant - p50
+                        
+                        if delta >= 0:
+                            delta_color = "🟢"
+                        else:
+                            delta_color = "🔴"
+                        
+                        st.markdown(f"**Tu media:** {p50:.0f} | **Alto (p75):** {p75:.0f}")
+                        st.markdown(f"{delta_color} **Hoy:** {delta:+.0f} vs media")
+                        
+                        # Barra de comparación visual
+                        progress_val = max(0, min(100, (readiness_instant / 100)))
+                        st.progress(progress_val)
+                        
+                        # Nota sobre comparación si hay suficientes datos
+                        n_days = baselines.get('readiness', {}).get('n', 0)
+                        if n_days < 14:
+                            st.caption(f"⏳ Basado en {n_days} días (más historia = mejor contexto)")
+                    else:
+                        st.write("⏳ *Necesita más historia*")
+                        st.caption("(Mínimo 7 días para calcular tu baseline)")
+                with col_result3:
+                    st.write("")
+                    render_section_title("Riesgo de Lesión", accent="#FF6B6B")
+                    st.write(f"{injury_risk['emoji']} **{injury_risk['risk_level'].upper()}**")
+                    st.caption(f"Score: {injury_risk['score']:.0f}/100\n({injury_risk['confidence']} confianza)")
+                
+                # Show injury risk factors if not low
+                if injury_risk['risk_level'] != 'low':
+                    st.warning(f"⚠️ **{injury_risk['action']}**")
+                    with st.expander("Factores de riesgo"):
+                        for factor in injury_risk['factors']:
+                            st.write(f"• {factor}")
+                
+                # Advice Cards (compact UI)
+                st.markdown("---")
+                render_section_title("Consejos de hoy", accent="#FFB81C")
+
+                def render_card(title: str, lines: list[str], accent: str = "#4ECDC4"):
+                    card_style = (
+                        "border-radius:12px; padding:16px; margin-bottom:12px; "
+                        "background-color: rgba(255,255,255,0.03); "
+                        "border-left: 4px solid " + accent + ";"
+                    )
+                    title_style = (
+                        "display:flex; align-items:center; gap:8px; "
+                        "font-weight:700; text-transform:uppercase; letter-spacing:0.5px; "
+                        f"color:{accent}; margin-bottom:10px;"
+                    )
+                    # filter out empty/whitespace lines to avoid blank bullets
+                    safe_lines = [str(l).strip() for l in lines if str(l).strip()]
+                    bullet_html = "".join([f"<div>• {l}</div>" for l in safe_lines])
+                    st.markdown(
+                        f"<div style='{card_style}'>"
+                        f"<div style='{title_style}'><span style='width:14px;height:3px;background:{accent};display:inline-block;border-radius:2px'></span>{title}</div>"
+                        f"<div style='font-size:0.95rem;color:#eaeaea;'>" + bullet_html + "</div>"
+                        + "</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                def _clean_line(s: str) -> str:
+                    s = str(s).strip()
+                    # remove leading markdown bullets
+                    if s.startswith("- ") or s.startswith("• "):
+                        s = s[2:].strip()
+                    # remove bold markers
+                    s = s.replace("**", "")
+                    return s
+
+                col_a, col_b = st.columns(2)
+
+                with col_a:
+                    fatigue_lines = [
+                        f"Diagnóstico: {fatigue_analysis['reason']}",
+                        f"Split recomendado: {fatigue_analysis['target_split'].upper()}",
+                    ]
+                    if 'intensity_hint' in fatigue_analysis:
+                        fatigue_lines.append(f"Intensidad sugerida: {fatigue_analysis['intensity_hint']}")
+                    fatigue_lines.append("Acciones específicas:")
+                    fatigue_lines.extend(fatigue_analysis.get('recommendations', []))
+                    render_card(
+                        f"Tipo de Fatiga: {fatigue_analysis['type'].upper()}",
+                        fatigue_lines,
+                        accent="#FFB81C",
+                    )
+
+                with col_b:
+                    plan_clean = [s for s in (_clean_line(p) for p in plan) if s]
+                    render_card("Plan accionable", plan_clean, accent="#FFB81C")
+
+                rules_clean = [s for s in (_clean_line(r) for r in rules) if s]
+                render_card("Reglas de hoy", rules_clean, accent="#FF6B6B")
             
-            # Show injury risk factors if not low
-            if injury_risk['risk_level'] != 'low':
-                st.warning(f"⚠️ **{injury_risk['action']}**")
-                with st.expander("Factores de riesgo"):
-                    for factor in injury_risk['factors']:
-                        st.write(f"• {factor}")
-            
-            # Advice Cards (compact UI)
-            st.markdown("---")
-            render_section_title("Consejos de hoy", accent="#FFB81C")
-
-            def render_card(title: str, lines: list[str], accent: str = "#4ECDC4"):
-                card_style = (
-                    "border-radius:12px; padding:16px; margin-bottom:12px; "
-                    "background-color: rgba(255,255,255,0.03); "
-                    "border-left: 4px solid " + accent + ";"
-                )
-                title_style = (
-                    "display:flex; align-items:center; gap:8px; "
-                    "font-weight:700; text-transform:uppercase; letter-spacing:0.5px; "
-                    f"color:{accent}; margin-bottom:10px;"
-                )
-                # filter out empty/whitespace lines to avoid blank bullets
-                safe_lines = [str(l).strip() for l in lines if str(l).strip()]
-                bullet_html = "".join([f"<div>• {l}</div>" for l in safe_lines])
-                st.markdown(
-                    f"<div style='{card_style}'>"
-                    f"<div style='{title_style}'><span style='width:14px;height:3px;background:{accent};display:inline-block;border-radius:2px'></span>{title}</div>"
-                    f"<div style='font-size:0.95rem;color:#eaeaea;'>" + bullet_html + "</div>"
-                    + "</div>",
-                    unsafe_allow_html=True,
-                )
-
-            def _clean_line(s: str) -> str:
-                s = str(s).strip()
-                # remove leading markdown bullets
-                if s.startswith("- ") or s.startswith("• "):
-                    s = s[2:].strip()
-                # remove bold markers
-                s = s.replace("**", "")
-                return s
-
-            col_a, col_b = st.columns(2)
-
-            with col_a:
-                fatigue_lines = [
-                    f"Diagnóstico: {fatigue_analysis['reason']}",
-                    f"Split recomendado: {fatigue_analysis['target_split'].upper()}",
-                ]
-                if 'intensity_hint' in fatigue_analysis:
-                    fatigue_lines.append(f"Intensidad sugerida: {fatigue_analysis['intensity_hint']}")
-                fatigue_lines.append("Acciones específicas:")
-                fatigue_lines.extend(fatigue_analysis.get('recommendations', []))
-                render_card(
-                    f"Tipo de Fatiga: {fatigue_analysis['type'].upper()}",
-                    fatigue_lines,
-                    accent="#FFB81C",
-                )
-
-            with col_b:
-                plan_clean = [s for s in (_clean_line(p) for p in plan) if s]
-                render_card("Plan accionable", plan_clean, accent="#FFB81C")
-
-            rules_clean = [s for s in (_clean_line(r) for r in rules) if s]
-            render_card("Reglas de hoy", rules_clean, accent="#FF6B6B")
-            
-            # Save option
-            st.markdown("---")
-            col_save1, col_save2 = st.columns([3, 1])
-            with col_save1:
-                st.write("**Guardar este día en el histórico** para que el motor lo aprenda y recalcule tendencias.")
-            with col_save2:
-                if st.button("💾 Guardar", use_container_width='stretch'):
-                    today = datetime.date.today()
-                    save_mood_to_csv(
-                        today, sleep_h, sleep_q, fatigue, soreness, stress, motivation,
-                        pain_flag, pain_location, readiness_instant
+            # Save option (only in precise mode)
+            if not quick_mode:
+                st.markdown("---")
+                col_save1, col_save2 = st.columns([3, 1])
+                with col_save1:
+                    st.write("**Guardar este día en el histórico** para que el motor lo aprenda y recalcule tendencias.")
+                with col_save2:
+                    if st.button("💾 Guardar", use_container_width='stretch'):
+                        today = datetime.date.today()
+                        save_mood_to_csv(
+                            today, sleep_h, sleep_q, fatigue, soreness, stress, motivation,
+                            pain_flag, pain_location, readiness_instant
                     )
                     st.success(f"✅ Guardado para {today}")
                     st.info("💡 **Próximo paso:** ejecuta el pipeline para que se regenere el histórico con estos datos.")
