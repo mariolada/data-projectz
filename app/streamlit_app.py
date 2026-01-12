@@ -383,8 +383,9 @@ def create_readiness_chart(data, title="Readiness"):
     fig.add_hrect(y0=0, y1=55, fillcolor="rgba(255, 68, 68, 0.1)", line_width=0, annotation_text="Baja", annotation_position="right")
     
     # Línea principal con gradient
+    x_vals = pd.to_datetime(data.index)
     fig.add_trace(go.Scatter(
-        x=data.index,
+        x=x_vals,
         y=data.values,
         mode='lines+markers',
         name='Readiness',
@@ -392,7 +393,7 @@ def create_readiness_chart(data, title="Readiness"):
         marker=dict(size=8, color='#B266FF', line=dict(color='#FFFFFF', width=2)),
         fill='tozeroy',
         fillcolor='rgba(178, 102, 255, 0.2)',
-        hovertemplate='<b>%{x}</b><br>Readiness: %{y:.0f}/100<extra></extra>'
+        hovertemplate='<b>%{x|%d/%m/%Y}</b><br>Readiness: %{y:.0f}/100<extra></extra>'
     ))
     
     fig.update_layout(
@@ -400,7 +401,7 @@ def create_readiness_chart(data, title="Readiness"):
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         font=dict(color='#E0E0E0'),
-        xaxis=dict(showgrid=True, gridcolor='rgba(178, 102, 255, 0.1)', zeroline=False),
+        xaxis=dict(showgrid=True, gridcolor='rgba(178, 102, 255, 0.1)', zeroline=False, tickformat='%d/%m/%Y'),
         yaxis=dict(showgrid=True, gridcolor='rgba(178, 102, 255, 0.1)', zeroline=False, range=[0, 105]),
         hovermode='x unified',
         margin=dict(l=40, r=40, t=40, b=40),
@@ -413,28 +414,30 @@ def create_readiness_chart(data, title="Readiness"):
 def create_volume_chart(data, title="Volumen"):
     """Crea gráfica de volumen con estilo gaming y gradient."""
     fig = go.Figure()
+
+    x_vals = pd.to_datetime(data.index)
     
     fig.add_trace(go.Scatter(
-        x=data.index,
+        x=x_vals,
         y=data.values,
         mode='lines',
         name='Volumen',
         line=dict(color='#00D084', width=0),
         fill='tozeroy',
         fillcolor='rgba(0, 208, 132, 0.3)',
-        hovertemplate='<b>%{x}</b><br>Volumen: %{y:,.0f} kg<extra></extra>'
+        hovertemplate='<b>%{x|%d/%m/%Y}</b><br>Volumen: %{y:,.0f} kg<extra></extra>'
     ))
     
     # Añadir línea superior para efecto
     fig.add_trace(go.Scatter(
-        x=data.index,
+        x=x_vals,
         y=data.values,
         mode='lines+markers',
         name='Volumen',
         line=dict(color='#00D084', width=3, shape='spline'),
         marker=dict(size=6, color='#00D084'),
         showlegend=False,
-        hovertemplate='<b>%{x}</b><br>Volumen: %{y:,.0f} kg<extra></extra>'
+        hovertemplate='<b>%{x|%d/%m/%Y}</b><br>Volumen: %{y:,.0f} kg<extra></extra>'
     ))
     
     fig.update_layout(
@@ -442,7 +445,7 @@ def create_volume_chart(data, title="Volumen"):
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         font=dict(color='#E0E0E0'),
-        xaxis=dict(showgrid=True, gridcolor='rgba(0, 208, 132, 0.1)', zeroline=False),
+        xaxis=dict(showgrid=True, gridcolor='rgba(0, 208, 132, 0.1)', zeroline=False, tickformat='%d/%m/%Y'),
         yaxis=dict(showgrid=True, gridcolor='rgba(0, 208, 132, 0.1)', zeroline=False),
         hovermode='x unified',
         margin=dict(l=40, r=40, t=40, b=40),
@@ -453,31 +456,33 @@ def create_volume_chart(data, title="Volumen"):
 
 
 def create_sleep_chart(data, title="Sueño"):
-    """Crea gráfica de sueño con barras estilo gaming."""
+    """Crea gráfica de sueño con línea+área estilo gaming (igual que readiness)."""
     fig = go.Figure()
     
     # Zona óptima de sueño
     fig.add_hrect(y0=7, y1=9, fillcolor="rgba(0, 208, 132, 0.1)", line_width=0)
     
-    colors = ['#FFB81C' if val < 7 else '#00D084' for val in data.values]
-    
-    fig.add_trace(go.Bar(
-        x=data.index,
+    colors = ['#FFB81C' if float(val) < 7 else '#00D084' for val in data.values]
+
+    x_vals = pd.to_datetime(data.index)
+    fig.add_trace(go.Scatter(
+        x=x_vals,
         y=data.values,
+        mode='lines+markers',
         name='Sueño',
-        marker=dict(
-            color=colors,
-            line=dict(color='#FFFFFF', width=1)
-        ),
-        hovertemplate='<b>%{x}</b><br>Sueño: %{y:.1f}h<extra></extra>'
+        line=dict(color='#4ECDC4', width=3, shape='spline'),
+        marker=dict(size=8, color=colors, line=dict(color='#FFFFFF', width=2)),
+        fill='tozeroy',
+        fillcolor='rgba(78, 205, 196, 0.18)',
+        hovertemplate='<b>%{x|%d/%m/%Y}</b><br>Sueño: %{y:.1f} h<extra></extra>'
     ))
     
     fig.update_layout(
-        title=dict(text=title, font=dict(size=16, color='#FFB81C', family='Orbitron')),
+        title=dict(text=title, font=dict(size=16, color='#4ECDC4', family='Orbitron')),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         font=dict(color='#E0E0E0'),
-        xaxis=dict(showgrid=False, zeroline=False),
+        xaxis=dict(showgrid=True, gridcolor='rgba(78, 205, 196, 0.10)', zeroline=False, tickformat='%d/%m/%Y'),
         yaxis=dict(showgrid=True, gridcolor='rgba(255, 184, 28, 0.1)', zeroline=False, range=[0, max(data.max() * 1.1, 10)]),
         hovermode='x unified',
         margin=dict(l=40, r=40, t=40, b=40),
@@ -499,14 +504,15 @@ def create_acwr_chart(data, title="ACWR (Carga)"):
     # Línea óptima
     fig.add_hline(y=1.0, line_dash="dash", line_color="rgba(255, 255, 255, 0.3)", annotation_text="1.0")
     
+    x_vals = pd.to_datetime(data.index)
     fig.add_trace(go.Scatter(
-        x=data.index,
+        x=x_vals,
         y=data.values,
         mode='lines+markers',
         name='ACWR',
         line=dict(color='#FF6B6B', width=3, shape='spline'),
         marker=dict(size=8, color='#FF6B6B', line=dict(color='#FFFFFF', width=2)),
-        hovertemplate='<b>%{x}</b><br>ACWR: %{y:.2f}<extra></extra>'
+        hovertemplate='<b>%{x|%d/%m/%Y}</b><br>ACWR: %{y:.2f}<extra></extra>'
     ))
     
     fig.update_layout(
@@ -514,7 +520,7 @@ def create_acwr_chart(data, title="ACWR (Carga)"):
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         font=dict(color='#E0E0E0'),
-        xaxis=dict(showgrid=True, gridcolor='rgba(255, 107, 107, 0.1)', zeroline=False),
+        xaxis=dict(showgrid=True, gridcolor='rgba(255, 107, 107, 0.1)', zeroline=False, tickformat='%d/%m/%Y'),
         yaxis=dict(showgrid=True, gridcolor='rgba(255, 107, 107, 0.1)', zeroline=False, range=[0, max(data.max() * 1.2, 2.0) if data.max() > 0 else 2.0]),
         hovermode='x unified',
         margin=dict(l=40, r=40, t=40, b=40),
@@ -594,7 +600,7 @@ def create_strain_chart(data, title="Strain"):
 def create_weekly_volume_chart(data, title="Volumen Semanal"):
     """Bar chart semanal para ver claro un único punto o pocos puntos."""
     fig = go.Figure()
-    x = [d.strftime("%Y-%m-%d") for d in data.index]  # Convert to string for categorical axis
+    x = [pd.to_datetime(d).strftime("%d/%m/%Y") for d in data.index]  # Spanish date format
     fig.add_trace(go.Bar(
         x=x,
         y=data.values,
@@ -620,7 +626,7 @@ def create_weekly_volume_chart(data, title="Volumen Semanal"):
 def create_weekly_strain_chart(data, title="Strain"):
     """Bar chart semanal para strain, útil con muestras cortas."""
     fig = go.Figure()
-    x = [d.strftime("%Y-%m-%d") for d in data.index]  # Convert to string for categorical axis
+    x = [pd.to_datetime(d).strftime("%d/%m/%Y") for d in data.index]  # Spanish date format
     fig.add_trace(go.Bar(
         x=x,
         y=data.values,
@@ -1004,62 +1010,158 @@ def main():
             background: linear-gradient(135deg, #00e094 0%, #00d080 100%) !important;
         }
         
-        /* Radio Toggle Pill Styling */
-        div[data-testid="stRadio"] > div {
+        /* ===== RADIO STYLES (SCOPED) ===== */
+
+        /* Mode toggle (Rápido / Preciso) — scoped by key (BaseWeb radios)
+           Your DOM is: label > div(indicator) + input + div(text)
+        */
+
+        /* Track */
+        .st-key-mode_toggle div[role="radiogroup"] {
+            position: relative;
             display: inline-flex;
-            gap: 8px;
+            gap: 0;
             padding: 6px;
             border-radius: 9999px;
-            background: rgba(10,25,41,0.8);
+            background: rgba(10,25,41,0.75);
             border: 1px solid rgba(255,255,255,0.12);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
         }
-        
-        /* Hide radio circles */
-        div[role="radiogroup"] input { 
-            display: none; 
-        }
-        
-        /* Each option as pill button */
-        div[role="radiogroup"] label {
-            cursor: pointer;
-            padding: 14px 32px;
+
+        /* Sliding highlight (best-effort; supported in modern Chrome/Edge) */
+        .st-key-mode_toggle div[role="radiogroup"]::before {
+            content: "";
+            position: absolute;
+            top: 6px;
+            bottom: 6px;
+            left: 6px;
+            width: calc(50% - 0px);
             border-radius: 9999px;
-            font-weight: 700;
-            letter-spacing: 0.3px;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            border: 2px solid rgba(255,255,255,0.1);
-            box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset;
+            background: linear-gradient(135deg, #00D084 0%, #4ECDC4 100%);
+            box-shadow: 0 0 0 2px rgba(0,208,132,0.18), 0 10px 26px rgba(0,0,0,0.25);
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), background 0.35s ease, box-shadow 0.35s ease;
         }
-        
+
+        .st-key-mode_toggle div[role="radiogroup"]:has(label[data-baseweb="radio"]:nth-child(2) input:checked)::before {
+            transform: translateX(100%);
+            background: linear-gradient(135deg, #B266FF 0%, #9D4EDD 100%);
+            box-shadow: 0 0 0 2px rgba(178,102,255,0.20), 0 10px 26px rgba(0,0,0,0.25);
+        }
+
+        .st-key-mode_toggle div[role="radiogroup"] label[data-baseweb="radio"] {
+            position: relative !important;
+            z-index: 1 !important;
+            flex: 1 1 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: 0 !important;
+            background: transparent !important;
+            cursor: pointer !important;
+        }
+
+        /* Hide BaseWeb indicator block (first div inside label) */
+        .st-key-mode_toggle div[role="radiogroup"] label[data-baseweb="radio"] > div:first-child {
+            display: none !important;
+        }
+
+        /* Hide the real input but keep checked state */
+        .st-key-mode_toggle div[role="radiogroup"] label[data-baseweb="radio"] > input {
+            position: absolute !important;
+            opacity: 0 !important;
+            width: 1px !important;
+            height: 1px !important;
+            pointer-events: none !important;
+        }
+
+        /* Surface for label text (kept transparent so the slider is visible)
+           Fallback rules below still support per-pill highlight if :has() isn't supported.
+        */
+        .st-key-mode_toggle div[role="radiogroup"] label[data-baseweb="radio"] > input + div,
+        .st-key-mode_toggle div[role="radiogroup"] label[data-baseweb="radio"] input + div {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 12px 26px !important;
+            border-radius: 9999px !important;
+            border: 2px solid transparent !important;
+            background: transparent !important;
+            font-weight: 900 !important;
+            letter-spacing: 0.04em !important;
+            white-space: nowrap !important;
+            transition: color 0.25s ease, transform 0.25s ease !important;
+        }
+
+        /* Any SVG artifacts inside the labels */
+        .st-key-mode_toggle div[role="radiogroup"] label[data-baseweb="radio"] svg {
+            display: none !important;
+        }
+
         /* Inactive colors by position */
-        div[role="radiogroup"] label:nth-child(1) { 
-            color: rgba(111, 231, 255, 0.5); 
+        .st-key-mode_toggle div[role="radiogroup"] label[data-baseweb="radio"]:nth-child(1) > input + div {
+            color: rgba(111, 231, 255, 0.60) !important;
         }
-        div[role="radiogroup"] label:nth-child(2) { 
-            color: rgba(255, 106, 213, 0.5); 
+        .st-key-mode_toggle div[role="radiogroup"] label[data-baseweb="radio"]:nth-child(2) > input + div {
+            color: rgba(255, 106, 213, 0.60) !important;
         }
-        
-        /* Active state with aria-checked */
-        div[role="radio"][aria-checked="true"] {
-            color: #fff !important;
+
+        /* Checked text color (works with or without slider) */
+        .st-key-mode_toggle div[role="radiogroup"] label[data-baseweb="radio"] > input:checked + div,
+        .st-key-mode_toggle div[role="radiogroup"] label[data-baseweb="radio"] input:checked + div {
+            transform: translateY(-1px) !important;
+            color: #0a1929 !important;
+        }
+
+        /* Fallback: if :has() isn't supported, highlight the checked pill directly */
+        .st-key-mode_toggle div[role="radiogroup"]:not(:has(label[data-baseweb="radio"] input)) label[data-baseweb="radio"] > input:checked + div {
             border-color: transparent !important;
         }
-        
-        div[role="radiogroup"] label:nth-child(1) div[role="radio"][aria-checked="true"] {
-            background: linear-gradient(135deg, #00D084 0%, #4ECDC4 100%);
+        .st-key-mode_toggle div[role="radiogroup"] label[data-baseweb="radio"]:nth-child(1) > input:checked + div {
+            background: linear-gradient(135deg, #00D084 0%, #4ECDC4 100%) !important;
+            box-shadow: 0 0 0 2px rgba(0,208,132,0.18), 0 10px 26px rgba(0,0,0,0.25) !important;
+        }
+        .st-key-mode_toggle div[role="radiogroup"] label[data-baseweb="radio"]:nth-child(2) > input:checked + div {
+            background: linear-gradient(135deg, #B266FF 0%, #9D4EDD 100%) !important;
+            box-shadow: 0 0 0 2px rgba(178,102,255,0.20), 0 10px 26px rgba(0,0,0,0.25) !important;
+        }
+
+        .st-key-mode_toggle div[role="radiogroup"] label[data-baseweb="radio"]:hover > input + div {
+            border-color: rgba(255,255,255,0.22) !important;
+        }
+
+        /* Sidebar view toggle (Día / Modo Hoy / Semana) — scoped by key */
+        .st-key-view_mode div[data-testid="stRadio"] > div {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 10px;
+            border-radius: 16px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.10);
+        }
+
+        .st-key-view_mode div[role="radiogroup"] input { display: none !important; }
+        .st-key-view_mode div[role="radio"] svg { display: none !important; }
+        .st-key-view_mode div[role="radio"] > div:first-child { display: none !important; }
+
+        .st-key-view_mode div[role="radiogroup"] label {
+            cursor: pointer;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.10);
+            background: rgba(10,25,41,0.35);
+            transition: all 0.25s ease;
+        }
+
+        .st-key-view_mode div[role="radio"][aria-checked="true"] {
+            background: linear-gradient(135deg, #00D084 0%, #4ECDC4 100%) !important;
             color: #0a1929 !important;
-            box-shadow: 0 4px 15px rgba(0,208,132,0.3);
+            border-color: transparent !important;
+            box-shadow: 0 0 0 2px rgba(0, 208, 132, 0.25), 0 10px 24px rgba(0,0,0,0.25) !important;
         }
-        
-        div[role="radiogroup"] label:nth-child(2) div[role="radio"][aria-checked="true"] {
-            background: linear-gradient(135deg, #B266FF 0%, #9D4EDD 100%);
-            color: #fff !important;
-            box-shadow: 0 4px 15px rgba(178,102,255,0.3);
-        }
-        
-        /* Hover */
-        div[role="radiogroup"] label:hover { 
-            border-color: rgba(255,255,255,0.25); 
+
+        .st-key-view_mode div[role="radiogroup"] label:hover {
+            border-color: rgba(255,255,255,0.22);
+            transform: translateY(-1px);
         }
         
         /* Divider */
@@ -1248,7 +1350,7 @@ def main():
 
     # Sidebar: view selector (day/week/today)
     st.sidebar.markdown("<div class='sidebar-title'>Configuración</div>", unsafe_allow_html=True)
-    view_mode = st.sidebar.radio("Vista", ["Día", "Modo Hoy", "Semana"])
+    view_mode = st.sidebar.radio("Vista", ["Día", "Modo Hoy", "Semana"], key="view_mode")
 
     # Sidebar: date range filter - Solo mostrar en modo Día
     dates = sorted(df_daily['date'].unique())
@@ -1287,7 +1389,11 @@ def main():
 
     # ============== DAY VIEW ==============
     if view_mode == "📅 Día":
-        render_section_title(f"Panel Diario — {selected_date}", accent="#B266FF")
+        try:
+            selected_date_label = pd.to_datetime(selected_date).strftime('%d/%m/%Y')
+        except Exception:
+            selected_date_label = selected_date
+        render_section_title(f"Panel Diario — {selected_date_label}", accent="#B266FF")
         
         if selected_date is None:
             st.info("No hay datos para mostrar.")
@@ -2214,7 +2320,7 @@ def main():
             
             # Combine last 7 days + today
             chart_data = pd.concat([last_7_days_pred, today_row], ignore_index=True)
-            chart_data['date'] = pd.to_datetime(chart_data['date']).dt.date
+            chart_data['date'] = pd.to_datetime(chart_data['date'])
             chart_data = chart_data.sort_values('date', ascending=True)
             
             if not chart_data.empty:
@@ -2296,6 +2402,11 @@ def main():
                     'strain': 'Strain',
                     'readiness_avg': 'Readiness'
                 })
+                if 'Semana (inicio)' in df_weekly_display.columns:
+                    df_weekly_display['Semana (inicio)'] = (
+                        pd.to_datetime(df_weekly_display['Semana (inicio)'], errors='coerce')
+                        .dt.strftime('%d/%m/%Y')
+                    )
                 for col in ['Volumen', 'Strain']:
                     if col in df_weekly_display.columns:
                         df_weekly_display[col] = df_weekly_display[col].round(0).astype('Int64')
@@ -2420,6 +2531,13 @@ def main():
     
     display_df = df_filtered[hist_cols_existing].sort_values('date', ascending=False).reset_index(drop=True)
     display_df = display_df.fillna('—')
+
+    if 'date' in display_df.columns:
+        display_df['date'] = (
+            pd.to_datetime(display_df['date'], errors='coerce')
+            .dt.strftime('%d/%m/%Y')
+            .fillna(display_df['date'].astype(str))
+        )
     
     # Apply conditional formatting BEFORE converting to string
     def color_readiness(val):
