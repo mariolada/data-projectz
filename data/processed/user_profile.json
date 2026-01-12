@@ -1,0 +1,46 @@
+{
+  "sleep_responsiveness": {
+    "correlation": 0.39771374813910265,
+    "strength": "weak",
+    "p_value": 0.017982071734701132,
+    "n_samples": 35,
+    "interpretation": "Sueño tiene efecto DÉBIL en tu readiness (r=0.40). No es tu factor clave.",
+    "sleep_responsive": false,
+    "recommendation": "Investiga otros factores (cafeína, estrés, carga)"
+  },
+  "perceived_vs_metrics": {
+    "correlation_sleep": 0.19063142489315005,
+    "correlation_volume": -0.21088048171452434,
+    "trust_intuition": true,
+    "discrepancy_rate": 0.37142857142857144,
+    "interpretation": "Tu percepción NO correlaciona con sueño (r=0.19). Confías en otros factores (estrés, carga, café).",
+    "recommendation": "Tu intuición es valiosa, sigue registrándola"
+  },
+  "archetype": {
+    "archetype": "standard",
+    "confidence": 0.75,
+    "reason": "Tu media es ~7.2h (normal)",
+    "all_detected": [
+      "standard"
+    ]
+  },
+  "adjustment_factors": {
+    "sleep_weight": 0.15,
+    "performance_weight": 0.25,
+    "acwr_weight": 0.15,
+    "fatigue_sensitivity": 0.7,
+    "recovery_speed": 1.0
+  },
+  "insights": [
+    "✨ Eres **standard**: Tu media es ~7.2h (normal)",
+    "😴 Sueño tiene efecto DÉBIL en tu readiness (r=0.40). No es tu factor clave.",
+    "🧠 Tu percepción NO correlaciona con sueño (r=0.19). Confías en otros factores (estrés, carga, café)."
+  ],
+  "last_updated": "2026-01-12T11:28:51.098931",
+  "data_quality": {
+    "total_days": 35,
+    "days_with_sleep": 35,
+    "days_with_readiness": 35,
+    "days_with_perceived": 35
+  }
+}
