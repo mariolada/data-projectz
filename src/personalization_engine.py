@@ -159,6 +159,111 @@ def analyze_sleep_responsiveness(df_daily: pd.DataFrame, min_days: int = 7) -> D
     }
 
 
+def analyze_perceived_vs_metrics(df_daily: pd.DataFrame, min_days: int = 7) -> Dict[str, Any]:
+    """
+    Analiza la relación entre PERCEPCIÓN PERSONAL (perceived_readiness) y métricas objetivas.
+    
+    Retorna:
+    - correlation_sleep: correlación entre perceived y sleep_hours
+    - correlation_volume: correlación entre perceived y volume
+    - trust_intuition: bool (¿Tu percepción es confiable vs métricas objetivas?)
+    - discrepancy_rate: % de días donde tu percepción difiere >2 puntos de lo esperado
+    - interpretation: texto amigable
+    
+    Ej: Si perceived es alta incluso con poco sueño consistentemente → "Eres poco sensible a sueño"
+        Si perceived es baja incluso con buen sueño → "Investiga otros factores (estrés, enfermedad)"
+    """
+    if df_daily.empty or len(df_daily) < min_days:
+        return {
+            'correlation_sleep': np.nan,
+            'correlation_volume': np.nan,
+            'trust_intuition': None,
+            'discrepancy_rate': 0,
+            'interpretation': 'Insuficientes datos para análisis (mín 7 días)',
+            'recommendation': 'Registra más días con percepción personal'
+        }
+    
+    if 'perceived_readiness' not in df_daily.columns:
+        return {
+            'correlation_sleep': np.nan,
+            'correlation_volume': np.nan,
+            'trust_intuition': None,
+            'discrepancy_rate': 0,
+            'interpretation': 'No hay datos de percepción personal',
+            'recommendation': 'Empieza a registrar cómo te sientes (0-10) cada día'
+        }
+    
+    perceived = df_daily['perceived_readiness'].dropna()
+    if len(perceived) < min_days:
+        return {
+            'correlation_sleep': np.nan,
+            'correlation_volume': np.nan,
+            'trust_intuition': None,
+            'discrepancy_rate': 0,
+            'interpretation': f'Solo {len(perceived)} días con percepción registrada',
+            'recommendation': 'Registra más días con percepción personal'
+        }
+    
+    # Correlaciones
+    corr_sleep = np.nan
+    corr_volume = np.nan
+    
+    if 'sleep_hours' in df_daily.columns:
+        sleep_data = df_daily.loc[perceived.index, 'sleep_hours'].dropna()
+        common_idx = perceived.index.intersection(sleep_data.index)
+        if len(common_idx) >= min_days:
+            corr_sleep, _ = stats.pearsonr(
+                perceived.loc[common_idx].values,
+                sleep_data.loc[common_idx].values
+            )
+    
+    if 'volume' in df_daily.columns:
+        volume_data = df_daily.loc[perceived.index, 'volume'].dropna()
+        common_idx = perceived.index.intersection(volume_data.index)
+        if len(common_idx) >= min_days:
+            corr_volume, _ = stats.pearsonr(
+                perceived.loc[common_idx].values * -1,  # Invertir: más volumen → peor percepción
+                volume_data.loc[common_idx].values
+            )
+    
+    # Discrepancias: comparar perceived vs readiness_score (si está disponible)
+    discrepancy_rate = 0
+    if 'readiness_score' in df_daily.columns:
+        readiness = df_daily.loc[perceived.index, 'readiness_score'].dropna()
+        common_idx = perceived.index.intersection(readiness.index)
+        if len(common_idx) >= min_days:
+            # Normalizar perceived (0-10) a (0-100) para comparar
+            perceived_norm = perceived.loc[common_idx] * 10
+            readiness_vals = readiness.loc[common_idx]
+            discrepancies = abs(perceived_norm - readiness_vals) > 20  # >20 puntos de diferencia
+            discrepancy_rate = discrepancies.mean()
+    
+    # Interpretación
+    if pd.notna(corr_sleep):
+        if abs(corr_sleep) < 0.3:
+            interpretation = f'Tu percepción NO correlaciona con sueño (r={corr_sleep:.2f}). Confías en otros factores (estrés, carga, café).'
+            trust_intuition = True
+        elif abs(corr_sleep) < 0.6:
+            interpretation = f'Tu percepción correlaciona MODERADAMENTE con sueño (r={corr_sleep:.2f}). Equilibras objetivo + subjetivo.'
+            trust_intuition = True
+        else:
+            interpretation = f'Tu percepción sigue muy de cerca tu sueño (r={corr_sleep:.2f}). Confía en tus métricas.'
+            trust_intuition = False
+    else:
+        interpretation = 'Datos insuficientes para análisis completo.'
+        trust_intuition = None
+    
+    return {
+        'correlation_sleep': float(corr_sleep) if pd.notna(corr_sleep) else None,
+        'correlation_volume': float(corr_volume) if pd.notna(corr_volume) else None,
+        'trust_intuition': trust_intuition,
+        'discrepancy_rate': float(discrepancy_rate),
+        'interpretation': interpretation,
+        'recommendation': 'Tu intuición es valiosa, sigue registrándola' if trust_intuition else 'Considera dar más peso a métricas objetivas'
+    }
+
+
+
 def detect_user_archetype(df_daily: pd.DataFrame) -> Dict[str, Any]:
     """
     Detecta qué "tipo" de atleta eres basándote en tu histórico.
@@ -330,6 +435,7 @@ def create_user_profile(df_daily: pd.DataFrame) -> Dict[str, Any]:
     """
     
     sleep_resp = analyze_sleep_responsiveness(df_daily)
+    perceived_analysis = analyze_perceived_vs_metrics(df_daily)  # NUEVO
     archetype = detect_user_archetype(df_daily)
     adjustment_factors = calculate_personal_adjustment_factors(df_daily)
     
@@ -342,6 +448,14 @@ def create_user_profile(df_daily: pd.DataFrame) -> Dict[str, Any]:
             'interpretation': sleep_resp['interpretation'],
             'sleep_responsive': bool(sleep_resp['sleep_responsive']) if sleep_resp['sleep_responsive'] is not None else None,
             'recommendation': sleep_resp['recommendation']
+        },
+        'perceived_vs_metrics': {
+            'correlation_sleep': perceived_analysis.get('correlation_sleep'),
+            'correlation_volume': perceived_analysis.get('correlation_volume'),
+            'trust_intuition': perceived_analysis.get('trust_intuition'),
+            'discrepancy_rate': float(perceived_analysis.get('discrepancy_rate', 0)),
+            'interpretation': perceived_analysis['interpretation'],
+            'recommendation': perceived_analysis['recommendation']
         },
         'archetype': {
             'archetype': archetype['archetype'],
@@ -361,7 +475,8 @@ def create_user_profile(df_daily: pd.DataFrame) -> Dict[str, Any]:
         'data_quality': {
             'total_days': int(len(df_daily)),
             'days_with_sleep': int(df_daily['sleep_hours'].notna().sum() if 'sleep_hours' in df_daily.columns else 0),
-            'days_with_readiness': int(df_daily['readiness_score'].notna().sum() if 'readiness_score' in df_daily.columns else 0)
+            'days_with_readiness': int(df_daily['readiness_score'].notna().sum() if 'readiness_score' in df_daily.columns else 0),
+            'days_with_perceived': int(df_daily['perceived_readiness'].notna().sum() if 'perceived_readiness' in df_daily.columns else 0)
         }
     }
     
@@ -371,6 +486,10 @@ def create_user_profile(df_daily: pd.DataFrame) -> Dict[str, Any]:
     
     if profile['sleep_responsiveness']['sleep_responsive'] is not None:
         profile['insights'].append(f"😴 {profile['sleep_responsiveness']['interpretation']}")
+    
+    # NUEVO: Insight sobre percepción personal
+    if perceived_analysis.get('trust_intuition') is not None:
+        profile['insights'].append(f"🧠 {perceived_analysis['interpretation']}")
     
     # Insight sobre recuperación
     if 'adjustment_factors' in profile:

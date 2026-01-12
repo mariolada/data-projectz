@@ -152,26 +152,44 @@ def compute_component_scores(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def compute_readiness(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calcula readiness score basado en métricas objetivas y PERCEPCIÓN PERSONAL si está disponible.
+    Si perceived_readiness (0-10) está presente, pesa 25%, reduciendo otros componentes proporcionalmente.
+    """
     out = df.copy()
 
     # Rellenar scores faltantes con valores por defecto (0.5 = neutral/promedio)
-    # Así podemos calcular readiness incluso con datos incompletos en los primeros días
     sleep_h_score = out["sleep_hours_score"].fillna(0.5)
     sleep_q_score = out["sleep_quality_score"].fillna(0.5)
     perf_score = out["perf_score"].fillna(0.5)
     trend_score = out["trend_score"].fillna(0.5)
     acwr_score = out["acwr_score"].fillna(0.5)
     rir_score = out["rir_fatigue_score"].fillna(0.5)
+    
+    # PERCEPCIÓN PERSONAL: si existe y es válida (0-10), usarla con peso 25%
+    has_perceived = 'perceived_readiness' in out.columns
+    if has_perceived:
+        perceived_score = out['perceived_readiness'].fillna(np.nan) / 10.0
+        # Solo aplicar peso si hay valor válido
+        perceived_weight = 0.25 * perceived_score.where(perceived_score.notna(), 0)
+        base_multiplier = perceived_score.notna().astype(float) * 0.75 + perceived_score.isna().astype(float) * 1.0
+    else:
+        perceived_weight = 0
+        base_multiplier = 1.0
 
     # Readiness base (0–1)
     # Sueño 40% (25 + 15), performance 25%, trend 10%, acwr 15%, fatiga por RIR 10%
+    # Si hay perceived, estos pesos se reducen proporcionalmente
     out["readiness_0_1"] = (
-        0.25 * sleep_h_score +
-        0.15 * sleep_q_score +
-        0.25 * perf_score +
-        0.10 * trend_score +
-        0.15 * acwr_score +
-        0.10 * rir_score
+        perceived_weight +
+        base_multiplier * (
+            0.25 * sleep_h_score +
+            0.15 * sleep_q_score +
+            0.25 * perf_score +
+            0.10 * trend_score +
+            0.15 * acwr_score +
+            0.10 * rir_score
+        )
     )
 
     out["readiness_score"] = (out["readiness_0_1"] * 100).round()

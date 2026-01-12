@@ -38,11 +38,34 @@ df_training.to_csv('data/raw/training.csv', index=False)
 print('✓ training.csv')
 
 # ===== SLEEP.CSV (raw) =====
-sleep_data = [{
-    'date': date.strftime('%Y-%m-%d'),
-    'sleep_hours': np.random.uniform(6, 9),
-    'sleep_quality': np.random.uniform(1, 5)
-} for date in dates]
+sleep_data = []
+for date in dates:
+    # Simulación de sueño con variabilidad
+    base_sleep = 7.5
+    sleep_hours = np.clip(np.random.normal(base_sleep, 0.8), 5.0, 9.5)
+    sleep_quality = np.random.choice([1, 2, 3, 4, 5], p=[0.05, 0.15, 0.3, 0.35, 0.15])
+    
+    # PERCEPCIÓN PERSONAL: cómo te sientes (puede no correlacionar 100% con sueño)
+    # A veces duermes poco pero te sientes bien (café, adrenalina, etc.)
+    # A veces duermes bien pero te sientes mal (estrés, enfermo, etc.)
+    perceived_base = 7.0  # Media neutral
+    # Correlación parcial con sueño (~60%)
+    sleep_influence = (sleep_hours - 6.5) * 0.6  # +/- 1.8 aprox
+    quality_influence = (sleep_quality - 3) * 0.3  # +/- 0.6 aprox
+    random_variation = np.random.normal(0, 1.2)  # Variación subjetiva
+    
+    perceived_readiness = np.clip(
+        perceived_base + sleep_influence + quality_influence + random_variation,
+        1, 10
+    )
+    perceived_readiness = round(perceived_readiness, 1)
+    
+    sleep_data.append({
+        'date': date.strftime('%Y-%m-%d'),
+        'sleep_hours': round(sleep_hours, 1),
+        'sleep_quality': sleep_quality,
+        'perceived_readiness': perceived_readiness
+    })
 
 df_sleep = pd.DataFrame(sleep_data)
 df_sleep.to_csv('data/raw/sleep.csv', index=False)

@@ -196,10 +196,19 @@ def aggregate_weekly_from_daily(daily: pd.DataFrame) -> pd.DataFrame:
 # Sueño + flags
 # ----------------------------
 def merge_sleep(daily: pd.DataFrame, sleep: pd.DataFrame) -> pd.DataFrame:
+    """
+    Merge daily aggregations con sleep data.
+    Si sleep.csv contiene 'perceived_readiness' (0-10), se incluye.
+    Si no, se crea la columna con NaN (para rellenar luego manualmente o desde UI).
+    """
     s = sleep.copy()
     s = normalize_dates(s, "date")
 
     out = daily.merge(s, on="date", how="left")
+    
+    # Si no existe perceived_readiness en sleep.csv, crear columna vacía
+    if 'perceived_readiness' not in out.columns:
+        out['perceived_readiness'] = np.nan
 
     # Flag fatiga robusto: volumen alto (P75) + sueño bajo (P25)
     # (se calcula sobre días con sueño disponible)
