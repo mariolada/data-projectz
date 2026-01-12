@@ -2092,89 +2092,8 @@ def main():
             # Display results - TWO MODES
             st.markdown("---")
             
-            if quick_mode:
-                # ===== MODO RÁPIDO: Output compacto =====
-                render_section_title("Tu Readiness HOY", accent="#00D084")
-                
-                # Extract clean zone text and emoji
-                if readiness_instant >= 75:
-                    zone_text = "ALTA"
-                    zone_emoji = "🟢"
-                elif readiness_instant >= 55:
-                    zone_text = "MEDIA"
-                    zone_emoji = "🟡"
-                else:
-                    zone_text = "BAJA"
-                    zone_emoji = "🔴"
-                
-                # Animated readiness circle
-                circle_color = "#00D084" if readiness_instant >= 75 else "#FFB81C" if readiness_instant >= 50 else "#FF6B6B"
-                
-                # Escape all text variables to prevent HTML breaking
-                import html
-                fatigue_type_safe = html.escape(str(fatigue_analysis.get('type', '')))
-                fatigue_reason_safe = html.escape(str(fatigue_analysis.get('reason', '')))
-                split_safe = html.escape(str(fatigue_analysis.get('target_split', '')).upper())
-                
-                # Build risk line separately
-                risk_html = ""
-                if injury_risk['risk_level'] != 'low':
-                    risk_level_safe = html.escape(str(injury_risk['risk_level']).upper())
-                    risk_score = injury_risk['score']
-                    risk_html = f"<br><strong style='color:#B266FF;'>Riesgo:</strong> {risk_level_safe} ({risk_score:.0f}/100)"
-                
-                circle_html = f"""
-                <div style="display:flex; align-items:center; gap:30px; margin:30px 0;">
-                    <div style="position:relative; width:140px; height:140px;">
-                        <svg width="140" height="140" viewBox="0 0 140 140">
-                            <circle cx="70" cy="70" r="60" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="12"/>
-                            <circle cx="70" cy="70" r="60" fill="none" stroke="{circle_color}" stroke-width="12" 
-                                    stroke-dasharray="{readiness_instant * 3.77} 377" 
-                                    stroke-linecap="round" 
-                                    transform="rotate(-90 70 70)"
-                                    style="transition: stroke-dasharray 1s ease;"/>
-                        </svg>
-                        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center;">
-                            <div style="font-size:2.5rem; font-weight:800; color:{circle_color};">{readiness_instant}</div>
-                            <div style="font-size:0.85rem; color:#aaa; margin-top:-8px;">/ 100</div>
-                        </div>
-                    </div>
-                    <div style="flex:1;">
-                        <div style="font-size:1.3rem; font-weight:700; color:#eaeaea; margin-bottom:10px;">
-                            {zone_emoji} {zone_text}
-                        </div>
-                        <div style="font-size:0.95rem; color:#bbb; line-height:1.6;">
-                            <strong style="color:{circle_color};">Fatiga {fatigue_type_safe}:</strong> {fatigue_reason_safe}<br>
-                            <strong style="color:#4ECDC4;">Hoy:</strong> {split_safe}{risk_html}
-                        </div>
-                    </div>
-                </div>
-                """
-                st.markdown(circle_html, unsafe_allow_html=True)
-                
-                # Brief recommendation card
-                def _clean_line(s: str) -> str:
-                    s = str(s).strip()
-                    if s.startswith("- ") or s.startswith("• "):
-                        s = s[2:].strip()
-                    s = s.replace("**", "")
-                    return s
-                
-                plan_clean = [s for s in (_clean_line(p) for p in plan[:3]) if s]  # Top 3 actions only
-                compact_card = f"""
-                <div style="border-radius:12px; padding:20px; background:linear-gradient(135deg, rgba(0,208,132,0.1), rgba(78,205,196,0.1)); 
-                            border:1px solid rgba(0,208,132,0.3);">
-                    <div style="font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#00D084; margin-bottom:12px;">
-                        ⚡ Acción Rápida
-                    </div>
-                    <div style="font-size:0.95rem; color:#eaeaea; line-height:1.8;">
-                        {'<br>'.join(['• ' + l for l in plan_clean])}
-                    </div>
-                </div>
-                """
-                st.markdown(compact_card, unsafe_allow_html=True)
-                
-            else:
+            # ===== INFORMACIÓN COMPLETA (MODO RÁPIDO Y PRECISO) =====
+            if True:  # Show full output in both modes
                 # ===== MODO PRECISO: Output completo con gráficos =====
                 render_section_title("Tu Readiness HOY", accent="#00D084")
                 
@@ -2282,7 +2201,7 @@ def main():
                 rules_clean = [s for s in (_clean_line(r) for r in rules) if s]
                 render_card("Reglas de hoy", rules_clean, accent="#FF6B6B")
             
-            # Save option (only in precise mode)
+            # Save option (both modes now show full output)
             if not quick_mode:
                 st.markdown("---")
                 col_save1, col_save2 = st.columns([3, 1])

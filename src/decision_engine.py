@@ -22,6 +22,11 @@ REQUIRED_DAILY_COLUMNS = [
     "sleep_hours", "sleep_quality", "fatigue_flag"
 ]
 
+# Columnas mínimas para sesiones de ejercicio (por-ejemplo OHP)
+EXERCISE_MIN_COLUMNS = [
+    "date", "exercise", "load_top", "reps_top", "rir_top"
+]
+
 
 def load_processed_daily(path: str) -> pd.DataFrame:
     df = pd.read_csv(path)
@@ -32,6 +37,20 @@ def load_processed_daily(path: str) -> pd.DataFrame:
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values("date").reset_index(drop=True)
     return df
+
+
+def load_exercise_sessions(path: Path) -> pd.DataFrame:
+    """Carga sesiones por ejercicio si el archivo existe; si falta, retorna None."""
+    if not path.exists():
+        return None
+    df = pd.read_csv(path)
+    missing = [c for c in EXERCISE_MIN_COLUMNS if c not in df.columns]
+    if missing:
+        raise ValueError(f"Faltan columnas obligatorias en {path.name}: {missing}")
+    df["date"] = pd.to_datetime(df["date"])
+    # Normalizar nombres de ejercicio
+    df["exercise"] = df["exercise"].str.lower().str.strip()
+    return df.sort_values("date").reset_index(drop=True)
 
 
 # ----------------------------
@@ -355,6 +374,141 @@ def export_outputs(df: pd.DataFrame, out_dir: str) -> None:
     df[existing].to_csv(out_path / "flags_daily.csv", index=False)
 
 
+def export_ohp_flags(flags: list, out_dir: str) -> None:
+    """Exporta flags/insights de OHP a JSON sencillo."""
+    out_path = Path(out_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+    out_file = out_path / "ohp_flags.json"
+    with open(out_file, "w", encoding="utf-8") as f:
+        json.dump(flags, f, indent=2, ensure_ascii=False)
+    print(f"✓ OHP flags guardados en {out_file} ({len(flags)} hallazgos)")
+
+
+def _estimate_e1rm(load_kg: float, reps: float, rir: float) -> float:
+    """Estimación rápida de e1RM (Epley) ajustando reps si hay RIR>0."""
+    if pd.isna(load_kg) or pd.isna(reps):
+        return np.nan
+    reps_eff = reps + max(rir, 0) * 0.5 if not pd.isna(rir) else reps
+    return float(load_kg * (1.0 + reps_eff / 30.0))
+
+
+def detect_ohp_neuromuscular_patterns(ohp_df: pd.DataFrame, sleep_p50: float = None, stress_col: str = "stress") -> list:
+    """
+    Detecta patrones de fatiga/volatilidad en OHP (Overhead Press).
+    Retorna lista de dicts con id, title, action y evidencia.
+    Requiere columnas: date, load_top, reps_top, rir_top, exercise (normalizado a "ohp").
+    Opcionales: sleep_hours, stress.
+    """
+    if ohp_df is None or ohp_df.empty:
+        return []
+
+    df = ohp_df.copy()
+    df = df[df["exercise"].str.contains("ohp|overhead", na=False)]
+    if df.empty:
+        return []
+
+    # Asegurar e1rm_top
+    if "e1rm_top" not in df.columns:
+        df["e1rm_top"] = df.apply(lambda r: _estimate_e1rm(r["load_top"], r["reps_top"], r.get("rir_top", np.nan)), axis=1)
+    else:
+        df["e1rm_top"] = df["e1rm_top"].fillna(df.apply(lambda r: _estimate_e1rm(r["load_top"], r["reps_top"], r.get("rir_top", np.nan)), axis=1))
+
+    # Sleep p50 si no viene de fuera
+    if sleep_p50 is None and "sleep_hours" in df.columns:
+        sleep_p50 = df["sleep_hours"].median()
+    if sleep_p50 is None:
+        sleep_p50 = 7.0
+
+    df = df.sort_values("date")
+    recent = df.tail(10)  # últimas 10 sesiones de OHP
+    if len(recent) < 4:
+        return []
+
+    flags = []
+    tol_load = 2.5
+
+    def same_load_mask(load_val: float):
+        return recent["load_top"].sub(load_val).abs() <= tol_load
+
+    e1rm_median = recent["e1rm_top"].median()
+    rir_median = recent["rir_top"].median()
+    last = recent.iloc[-1]
+
+    # FLAG 1 — Drop con buen descanso
+    if "sleep_hours" in recent.columns:
+        good_rest = (recent["sleep_hours"] >= sleep_p50)
+        if stress_col in recent.columns:
+            good_rest &= (recent[stress_col] <= 6)
+        if good_rest.any():
+            ref = recent[good_rest].iloc[-1]
+            mask_same = same_load_mask(ref["load_top"])
+            median_reps_same = recent.loc[mask_same, "reps_top"].median()
+            median_rir_same = recent.loc[mask_same, "rir_top"].median()
+            rep_drop = ref["reps_top"] <= (median_reps_same - 1)
+            rir_drop = ref["rir_top"] <= (median_rir_same - 1)
+            e1rm_drop = ref["e1rm_top"] < e1rm_median * 0.99
+            if rep_drop or rir_drop or e1rm_drop:
+                flags.append({
+                    "id": "ohp_drop_good_rest",
+                    "title": "Fatiga neuromuscular en OHP",
+                    "action": "Sube RIR objetivo +1–2 y recorta 10–20% sets de OHP.",
+                    "evidence": {
+                        "load": ref["load_top"],
+                        "reps": ref["reps_top"],
+                        "e1rm": ref["e1rm_top"],
+                        "median_e1rm": e1rm_median
+                    }
+                })
+
+    # FLAG 2 — Grinding trap
+    if rir_median < 1.5 and e1rm_median <= recent.iloc[0]["e1rm_top"] * 1.005:
+        flags.append({
+            "id": "ohp_grinding",
+            "title": "Grinding trap en OHP",
+            "action": "1 semana OHP @RIR 2–3, volumen moderado o -20%.",
+            "evidence": {
+                "median_rir": rir_median,
+                "median_e1rm": e1rm_median
+            }
+        })
+
+    # FLAG 3 — Volatilidad alta
+    ref_load = last["load_top"]
+    comp = recent[same_load_mask(ref_load)]
+    if len(comp) >= 3:
+        rng = comp["reps_top"].max() - comp["reps_top"].min()
+        std = comp["reps_top"].std()
+        low_rir_share = (comp["rir_top"] <= 1).mean()
+        if ((rng >= 2) or (std is not None and std >= 1)) and (low_rir_share >= 0.5):
+            flags.append({
+                "id": "ohp_volatility",
+                "title": "Volatilidad alta en OHP",
+                "action": "Máx 1 set @RIR0/semana; top set @RIR1 + backoffs.",
+                "evidence": {
+                    "range_reps": rng,
+                    "std_reps": std,
+                    "low_rir_share": low_rir_share
+                }
+            })
+
+    # FLAG 4 — Degradación con mal sueño
+    if "sleep_hours" in recent.columns and last["sleep_hours"] < sleep_p50:
+        if last["e1rm_top"] < e1rm_median * 0.99:
+            flags.append({
+                "id": "ohp_sleep_related",
+                "title": "Bajada de OHP alineada con sueño bajo",
+                "action": "Reduce volumen y evita máximos hoy (causa: sueño bajo).",
+                "evidence": {
+                    "last_sleep": last["sleep_hours"],
+                    "p50_sleep": sleep_p50,
+                    "e1rm": last["e1rm_top"],
+                    "median_e1rm": e1rm_median
+                }
+            })
+
+    return flags
+
+
 def export_user_profile(df_daily: pd.DataFrame, out_dir: str) -> None:
     """Crea y guarda el perfil personalizado del usuario como JSON."""
     out_path = Path(out_dir)
@@ -394,6 +548,19 @@ def main(daily_path: str, out_dir: str) -> None:
     
     # === NUEVO: Guardar perfil del usuario ===
     export_user_profile(df, out_dir)
+
+    # === NUEVO: Detectar patrones OHP si hay datos de ejercicio ===
+    exercise_path = Path(daily_path).parent / "daily_exercise.csv"
+    ohp_flags = []
+    try:
+        exercise_df = load_exercise_sessions(exercise_path)
+        if exercise_df is not None:
+            sleep_p50 = df["sleep_hours"].median()
+            ohp_flags = detect_ohp_neuromuscular_patterns(exercise_df, sleep_p50=sleep_p50, stress_col="stress")
+            if ohp_flags:
+                export_ohp_flags(ohp_flags, out_dir)
+    except Exception as exc:
+        print(f"⚠️  No se pudieron calcular flags OHP: {exc}")
 
 
 if __name__ == "__main__":
