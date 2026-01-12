@@ -1,0 +1,41 @@
+Original weekly code block:
+if latest_row is not None:
+    fatigue_analysis = detect_fatigue_type(
+        latest_row['readiness_score'],
+        latest_row['sleep_hours'],
+        latest_row.get('performance_index', 1.0),
+        latest_row['fatigue'],
+        latest_row['motivation'],
+        baselines
+    )
+    
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        st.markdown(f"""
+        **Tipo de fatiga:** {fatigue_analysis['type'].upper()}  
+        **Confianza:** {fatigue_analysis['confidence']}  
+        **Severidad:** {fatigue_analysis['severity']}
+        """)
+    
+    with col_f2:
+        st.markdown("**Indicadores detectados:**")
+        for indicator in fatigue_analysis['indicators']:
+            st.markdown(f"- {indicator}")
+    
+    st.markdown("**Split recomendado:**")
+    split = fatigue_analysis['target_split'].upper()
+    split_emoji = {"UPPER": "💪", "LOWER": "🦵", "REST": "😴", "LIGHT": "🚶"}.get(split, "🏋️")
+    st.markdown(f"{split_emoji} **{split}** — {fatigue_analysis['reasoning']}")
+    
+    weekly_plan = suggest_weekly_sequence(df_filtered, baselines)
+    if weekly_plan:
+        render_section_title("📅 Plan Semanal Sugerido", accent="#00D084")
+        st.markdown("**Secuencia óptima para los próximos 7 días:**")
+        for day_plan in weekly_plan:
+            day_num = day_plan.get('day', '?')
+            split_type = day_plan.get('split', 'rest').upper()
+            intensity = day_plan.get('intensity', 'moderate')
+            reason = day_plan.get('reason', '')
+            
+            day_emoji = {"UPPER": "💪", "LOWER": "🦵", "FULL": "🏋️", "REST": "😴", "LIGHT": "🚶"}.get(split_type, "🏋️")
+            st.markdown(f"**Día {day_num}:** {day_emoji} {split_type} ({intensity}) — {reason}")

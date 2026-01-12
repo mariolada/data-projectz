@@ -48,8 +48,7 @@ from data.formatters import (
 )
 
 # ===== IMPORTS EXTERNOS (src) =====
-sys.path.append(str(Path(__file__).parent.parent / 'src'))
-from personalization_engine import (
+from src.personalization_engine import (
     calculate_personal_baselines,
     calculate_personal_adjustment_factors,
     contextualize_readiness,
@@ -151,7 +150,7 @@ def render_today_mode(df_daily):
     col_input, col_feedback = st.columns([3, 2])
     
     with col_input:
-        st.markdown('<div class="eyebrow" style="margin-bottom:12px;">📋 DATOS DE HOY</div>', unsafe_allow_html=True)
+        render_section_title("📋 Datos de Hoy", accent="#FFB81C")
 
         mode = st.radio("Modo", ["Rápido", "Preciso"], horizontal=True, key="input_mode")
         
@@ -397,6 +396,23 @@ def render_today_mode(df_daily):
 </div>
 </div>
 """
+            else:
+                # Quick-mode compact readiness analysis (zone + intensity)
+                if readiness >= 80:
+                    intensity_txt = "Push: RIR 1–2"
+                elif readiness >= 55:
+                    intensity_txt = "Normal: RIR 2–3"
+                else:
+                    intensity_txt = "Conservador: RIR 3–5"
+
+                summary_html = f"""
+<div style='margin-top:12px; padding:12px; border-radius:12px; background:linear-gradient(135deg, rgba(0,208,132,0.20), rgba(78,205,196,0.08)); border:1px solid rgba(0,208,132,0.35); box-shadow:0 8px 20px rgba(0,208,132,0.18);'>
+<div style='display:flex; flex-wrap:wrap; gap:10px;'>
+<span style='color:{zone_color}; font-weight:900; letter-spacing:0.05em;'>Zona: {zone_display}</span>
+<span style='color:#9CA3AF; font-weight:700;'>Intensidad: {intensity_txt}</span>
+</div>
+</div>
+"""
 
             plan_html = f"""
 <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 18px; box-shadow: 0 8px 24px rgba(0,0,0,0.25);">
@@ -415,24 +431,20 @@ def render_today_mode(df_daily):
                 factors_html = "".join([f"<div>• {_clean_line(f)}</div>" for f in injury_risk.get('factors', [])])
                 render_section_title("Riesgo de Lesión", accent="#FF6B6B")
                 st.markdown(f"""
-                <div class="hero" style="border-left: 4px solid {risk_color};">
-                    <div style="display:flex; align-items:center; gap:16px;">
-                        <div style="width:60px; height:60px; border-radius:50%; background:{risk_color}; opacity:0.85;"></div>
-                        <div>
-                            <div class="eyebrow">NIVEL DE RIESGO</div>
-                            <h2 style="color:{risk_color}; margin:4px 0; text-transform:uppercase;">{injury_risk['risk_level']}</h2>
-                            <div class="sub">Score: {injury_risk['score']:.0f}/100 • {injury_risk['confidence']}</div>
-                        </div>
-                    </div>
+                <div class="hero" style="display:flex; flex-direction:column; align-items:center; text-align:center; padding:18px; border-left: 4px solid {risk_color};">
+                    <div class="eyebrow">NIVEL DE RIESGO</div>
+                    <div style="width:60px; height:60px; border-radius:50%; background:{risk_color}; opacity:0.85; margin:8px 0;"></div>
+                    <h2 style="color:{risk_color}; margin:4px 0; text-transform:uppercase;">{injury_risk['risk_level']}</h2>
+                    <div class="sub">Score: {injury_risk['score']:.0f}/100 • {injury_risk['confidence']}</div>
                     <div style="margin-top:12px; color:#E5E7EB;">{_clean_line(injury_risk['action'])}</div>
-                    <div style="margin-top:8px; color:#9CA3AF; font-size:0.9rem;">{factors_html}</div>
+                    <div style="margin-top:8px; color:#9CA3AF; font-size:0.9rem; text-align:left; max-width:520px;">{factors_html}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
             if mode == "Preciso" and fatigue_analysis is not None:
                 render_section_title("Análisis de Fatiga", accent="#4ECDC4")
                 st.markdown(f"""
-                <div class="hero">
+                <div class="hero" style="display:flex; flex-direction:column; align-items:center; text-align:center; padding:18px;">
                     <div class="eyebrow">TIPO DE FATIGA DETECTADA</div>
                     <h2 style="color:#4ECDC4; margin:4px 0;">{fatigue_analysis.get('type','').upper()}</h2>
                     <div class="sub">{_clean_line(fatigue_analysis.get('reason',''))}</div>
@@ -735,45 +747,70 @@ def render_week_view(df_filtered, df_weekly, user_profile):
     latest_row = df_filtered.iloc[-1] if not df_filtered.empty else None
     
     if latest_row is not None:
+        # Adaptar llamada a detect_fatigue_type con columnas seguras y defaults
+        sleep_hours = float(latest_row.get('sleep_hours', baselines.get('sleep', {}).get('p50', 7.0)))
+        sleep_quality = int(latest_row.get('sleep_quality', 3))
+        stress = int(latest_row.get('stress', 5))
+        fatigue_val = int(latest_row.get('fatigue', latest_row.get('effort_level', 5)))
+        soreness = int(latest_row.get('soreness', 0))
+        pain_flag = bool(latest_row.get('pain_flag', (latest_row.get('pain_severity', 0) or 0) > 0))
+        pain_location = str(latest_row.get('pain_location', latest_row.get('pain_zone', '') or ''))
+        readiness_instant = int(latest_row.get('readiness_score', 50))
+
         fatigue_analysis = detect_fatigue_type(
-            latest_row['readiness_score'],
-            latest_row['sleep_hours'],
-            latest_row.get('performance_index', 1.0),
-            latest_row['fatigue'],
-            latest_row['motivation'],
-            baselines
+            sleep_hours,
+            sleep_quality,
+            stress,
+            fatigue_val,
+            soreness,
+            pain_flag,
+            pain_location,
+            baselines,
+            readiness_instant
         )
         
         col_f1, col_f2 = st.columns(2)
         with col_f1:
             st.markdown(f"""
             **Tipo de fatiga:** {fatigue_analysis['type'].upper()}  
-            **Confianza:** {fatigue_analysis['confidence']}  
-            **Severidad:** {fatigue_analysis['severity']}
+            **Primario:** {fatigue_analysis.get('primary_issue', '-') }  
+            **Intensidad:** {fatigue_analysis.get('intensity_hint', '')}
             """)
         
         with col_f2:
-            st.markdown("**Indicadores detectados:**")
-            for indicator in fatigue_analysis['indicators']:
-                st.markdown(f"- {indicator}")
+            st.markdown("**Recomendaciones:**")
+            for rec in fatigue_analysis.get('recommendations', []):
+                st.markdown(f"- {rec}")
         
         st.markdown("**Split recomendado:**")
         split = fatigue_analysis['target_split'].upper()
         split_emoji = {"UPPER": "💪", "LOWER": "🦵", "REST": "😴", "LIGHT": "🚶"}.get(split, "🏋️")
-        st.markdown(f"{split_emoji} **{split}** — {fatigue_analysis['reasoning']}")
+        st.markdown(f"{split_emoji} **{split}** — {fatigue_analysis.get('reason', '')}")
         
-        weekly_plan = suggest_weekly_sequence(df_filtered, baselines)
-        if weekly_plan:
+        # Preparar entradas para la secuencia semanal
+        last_7 = df_filtered.tail(7) if len(df_filtered) >= 1 else df_filtered
+        strain_list = last_7['strain'].fillna(0).tolist() if 'strain' in last_7.columns else [0] * len(last_7)
+        if 'volume' in last_7.columns and last_7['volume'].std() and last_7['volume'].std() > 0:
+            monotony = float(last_7['volume'].mean() / last_7['volume'].std())
+        else:
+            monotony = 1.0
+        readiness_mean = float(last_7['readiness_score'].mean()) if 'readiness_score' in last_7.columns else readiness_instant
+        high_days = int((last_7['effort_level'] >= 8).sum()) if 'effort_level' in last_7.columns else 0
+
+        weekly_seq = suggest_weekly_sequence(strain_list, monotony, readiness_mean, baselines, high_days)
+        if weekly_seq:
             render_section_title("📅 Plan Semanal Sugerido", accent="#00D084")
             st.markdown("**Secuencia óptima para los próximos 7 días:**")
-            for day_plan in weekly_plan:
-                day_num = day_plan.get('day', '?')
-                split_type = day_plan.get('split', 'rest').upper()
-                intensity = day_plan.get('intensity', 'moderate')
-                reason = day_plan.get('reason', '')
-                
-                day_emoji = {"UPPER": "💪", "LOWER": "🦵", "FULL": "🏋️", "REST": "😴", "LIGHT": "🚶"}.get(split_type, "🏋️")
-                st.markdown(f"**Día {day_num}:** {day_emoji} {split_type} ({intensity}) — {reason}")
+            for day in weekly_seq['sequence']:
+                day_name = day.get('day', '?')
+                split_type = day.get('type', 'rest').lower()
+                desc = day.get('description', '')
+                emoji_map = {
+                    'upper': "💪", 'lower': "🦵", 'full': "🏋️", 'rest': "😴", 'light': "🚶",
+                    'deload': "🧯", 'reduce': "🟡", 'push': "🟢", 'switch': "🔄", 'normal': "🏋️"
+                }
+                day_emoji = emoji_map.get(split_type, "🏋️")
+                st.markdown(f"**{day_name}:** {day_emoji} {split_type.upper()} — {desc}")
     
     render_section_title("📚 Contexto & Educación", accent="#FFB81C")
     
