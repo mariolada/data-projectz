@@ -1,0 +1,6 @@
+date,readiness_score,recommendation,action_intensity,reason_codes,sleep_hours,sleep_quality,acwr_7_28,performance_index,performance_7d_mean,rir_weighted,effort_mean,fatigue_flag,flag_high_strain_day,flag_understim
+2026-01-01,63.0,Reduce,"-20% volume, avoid RIR<=1",HIGH_EFFORT,7.2,4,,0.995,,1.425,8.5,False,False,False
+2026-01-03,62.0,Reduce,"-20% volume, avoid RIR<=1",PERF_DROP,7.8,5,,0.972,,2.587,7.5,False,False,False
+2026-01-05,80.0,Push day,+2.5% load (key lift) if PI>=1.01 else +1 set,HIGH_EFFORT|HIGH_STRAIN_DAY,7.5,4,,1.006,0.991,1.0,9.0,False,True,False
+2026-01-07,55.0,Reduce,"-15% volume, keep technique, target RIR 2–3",LOW_SLEEP|HIGH_EFFORT|HIGH_STRAIN_DAY,6.3,3,,1.004,0.994,1.0,9.0,False,True,False
+2026-01-08,92.0,Push day,+2.5% load (key lift) if PI>=1.01 else +1 set,NONE,7.9,5,,1.028,1.001,2.0,8.0,False,False,False

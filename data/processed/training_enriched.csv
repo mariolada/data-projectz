@@ -1,0 +1,8 @@
+date,exercise,sets,reps,weight,rpe,rir,rpe_from_rir,rpe_diff,coherencia_rpe_rir,volume,e1rm,effort,rir_weighted_day
+2026-01-01,Press militar,4,6,60.0,8.0,2,8,0.0,True,1440.0,72.0,8,1.425
+2026-01-01,Peso muerto,3,5,130.0,8.5,1,9,0.5,True,1950.0,151.667,9,1.425
+2026-01-03,Press banca,4,5,90.0,8.0,2,8,0.0,True,1800.0,105.0,8,2.587
+2026-01-03,Remo con barra,4,8,80.0,7.5,3,7,0.5,True,2560.0,101.333,7,2.587
+2026-01-05,Press militar,5,5,62.5,8.5,1,9,0.5,True,1562.5,72.917,9,1.0
+2026-01-07,Peso muerto,4,4,135.0,9.0,1,9,0.0,True,2160.0,153.0,9,1.0
+2026-01-08,Press banca,4,6,92.5,8.0,2,8,0.0,True,2220.0,111.0,8,2.0

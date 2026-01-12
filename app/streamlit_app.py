@@ -338,6 +338,13 @@ def create_readiness_chart(data, title="Readiness"):
     """Crea gráfica de readiness con estilo gaming y gradient."""
     fig = go.Figure()
     
+    # Filtrar NaN
+    data = data.dropna()
+    
+    if data.empty:
+        fig.add_annotation(text="Sin datos", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
+        return fig
+    
     # Añadir zona de referencia (óptimo)
     fig.add_hrect(y0=75, y1=100, fillcolor="rgba(0, 208, 132, 0.1)", line_width=0, annotation_text="Alta", annotation_position="right")
     fig.add_hrect(y0=55, y1=75, fillcolor="rgba(255, 184, 28, 0.1)", line_width=0, annotation_text="Media", annotation_position="right")
@@ -372,29 +379,28 @@ def create_readiness_chart(data, title="Readiness"):
 
 
 def create_volume_chart(data, title="Volumen"):
-    """Crea gráfica de volumen con estilo gaming y gradient."""
+    """Crea gráfica de volumen con líneas estilo readiness."""
     fig = go.Figure()
     
-    fig.add_trace(go.Scatter(
-        x=data.index,
-        y=data.values,
-        mode='lines',
-        name='Volumen',
-        line=dict(color='#00D084', width=0),
-        fill='tozeroy',
-        fillcolor='rgba(0, 208, 132, 0.3)',
-        hovertemplate='<b>%{x}</b><br>Volumen: %{y:,.0f} kg<extra></extra>'
-    ))
+    # Filtrar NaN
+    data = data.dropna()
     
-    # Añadir línea superior para efecto
+    if data.empty:
+        fig.add_annotation(text="Sin datos", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
+        return fig
+    
+    # Convertir índice a string de fecha para Plotly
+    x_labels = [pd.Timestamp(idx).strftime('%b %d') if pd.notna(idx) else '' for idx in data.index]
+    
     fig.add_trace(go.Scatter(
-        x=data.index,
+        x=x_labels,
         y=data.values,
         mode='lines+markers',
         name='Volumen',
         line=dict(color='#00D084', width=3, shape='spline'),
-        marker=dict(size=6, color='#00D084'),
-        showlegend=False,
+        marker=dict(size=8, color='#00D084', line=dict(color='#FFFFFF', width=2)),
+        fill='tozeroy',
+        fillcolor='rgba(0, 208, 132, 0.2)',
         hovertemplate='<b>%{x}</b><br>Volumen: %{y:,.0f} kg<extra></extra>'
     ))
     
@@ -413,44 +419,19 @@ def create_volume_chart(data, title="Volumen"):
     return fig
 
 
-def create_sleep_chart(data, title="Sueño"):
-    """Crea gráfica de sueño con barras estilo gaming."""
-    fig = go.Figure()
-    
-    # Zona óptima de sueño
-    fig.add_hrect(y0=7, y1=9, fillcolor="rgba(0, 208, 132, 0.1)", line_width=0)
-    
-    colors = ['#FFB81C' if val < 7 else '#00D084' for val in data.values]
-    
-    fig.add_trace(go.Bar(
-        x=data.index,
-        y=data.values,
-        name='Sueño',
-        marker=dict(
-            color=colors,
-            line=dict(color='#FFFFFF', width=1)
-        ),
-        hovertemplate='<b>%{x}</b><br>Sueño: %{y:.1f}h<extra></extra>'
-    ))
-    
-    fig.update_layout(
-        title=dict(text=title, font=dict(size=16, color='#FFB81C', family='Orbitron')),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#E0E0E0'),
-        xaxis=dict(showgrid=False, zeroline=False),
-        yaxis=dict(showgrid=True, gridcolor='rgba(255, 184, 28, 0.1)', zeroline=False, range=[0, max(data.max() * 1.1, 10)]),
-        hovermode='x unified',
-        margin=dict(l=40, r=40, t=40, b=40),
-        height=300
-    )
-    
-    return fig
-
-
 def create_acwr_chart(data, title="ACWR (Carga)"):
-    """Crea gráfica de ACWR con zonas de riesgo."""
+    """Crea gráfica de ACWR con líneas estilo readiness."""
     fig = go.Figure()
+    
+    # Filtrar NaN
+    data = data.dropna()
+    
+    if data.empty:
+        fig.add_annotation(text="Sin datos", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
+        return fig
+    
+    # Convertir índice a string de fecha para Plotly
+    x_labels = [pd.Timestamp(idx).strftime('%b %d') if pd.notna(idx) else '' for idx in data.index]
     
     # Zonas de ACWR
     fig.add_hrect(y0=0.8, y1=1.3, fillcolor="rgba(0, 208, 132, 0.1)", line_width=0, annotation_text="Óptimo", annotation_position="right")
@@ -461,12 +442,14 @@ def create_acwr_chart(data, title="ACWR (Carga)"):
     fig.add_hline(y=1.0, line_dash="dash", line_color="rgba(255, 255, 255, 0.3)", annotation_text="1.0")
     
     fig.add_trace(go.Scatter(
-        x=data.index,
+        x=x_labels,
         y=data.values,
         mode='lines+markers',
         name='ACWR',
         line=dict(color='#FF6B6B', width=3, shape='spline'),
         marker=dict(size=8, color='#FF6B6B', line=dict(color='#FFFFFF', width=2)),
+        fill='tozeroy',
+        fillcolor='rgba(255, 107, 107, 0.2)',
         hovertemplate='<b>%{x}</b><br>ACWR: %{y:.2f}<extra></extra>'
     ))
     
@@ -485,9 +468,60 @@ def create_acwr_chart(data, title="ACWR (Carga)"):
     return fig
 
 
+def create_sleep_chart(data, title="Sueño"):
+    """Crea gráfica de sueño con líneas estilo readiness."""
+    fig = go.Figure()
+    
+    # Filtrar NaN
+    data = data.dropna()
+    
+    if data.empty:
+        fig.add_annotation(text="Sin datos", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
+        return fig
+    
+    # Convertir índice a string de fecha para Plotly
+    x_labels = [pd.Timestamp(idx).strftime('%b %d') if pd.notna(idx) else '' for idx in data.index]
+    
+    # Zona óptima de sueño
+    fig.add_hrect(y0=7, y1=9, fillcolor="rgba(255, 184, 28, 0.1)", line_width=0)
+    
+    fig.add_trace(go.Scatter(
+        x=x_labels,
+        y=data.values,
+        mode='lines+markers',
+        name='Sueño',
+        line=dict(color='#FFB81C', width=3, shape='spline'),
+        marker=dict(size=8, color='#FFB81C', line=dict(color='#FFFFFF', width=2)),
+        fill='tozeroy',
+        fillcolor='rgba(255, 184, 28, 0.2)',
+        hovertemplate='<b>%{x}</b><br>Sueño: %{y:.1f}h<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title=dict(text=title, font=dict(size=16, color='#FFB81C', family='Orbitron')),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#E0E0E0'),
+        xaxis=dict(showgrid=False, zeroline=False),
+        yaxis=dict(showgrid=True, gridcolor='rgba(255, 184, 28, 0.1)', zeroline=False, range=[0, max(data.max() * 1.1, 10)]),
+        hovermode='x unified',
+        margin=dict(l=40, r=40, t=40, b=40),
+        height=300
+    )
+    
+    return fig
+
+
 def create_performance_chart(data, title="Performance Index"):
     """Crea gráfica de performance index con zona objetivo."""
     fig = go.Figure()
+    
+    # Filtrar NaN
+    data = data.dropna()
+    
+    if data.empty:
+        fig.add_annotation(text="Sin datos", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
+        return fig
     
     # Zona objetivo
     fig.add_hrect(y0=0.99, y1=1.01, fillcolor="rgba(0, 208, 132, 0.1)", line_width=0)
@@ -620,8 +654,6 @@ def calculate_injury_risk_score_v2(
     last_hard=False, baselines=None, days_high_strain=0
 ):
     """Versión mejorada con pain_severity, stiffness, sick_flag."""
-    from src.personalization_engine import calculate_injury_risk_score
-    
     # Usar función base
     base_risk = calculate_injury_risk_score(
         readiness_score, acwr, sleep_hours, performance_index, effort_level,
@@ -1465,13 +1497,13 @@ def main():
                     if 'readiness_score' in last_7_days.columns:
                         readiness_hist = last_7_days.set_index('date')['readiness_score']
                         fig = create_readiness_chart(readiness_hist, "Readiness")
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True, key="day_readiness")
                 
                 with col_hist2:
                     if 'volume' in last_7_days.columns:
                         volume_hist = last_7_days.set_index('date')['volume']
                         fig = create_volume_chart(volume_hist, "Volumen")
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True, key="day_volume")
                 
                 col_hist3, col_hist4 = st.columns(2)
                 
@@ -1479,13 +1511,13 @@ def main():
                     if 'sleep_hours' in last_7_days.columns:
                         sleep_hist = last_7_days.set_index('date')['sleep_hours']
                         fig = create_sleep_chart(sleep_hist, "Sueño (horas)")
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True, key="day_sleep")
                 
                 with col_hist4:
                     if 'acwr_7_28' in last_7_days.columns:
                         acwr_hist = last_7_days.set_index('date')['acwr_7_28']
                         fig = create_acwr_chart(acwr_hist, "ACWR (Carga)")
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True, key="day_acwr")
             else:
                 st.info("📅 No hay datos históricos disponibles aún.")
         
@@ -1697,20 +1729,33 @@ def main():
             # Get last 7 days data, excluding today if it exists
             today = datetime.date.today()
             last_7_days_pred = df_filtered[df_filtered['date'] < today].sort_values('date', ascending=True).tail(7).copy()
+            # Normalizar fechas a Timestamp para evitar mezcla con datetime.date
+            if 'date' in last_7_days_pred.columns:
+                last_7_days_pred['date'] = pd.to_datetime(last_7_days_pred['date'])
+            
+            # Asegurar que las columnas necesarias existen
+            cols_needed = ['date', 'readiness_score', 'volume', 'sleep_hours', 'acwr_7_28']
+            for col in cols_needed:
+                if col not in last_7_days_pred.columns:
+                    last_7_days_pred[col] = np.nan
             
             # Create today's row with calculated readiness and form inputs
-            # Solo incluir columnas que existen en last_7_days_pred para mantener coherencia
+            # Usar el último valor de volume/acwr disponible si no hay datos de hoy
+            last_volume = last_7_days_pred['volume'].iloc[-1] if not last_7_days_pred.empty else np.nan
+            last_acwr = last_7_days_pred['acwr_7_28'].iloc[-1] if not last_7_days_pred.empty else np.nan
+            
             today_row = pd.DataFrame({
-                'date': [today],
+                'date': [pd.Timestamp(today)],
                 'readiness_score': [readiness_instant],
-                'volume': [np.nan],  # Hoy aún no hay volumen registrado; se apunta tras entrenar
+                'volume': [last_volume],  # Usar último valor disponible
                 'sleep_hours': [sleep_h],
-                'acwr_7_28': [np.nan]  # Hoy aún no hay datos de entrenamiento, así que ACWR es NaN
+                'acwr_7_28': [last_acwr]  # Usar último valor disponible
             })
             
             # Combine last 7 days + today
-            chart_data = pd.concat([last_7_days_pred, today_row], ignore_index=True)
-            chart_data['date'] = pd.to_datetime(chart_data['date']).dt.date
+            chart_data = pd.concat([last_7_days_pred[cols_needed], today_row], ignore_index=True)
+            # Asegurar tipo Timestamp homogéneo
+            chart_data['date'] = pd.to_datetime(chart_data['date'])
             chart_data = chart_data.sort_values('date', ascending=True)
             
             if not chart_data.empty:
@@ -1720,13 +1765,13 @@ def main():
                 with col_chart1:
                     readiness_chart = chart_data.set_index('date')['readiness_score']
                     fig = create_readiness_chart(readiness_chart, "Readiness")
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True, key="today_readiness")
                 
                 # Volume Chart
                 with col_chart2:
                     volume_chart = chart_data.set_index('date')['volume']
                     fig = create_volume_chart(volume_chart, "Volumen")
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True, key="today_volume")
                 
                 col_chart3, col_chart4 = st.columns(2)
                 
@@ -1734,13 +1779,13 @@ def main():
                 with col_chart3:
                     sleep_chart = chart_data.set_index('date')['sleep_hours']
                     fig = create_sleep_chart(sleep_chart, "Sueño (horas)")
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True, key="today_sleep")
                 
                 # ACWR Chart
                 with col_chart4:
                     acwr_chart = chart_data.set_index('date')['acwr_7_28']
                     fig = create_acwr_chart(acwr_chart, "ACWR (Carga)")
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True, key="today_acwr")
 
     # ============== WEEK VIEW ==============
     else:
@@ -1782,13 +1827,13 @@ def main():
                     if 'volume_week' in df_weekly_filtered.columns:
                         vol_data = df_weekly_filtered.set_index('week_start')['volume_week'].sort_index()
                         fig = create_weekly_volume_chart(vol_data, "Volumen Semanal")
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True, key="week_volume")
                 
                 with col2:
                     if 'strain' in df_weekly_filtered.columns:
                         strain_data = df_weekly_filtered.set_index('week_start')['strain'].sort_index()
                         fig = create_weekly_strain_chart(strain_data, "Strain")
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True, key="week_strain")
                 
                 # === WEEKLY SUGGESTION ===
                 render_section_title("📋 Secuencia Sugerida (Próxima Semana)", accent="#00D084")
@@ -1873,7 +1918,7 @@ def main():
             if 'readiness_score' in df_filtered.columns:
                 rts = df_filtered.set_index('date')['readiness_score'].sort_index()
                 fig = create_readiness_chart(rts, "Readiness")
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True, key="view_readiness")
                 
                 with st.expander("❓ ¿Qué significa Readiness?"):
                     st.write("""
@@ -1896,7 +1941,7 @@ def main():
             if 'performance_index' in df_filtered.columns:
                 pi = df_filtered.set_index('date')['performance_index'].sort_index()
                 fig = create_performance_chart(pi, "Performance Index")
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True, key="view_performance")
                 
                 with st.expander("❓ ¿Qué significa Performance Index?"):
                     st.write("""
@@ -1917,7 +1962,7 @@ def main():
         if 'volume' in df_filtered.columns:
             vol = df_filtered.set_index('date')['volume'].sort_index()
             fig = create_volume_chart(vol, "Volumen")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key="view_volume_details")
             
             with st.expander("❓ ¿Qué significa Volumen?"):
                 st.write("""

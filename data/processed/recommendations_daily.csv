@@ -1,0 +1,17 @@
+date,readiness_score,recommendation,action_intensity,reason_codes
+2025-12-25,65.0,Reduce,"-15% volume, keep technique, target RIR 2–3",LOW_READINESS|VOLUME_CUT
+2025-12-26,72.0,Train,-,MODERATE_READINESS
+2025-12-27,58.0,Reduce,"-15% volume, keep technique, target RIR 2–3",LOW_READINESS|VOLUME_CUT
+2025-12-28,75.0,Push day,+2.5% load (key lift) if PI>=1.01 else +1 set,HIGH_READINESS
+2025-12-29,68.0,Train,-,MODERATE_READINESS
+2025-12-30,78.0,Push day,+2.5% load (key lift) if PI>=1.01 else +1 set,HIGH_READINESS
+2025-12-31,62.0,Reduce,"-20% volume, avoid RIR<=1",LOW_READINESS|PERF_SOFT
+2026-01-01,63.0,Reduce,"-20% volume, avoid RIR<=1",LOW_READINESS|PERF_SOFT|HIGH_EFFORT
+2026-01-03,62.0,Reduce,"-20% volume, avoid RIR<=1",LOW_READINESS|PERF_SOFT|PERF_DROP
+2026-01-05,80.0,Push day,+2.5% load (key lift) if PI>=1.01 else +1 set,HIGH_READINESS|HIGH_EFFORT|HIGH_STRAIN_DAY
+2026-01-07,55.0,Reduce,"-15% volume, keep technique, target RIR 2–3",LOW_READINESS|VOLUME_CUT|LOW_SLEEP|HIGH_EFFORT|HIGH_STRAIN_DAY
+2026-01-08,92.0,Push day,+2.5% load (key lift) if PI>=1.01 else +1 set,HIGH_READINESS
+2026-01-09,85.0,Push day,+2.5% load (key lift) if PI>=1.01 else +1 set,HIGH_READINESS|HIGH_EFFORT
+2026-01-10,88.0,Push day,+2.5% load (key lift) if PI>=1.01 else +1 set,HIGH_READINESS
+2026-01-11,70.0,Train,-,MODERATE_READINESS
+2026-01-12,76.0,Push day,+2.5% load (key lift) if PI>=1.01 else +1 set,HIGH_READINESS
