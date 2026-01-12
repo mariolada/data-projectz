@@ -2,6 +2,18 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import argparse
+import json
+import sys
+
+# Importar personalization engine
+sys.path.insert(0, str(Path(__file__).parent))
+from personalization_engine import (
+    calculate_personal_baselines,
+    analyze_sleep_responsiveness,
+    detect_user_archetype,
+    calculate_personal_adjustment_factors,
+    create_user_profile
+)
 
 
 REQUIRED_DAILY_COLUMNS = [
@@ -142,19 +154,25 @@ def compute_component_scores(df: pd.DataFrame) -> pd.DataFrame:
 def compute_readiness(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
 
+    # Rellenar scores faltantes con valores por defecto (0.5 = neutral/promedio)
+    # Así podemos calcular readiness incluso con datos incompletos en los primeros días
+    sleep_h_score = out["sleep_hours_score"].fillna(0.5)
+    sleep_q_score = out["sleep_quality_score"].fillna(0.5)
+    perf_score = out["perf_score"].fillna(0.5)
+    trend_score = out["trend_score"].fillna(0.5)
+    acwr_score = out["acwr_score"].fillna(0.5)
+    rir_score = out["rir_fatigue_score"].fillna(0.5)
+
     # Readiness base (0–1)
     # Sueño 40% (25 + 15), performance 25%, trend 10%, acwr 15%, fatiga por RIR 10%
     out["readiness_0_1"] = (
-        0.25 * out["sleep_hours_score"] +
-        0.15 * out["sleep_quality_score"] +
-        0.25 * out["perf_score"] +
-        0.10 * out["trend_score"] +
-        0.15 * out["acwr_score"] +
-        0.10 * out["rir_fatigue_score"]
+        0.25 * sleep_h_score +
+        0.15 * sleep_q_score +
+        0.25 * perf_score +
+        0.10 * trend_score +
+        0.15 * acwr_score +
+        0.10 * rir_score
     )
-
-    # Si falta sueño o perf, no inventamos
-    out.loc[out["sleep_hours_score"].isna() | out["perf_score"].isna(), "readiness_0_1"] = np.nan
 
     out["readiness_score"] = (out["readiness_0_1"] * 100).round()
 
@@ -166,6 +184,71 @@ def compute_readiness(df: pd.DataFrame) -> pd.DataFrame:
     # Clamp final
     out["readiness_score"] = out["readiness_score"].clip(lower=0, upper=100)
 
+    return out
+
+
+def compute_readiness_with_personalisation(df: pd.DataFrame, adjustment_factors: dict = None) -> pd.DataFrame:
+    """
+    Calcula readiness CON factores de personalización.
+    
+    Si adjustment_factors es None, usa valores por defecto.
+    Útil para aplicar ajustes personales calculados en el histórico.
+    """
+    out = df.copy()
+    
+    if adjustment_factors is None:
+        adjustment_factors = {
+            'sleep_weight': 0.25,
+            'performance_weight': 0.25,
+            'acwr_weight': 0.15,
+            'fatigue_sensitivity': 1.0,
+        }
+    
+    # Extraer factores
+    sleep_w = adjustment_factors.get('sleep_weight', 0.25)
+    perf_w = adjustment_factors.get('performance_weight', 0.25)
+    acwr_w = adjustment_factors.get('acwr_weight', 0.15)
+    fatigue_sens = adjustment_factors.get('fatigue_sensitivity', 1.0)
+    
+    # Otros pesos (derivados para mantener suma ~1.0)
+    sleep_quality_w = 0.15
+    trend_w = 0.10
+    rir_w = 0.10
+    
+    # Normalizar si es necesario (mantener suma cercana a 1.0)
+    total = sleep_w + sleep_quality_w + perf_w + trend_w + acwr_w + rir_w
+    sleep_w = (sleep_w / total) * 0.95  # 95% para dejar margen
+    perf_w = (perf_w / total) * 0.95
+    acwr_w = (acwr_w / total) * 0.95
+    rir_w = (rir_w / total) * 0.95 * fatigue_sens
+    
+    # Rellenar scores faltantes con valores por defecto (0.5 = neutral/promedio)
+    sleep_h_score = out["sleep_hours_score"].fillna(0.5)
+    sleep_q_score = out["sleep_quality_score"].fillna(0.5)
+    perf_score = out["perf_score"].fillna(0.5)
+    trend_score = out["trend_score"].fillna(0.5)
+    acwr_score = out["acwr_score"].fillna(0.5)
+    rir_score = out["rir_fatigue_score"].fillna(0.5)
+    
+    # Readiness personalizado
+    out["readiness_0_1_personalized"] = (
+        sleep_w * sleep_h_score +
+        sleep_quality_w * sleep_q_score +
+        perf_w * perf_score +
+        trend_w * trend_score +
+        acwr_w * acwr_score +
+        rir_w * rir_score
+    )
+    
+    out["readiness_score_personalized"] = (out["readiness_0_1_personalized"] * 100).round()
+    
+    # Aplicar overrides (igual que versión genérica)
+    out.loc[out["fatigue_flag"] == True, "readiness_score_personalized"] = np.minimum(out["readiness_score_personalized"], 60)
+    out.loc[out["sleep_hours"] < 6.0, "readiness_score_personalized"] = np.minimum(out["readiness_score_personalized"], 55)
+    out.loc[(out["performance_index"] < 0.98) & (out["effort_mean"] >= 8.5), "readiness_score_personalized"] = np.minimum(out["readiness_score_personalized"], 50)
+    
+    out["readiness_score_personalized"] = out["readiness_score_personalized"].clip(lower=0, upper=100)
+    
     return out
 
 
@@ -240,7 +323,7 @@ def export_outputs(df: pd.DataFrame, out_dir: str) -> None:
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
-    # Recomendaciones
+    # Recomendaciones (readiness + recomendaciones)
     df.to_csv(out_path / "recommendations_daily.csv", index=False)
 
     # Flags/diagnóstico (útil para debug + LinkedIn)
@@ -254,16 +337,49 @@ def export_outputs(df: pd.DataFrame, out_dir: str) -> None:
     df[existing].to_csv(out_path / "flags_daily.csv", index=False)
 
 
+def export_user_profile(df_daily: pd.DataFrame, out_dir: str) -> None:
+    """Crea y guarda el perfil personalizado del usuario como JSON."""
+    out_path = Path(out_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+    
+    # Crear perfil
+    profile = create_user_profile(df_daily)
+    
+    # Guardar como JSON para que Streamlit lo lea
+    profile_path = out_path / "user_profile.json"
+    with open(profile_path, 'w', encoding='utf-8') as f:
+        json.dump(profile, f, indent=2, ensure_ascii=False)
+    
+    print(f"✓ User profile guardado: {profile_path}")
+    print(f"  Archetype: {profile['archetype'].get('archetype', 'unknown')}")
+    print(f"  Insights: {len(profile['insights'])} descubrimientos")
+
+
 def main(daily_path: str, out_dir: str) -> None:
     df = load_processed_daily(daily_path)
     df = compute_component_scores(df)
     df = compute_readiness(df)
+    
+    # === NUEVO: Calcular factores personalizados ===
+    adjustment_factors = calculate_personal_adjustment_factors(df)
+    print(f"\n📊 Factores de ajuste calculados:")
+    print(f"   Sleep weight: {adjustment_factors['sleep_weight']:.2f} (default: 0.25)")
+    print(f"   Performance weight: {adjustment_factors['performance_weight']:.2f} (default: 0.25)")
+    print(f"   ACWR weight: {adjustment_factors['acwr_weight']:.2f} (default: 0.15)")
+    print(f"   Fatigue sensitivity: {adjustment_factors['fatigue_sensitivity']:.2f}x (default: 1.0)")
+    
+    # === NUEVO: Calcular readiness personalizado ===
+    df = compute_readiness_with_personalisation(df, adjustment_factors)
+    
     df = generate_recommendations(df)
     export_outputs(df, out_dir)
+    
+    # === NUEVO: Guardar perfil del usuario ===
+    export_user_profile(df, out_dir)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Decision Engine: readiness + recomendaciones diarias.")
+    parser = argparse.ArgumentParser(description="Decision Engine: readiness + recomendaciones diarias + perfil personalizado.")
     parser.add_argument("--daily", required=True, help="Ruta a data/processed/daily.csv")
     parser.add_argument("--out", required=True, help="Directorio de salida (ej: data/processed)")
     args = parser.parse_args()

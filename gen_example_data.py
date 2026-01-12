@@ -1,6 +1,18 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+from pathlib import Path
+import sys
+import os
+
+# Configurar encoding para Windows
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
+
+# Crear directorios si no existen
+Path('data/raw').mkdir(parents=True, exist_ok=True)
+Path('data/processed').mkdir(parents=True, exist_ok=True)
 
 # Rango de fechas: últimos 35 días (para tener histórico suficiente)
 today = datetime(2026, 1, 10)

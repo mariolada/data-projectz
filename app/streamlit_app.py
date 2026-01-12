@@ -8,6 +8,7 @@ from plotly.subplots import make_subplots
 from pathlib import Path
 import datetime
 import sys
+import json
 sys.path.append(str(Path(__file__).parent.parent / 'src'))
 from personalization_engine import (
     calculate_personal_baselines,
@@ -28,6 +29,33 @@ def load_csv(path: str):
     if 'date' in df.columns:
         df['date'] = pd.to_datetime(df['date'])
     return df
+
+
+@st.cache_data
+def load_user_profile(profile_path: str = "data/processed/user_profile.json"):
+    """Carga el perfil personalizado del usuario desde JSON."""
+    p = Path(profile_path)
+    if not p.exists():
+        return {
+            'archetype': {'archetype': 'unknown', 'confidence': 0},
+            'adjustment_factors': {
+                'sleep_weight': 0.25,
+                'performance_weight': 0.25,
+                'acwr_weight': 0.15,
+                'fatigue_sensitivity': 1.0,
+                'recovery_speed': 1.0
+            },
+            'sleep_responsiveness': {'sleep_responsive': None},
+            'insights': ['No hay datos suficientes aún para personalización'],
+            'data_quality': {'total_days': 0}
+        }
+    
+    try:
+        with open(p, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return {}
+
 
 
 def get_readiness_zone(readiness):
@@ -1114,19 +1142,19 @@ def main():
     df_recommendations = None
     
     try:
-        df_metrics = load_csv(daily_path)  # Tiene: volume, acwr_7_28, sleep_hours, performance_index, etc.
+        df_metrics = load_csv(daily_path)  # daily.csv solo tiene métricas base
     except FileNotFoundError:
         st.warning("❌ Falta daily.csv. Ejecuta el `pipeline` primero.")
         st.stop()
     
     try:
-        df_recommendations = load_csv(reco_path)  # Tiene: readiness_score, recommendation, reason_codes
+        df_recommendations = load_csv(reco_path)  # recommendations_daily.csv contiene TODO: métricas + readiness + recomendaciones
     except FileNotFoundError:
         st.warning("❌ Falta recommendations_daily.csv. Ejecuta `decision_engine` primero.")
         st.stop()
 
-    # Merge: métricas + recomendaciones por fecha
-    df_daily = df_metrics.merge(df_recommendations, on='date', how='left')
+    # Usar directamente recommendations_daily.csv como df_daily (ya tiene todas las columnas)
+    df_daily = df_recommendations.copy()
     df_daily['date'] = pd.to_datetime(df_daily['date']).dt.date
 
     # Load optional files
@@ -1278,6 +1306,47 @@ def main():
     elif view_mode == "🎯 Modo Hoy":
         render_section_title("Modo Hoy — Ready Check", accent="#B266FF")
         st.write("Introduce cómo te sientes **ahora mismo** y obtén recomendaciones instantáneas.")
+        
+        # === CARGAR PERFIL PERSONALIZADO ===
+        user_profile = load_user_profile()
+        
+        # Mostrar insights personalizados si hay
+        if user_profile.get('insights') and user_profile['data_quality'].get('total_days', 0) > 7:
+            with st.expander("📊 Tu Perfil Personal", expanded=False):
+                col_arch, col_sleep = st.columns(2)
+                
+                with col_arch:
+                    archetype = user_profile.get('archetype', {})
+                    if archetype.get('confidence', 0) > 0.5:
+                        st.markdown(f"**Arquetipo:** {archetype.get('archetype', '?').upper()}")
+                        st.caption(f"{archetype.get('reason', '')}")
+                        st.caption(f"Confianza: {archetype.get('confidence', 0):.0%}")
+                
+                with col_sleep:
+                    sleep_resp = user_profile.get('sleep_responsiveness', {})
+                    if sleep_resp.get('sleep_responsive') is not None:
+                        st.markdown(f"**Sueño te afecta:** {'Mucho ✅' if sleep_resp['sleep_responsive'] else 'Poco ⚠️'}")
+                        st.caption(f"Correlación: {sleep_resp.get('correlation', 0):.2f}")
+                
+                # Mostrar insights clave
+                st.markdown("**Insights:**")
+                for insight in user_profile.get('insights', []):
+                    st.write(f"• {insight}")
+                
+                # Mostrar adjustment factors
+                factors = user_profile.get('adjustment_factors', {})
+                if factors:
+                    st.markdown("**Factores de personalización:**")
+                    col_f1, col_f2, col_f3 = st.columns(3)
+                    with col_f1:
+                        st.metric("Sleep Weight", f"{factors.get('sleep_weight', 0.25):.2f}", 
+                                 delta=f"{factors.get('sleep_weight', 0.25) - 0.25:+.2f} vs default")
+                    with col_f2:
+                        st.metric("Performance Weight", f"{factors.get('performance_weight', 0.25):.2f}",
+                                 delta=f"{factors.get('performance_weight', 0.25) - 0.25:+.2f} vs default")
+                    with col_f3:
+                        st.metric("Fatigue Sensitivity", f"{factors.get('fatigue_sensitivity', 1.0):.2f}x",
+                                 delta=f"{factors.get('fatigue_sensitivity', 1.0) - 1.0:+.2f}x vs normal")
         
         # Modo toggle
         col_mode, col_reset = st.columns([3, 1])
@@ -1449,14 +1518,15 @@ def main():
             st.session_state.mood_time_available = time_available
             st.session_state.mood_calculated = True
         
-        # Gráficas históricas (solo visibles si NO se ha calculado)
+        # Gráficas históricas (mostrar SOLO si aún no se ha calculado)
+        # IMPORTANTE: Usar df_daily, NO df_filtered, para mostrar los últimos 7 días completos
         if not st.session_state.get('mood_calculated', False):
             st.markdown("---")
             render_section_title("Tendencia histórica (últimos 7 días)", accent="#4ECDC4")
             
             # Get last 7 days data (sin incluir hoy)
             today = datetime.date.today()
-            last_7_days = df_filtered[df_filtered['date'] < today].sort_values('date', ascending=True).tail(7).copy()
+            last_7_days = df_daily[df_daily['date'] < today].sort_values('date', ascending=True).tail(7).copy()
             
             if not last_7_days.empty:
                 col_hist1, col_hist2 = st.columns(2)
@@ -1488,7 +1558,6 @@ def main():
                         st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("📅 No hay datos históricos disponibles aún.")
-        
         # Inputs already persisted above if submitted
         
         # Show results if calculated
@@ -1582,8 +1651,14 @@ def main():
             )
             
             # 3. Calculate injury risk - ahora considera pain_severity, stiffness, sick
-            last_perf = df_daily['performance_index'].dropna().iloc[-1] if 'performance_index' in df_daily.columns and len(df_daily) > 0 else 1.0
-            last_acwr = df_daily['acwr_7_28'].dropna().iloc[-1] if 'acwr_7_28' in df_daily.columns and len(df_daily) > 0 else 1.0
+            # Obtener último performance_index válido (con fallback a 1.0 si no hay datos)
+            perf_vals = df_daily['performance_index'].dropna() if 'performance_index' in df_daily.columns else pd.Series()
+            last_perf = perf_vals.iloc[-1] if len(perf_vals) > 0 else 1.0
+            
+            # Obtener último acwr válido (con fallback a 1.0 si no hay datos)
+            acwr_vals = df_daily['acwr_7_28'].dropna() if 'acwr_7_28' in df_daily.columns else pd.Series()
+            last_acwr = acwr_vals.iloc[-1] if len(acwr_vals) > 0 else 1.0
+            
             injury_risk = calculate_injury_risk_score_v2(
                 readiness_instant, last_acwr, sleep_h, last_perf, 
                 effort_level=max(stress, fatigue),
@@ -1695,8 +1770,9 @@ def main():
             render_section_title("Predicción con tu readiness hoy", accent="#00D084")
             
             # Get last 7 days data, excluding today if it exists
+            # IMPORTANTE: Usar df_daily, NO df_filtered, para mostrar datos completos
             today = datetime.date.today()
-            last_7_days_pred = df_filtered[df_filtered['date'] < today].sort_values('date', ascending=True).tail(7).copy()
+            last_7_days_pred = df_daily[df_daily['date'] < today].sort_values('date', ascending=True).tail(7).copy()
             
             # Create today's row with calculated readiness and form inputs
             # Solo incluir columnas que existen en last_7_days_pred para mantener coherencia
@@ -1756,22 +1832,48 @@ def main():
             if df_weekly_filtered.empty:
                 st.info("No hay datos semanales disponibles.")
             else:
-                # Tabla con etiquetas limpias y números redondeados
-                df_weekly_display = df_weekly_filtered.sort_values('week_start', ascending=False).rename(columns={
+                # Calcular readiness promedio por semana desde df_daily
+                df_weekly_display = df_weekly_filtered.sort_values('week_start', ascending=False).copy()
+                
+                if 'readiness_score' in df_daily.columns:
+                    df_daily_copy = df_daily.copy()
+                    df_daily_copy['date'] = pd.to_datetime(df_daily_copy['date'])
+                    df_daily_copy['week_start'] = df_daily_copy['date'] - pd.to_timedelta(df_daily_copy['date'].dt.dayofweek, unit='D')
+                    
+                    weekly_readiness = df_daily_copy.groupby('week_start')['readiness_score'].mean().reset_index()
+                    weekly_readiness.columns = ['week_start', 'readiness_avg']
+                    
+                    # Convertir week_start a string para hacer match
+                    weekly_readiness['week_start'] = pd.to_datetime(weekly_readiness['week_start']).astype(str)
+                    df_weekly_display['week_start_str'] = pd.to_datetime(df_weekly_display['week_start']).astype(str)
+                    
+                    # Merge con la tabla semanal
+                    df_weekly_display = df_weekly_display.merge(
+                        weekly_readiness,
+                        left_on='week_start_str',
+                        right_on='week_start',
+                        how='left'
+                    )
+                    df_weekly_display = df_weekly_display.drop('week_start_str', axis=1)
+                else:
+                    df_weekly_display['readiness_avg'] = None
+                
+                df_weekly_display = df_weekly_display.rename(columns={
                     'week_start': 'Semana (inicio)',
                     'days': 'Días',
                     'volume_week': 'Volumen',
                     'effort_week_mean': 'Esfuerzo medio',
                     'rir_week_mean': 'RIR medio',
                     'monotony': 'Monotonía',
-                    'strain': 'Strain'
+                    'strain': 'Strain',
+                    'readiness_avg': 'Readiness'
                 })
                 for col in ['Volumen', 'Strain']:
                     if col in df_weekly_display.columns:
                         df_weekly_display[col] = df_weekly_display[col].round(0).astype('Int64')
-                for col in ['Esfuerzo medio', 'RIR medio', 'Monotonía']:
+                for col in ['Esfuerzo medio', 'RIR medio', 'Monotonía', 'Readiness']:
                     if col in df_weekly_display.columns:
-                        df_weekly_display[col] = df_weekly_display[col].round(2)
+                        df_weekly_display[col] = df_weekly_display[col].round(1)
                 if 'Días' in df_weekly_display.columns:
                     df_weekly_display['Días'] = df_weekly_display['Días'].astype('Int64')
                 st.dataframe(df_weekly_display, use_container_width=True)
@@ -1788,6 +1890,61 @@ def main():
                     if 'strain' in df_weekly_filtered.columns:
                         strain_data = df_weekly_filtered.set_index('week_start')['strain'].sort_index()
                         fig = create_weekly_strain_chart(strain_data, "Strain")
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                # === READINESS SEMANAL ===
+                st.markdown("---")
+                col3, col4 = st.columns(2)
+                
+                with col3:
+                    # Calcular readiness promedio por semana desde df_daily
+                    if 'readiness_score' in df_daily.columns:
+                        df_daily_copy = df_daily.copy()
+                        df_daily_copy['date'] = pd.to_datetime(df_daily_copy['date'])
+                        df_daily_copy['week_start'] = df_daily_copy['date'] - pd.to_timedelta(df_daily_copy['date'].dt.dayofweek, unit='D')
+                        
+                        weekly_readiness = df_daily_copy.groupby('week_start')['readiness_score'].mean().sort_index()
+                        
+                        if not weekly_readiness.empty:
+                            fig = go.Figure()
+                            fig.add_trace(go.Scatter(
+                                x=weekly_readiness.index,
+                                y=weekly_readiness.values,
+                                mode='lines+markers',
+                                name='Readiness Promedio',
+                                line=dict(color='#B266FF', width=3),
+                                marker=dict(size=8)
+                            ))
+                            fig.add_hline(y=65, line_dash="dash", line_color="orange", annotation_text="Óptimo")
+                            fig.update_layout(
+                                title="Readiness Promedio Semanal",
+                                xaxis_title="Semana",
+                                yaxis_title="Readiness (0-100)",
+                                template="plotly_dark",
+                                hovermode='x unified',
+                                height=350
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                
+                with col4:
+                    # Esfuerzo promedio semanal
+                    if 'effort_week_mean' in df_weekly_filtered.columns:
+                        effort_data = df_weekly_filtered.set_index('week_start')['effort_week_mean'].sort_index()
+                        
+                        fig = go.Figure()
+                        fig.add_trace(go.Bar(
+                            x=effort_data.index,
+                            y=effort_data.values,
+                            name='Esfuerzo',
+                            marker=dict(color='#FF6B6B')
+                        ))
+                        fig.update_layout(
+                            title="Esfuerzo Promedio Semanal",
+                            xaxis_title="Semana",
+                            yaxis_title="Esfuerzo",
+                            template="plotly_dark",
+                            height=350
+                        )
                         st.plotly_chart(fig, use_container_width=True)
                 
                 # === WEEKLY SUGGESTION ===

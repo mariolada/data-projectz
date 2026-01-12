@@ -1,10 +1,12 @@
 """
-Personalization Engine: Baselines, fatiga diferenciada, riesgo de lesión.
+Personalization Engine: Baselines, fatiga diferenciada, riesgo de lesión, aprendizaje personal.
+Calcula correlaciones y factores de ajuste personalizados para cada usuario.
 """
 
 import pandas as pd
 import numpy as np
 from typing import Tuple, Dict, List, Any
+from scipy import stats
 
 
 def calculate_personal_baselines(df_daily: pd.DataFrame, min_days: int = 7) -> Dict[str, Any]:
@@ -79,6 +81,306 @@ def calculate_personal_baselines(df_daily: pd.DataFrame, min_days: int = 7) -> D
     }
     
     return baselines
+
+
+def analyze_sleep_responsiveness(df_daily: pd.DataFrame, min_days: int = 7) -> Dict[str, Any]:
+    """
+    Analiza cuánto afecta el sueño realmente a TU rendimiento (readiness).
+    
+    Retorna:
+    - correlation: coef Pearson entre sleep_hours y readiness_score (-1 a 1)
+    - strength: 'none', 'weak', 'moderate', 'strong'
+    - interpretation: texto amigable
+    - sleep_responsive: bool (¿Eres sensible al sueño?)
+    
+    Ej: Algunos rinden igual con 6h que 8h (baja correlación)
+        Otros necesitan 7.5h+ para rendir (alta correlación)
+    """
+    if df_daily.empty or len(df_daily) < min_days:
+        return {
+            'correlation': np.nan,
+            'strength': 'unknown',
+            'p_value': np.nan,
+            'n_samples': len(df_daily),
+            'interpretation': 'Insuficientes datos para análisis (mín 7 días)',
+            'sleep_responsive': None,
+            'recommendation': 'Registra más días para análisis personalizado'
+        }
+    
+    sleep_clean = df_daily['sleep_hours'].dropna()
+    readiness_clean = df_daily['readiness_score'].dropna()
+    
+    # Alinear índices
+    common_idx = sleep_clean.index.intersection(readiness_clean.index)
+    if len(common_idx) < min_days:
+        return {
+            'correlation': np.nan,
+            'strength': 'unknown',
+            'p_value': np.nan,
+            'n_samples': len(common_idx),
+            'interpretation': 'Datos incompletos (falta sueño o readiness)',
+            'sleep_responsive': None,
+            'recommendation': 'Completa registros de sueño y readiness'
+        }
+    
+    sleep_data = sleep_clean.loc[common_idx].values
+    readiness_data = readiness_clean.loc[common_idx].values
+    
+    # Calcular correlación de Pearson
+    corr, p_value = stats.pearsonr(sleep_data, readiness_data)
+    
+    # Clasificar fuerza
+    abs_corr = abs(corr)
+    if abs_corr < 0.3:
+        strength = 'none'
+        interpretation = f'Sueño tiene POCO efecto en tu readiness (r={corr:.2f}). Posiblemente otros factores te afectan más (cafeína, estrés, carga).'
+        sleep_responsive = False
+    elif abs_corr < 0.5:
+        strength = 'weak'
+        interpretation = f'Sueño tiene efecto DÉBIL en tu readiness (r={corr:.2f}). No es tu factor clave.'
+        sleep_responsive = False
+    elif abs_corr < 0.7:
+        strength = 'moderate'
+        interpretation = f'Sueño tiene efecto MODERADO en tu readiness (r={corr:.2f}). Importante pero no determinante.'
+        sleep_responsive = True
+    else:
+        strength = 'strong'
+        interpretation = f'Sueño es CRÍTICO para tu readiness (r={corr:.2f}). Prioriza dormir adecuadamente.'
+        sleep_responsive = True
+    
+    return {
+        'correlation': float(corr),
+        'strength': strength,
+        'p_value': float(p_value),
+        'n_samples': len(common_idx),
+        'interpretation': interpretation,
+        'sleep_responsive': sleep_responsive,
+        'recommendation': 'Prioriza sueño' if sleep_responsive else 'Investiga otros factores (cafeína, estrés, carga)'
+    }
+
+
+def detect_user_archetype(df_daily: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Detecta qué "tipo" de atleta eres basándote en tu histórico.
+    
+    Arquetipos:
+    - 'short_sleeper': Rindes bien con <7h (no necesitas muchas horas)
+    - 'standard': Necesitas 7-7.5h (media)
+    - 'needs_sleep': Necesitas 8h+ para rendir (sensible)
+    - 'consistent_performer': Tu readiness es muy estable (predecible)
+    - 'variable_performer': Tu readiness fluctúa mucho (imprevisible)
+    - 'high_acwr_tolerator': Toleras bien ACWR alto sin caer readiness
+    - 'acwr_sensitive': ACWR alto impacta mucho tu recuperación
+    """
+    if df_daily.empty or len(df_daily) < 7:
+        return {'archetype': 'unknown', 'reason': 'Insuficientes datos', 'confidence': 0.0}
+    
+    archetypes = []
+    
+    # === Sleep pattern ===
+    if 'sleep_hours' in df_daily.columns:
+        sleep_hours = df_daily['sleep_hours'].dropna()
+        if len(sleep_hours) >= 7:
+            sleep_mean = sleep_hours.mean()
+            readiness = df_daily.loc[sleep_hours.index, 'readiness_score'].dropna()
+            
+            if sleep_mean < 6.5:
+                # Short sleeper: buena readiness con poco sueño
+                if len(readiness) > 0 and readiness.mean() > 60:
+                    archetypes.append(('short_sleeper', 0.85, 'Tienes media ~6.2h pero readiness decente'))
+            elif sleep_mean < 7.0:
+                if len(readiness) > 0 and readiness.mean() > 65:
+                    archetypes.append(('standard', 0.8, 'Necesitas típicamente 6.5-7h'))
+            elif sleep_mean < 7.5:
+                archetypes.append(('standard', 0.75, 'Tu media es ~7.2h (normal)'))
+            else:
+                archetypes.append(('needs_sleep', 0.8, f'Necesitas {sleep_mean:.1f}h para rendir'))
+    
+    # === Readiness consistency ===
+    if 'readiness_score' in df_daily.columns:
+        readiness = df_daily['readiness_score'].dropna()
+        if len(readiness) >= 7:
+            readiness_std = readiness.std()
+            if readiness_std < 10:
+                archetypes.append(('consistent_performer', 0.85, 'Tu readiness es muy predecible'))
+            elif readiness_std > 20:
+                archetypes.append(('variable_performer', 0.8, 'Tu readiness fluctúa (múltiples factores)'))
+    
+    # === ACWR tolerance ===
+    if 'acwr_7_28' in df_daily.columns and 'readiness_score' in df_daily.columns:
+        acwr_data = df_daily[['acwr_7_28', 'readiness_score']].dropna()
+        if len(acwr_data) >= 7:
+            high_acwr = acwr_data[acwr_data['acwr_7_28'] > 1.3]
+            if len(high_acwr) > 0:
+                acwr_corr, _ = stats.pearsonr(
+                    acwr_data['acwr_7_28'].values,
+                    acwr_data['readiness_score'].values
+                )
+                if abs(acwr_corr) < 0.4:
+                    archetypes.append(('high_acwr_tolerator', 0.75, 'Toleras bien picos de carga'))
+                else:
+                    archetypes.append(('acwr_sensitive', 0.8, 'ACWR alto impacta tu recuperación'))
+    
+    # Retornar el arquetipo con mayor confianza
+    if archetypes:
+        best = max(archetypes, key=lambda x: x[1])
+        return {
+            'archetype': best[0],
+            'confidence': float(best[1]),
+            'reason': best[2],
+            'all_detected': [a[0] for a in archetypes]
+        }
+    
+    return {'archetype': 'unknown', 'reason': 'No hay patrones claros', 'confidence': 0.0}
+
+
+def calculate_personal_adjustment_factors(df_daily: pd.DataFrame) -> Dict[str, float]:
+    """
+    Calcula pesos personalizados para la fórmula de readiness.
+    
+    Retorna dict de adjustment factors:
+    {
+        'sleep_weight': 0.25,       # Default 0.25
+        'performance_weight': 0.25, # Default 0.25
+        'acwr_weight': 0.15,        # Default 0.15
+        'fatigue_sensitivity': 1.0, # 1.0 = normal, >1.0 = muy sensible
+        'recovery_speed': 1.0,      # 1.0 = normal, >1.0 = recuperas rápido
+    }
+    
+    Lógica:
+    - Si sueño correlaciona alto con readiness → aumenta sleep_weight
+    - Si eres 'short_sleeper' → baja sleep_weight (no es crítico)
+    - Si performance es muy predecible → aumenta performance_weight
+    - Si toleras ACWR alto → baja acwr_weight
+    """
+    
+    if df_daily.empty or len(df_daily) < 7:
+        # Retornar defaults
+        return {
+            'sleep_weight': 0.25,
+            'performance_weight': 0.25,
+            'acwr_weight': 0.15,
+            'fatigue_sensitivity': 1.0,
+            'recovery_speed': 1.0
+        }
+    
+    factors = {
+        'sleep_weight': 0.25,
+        'performance_weight': 0.25,
+        'acwr_weight': 0.15,
+        'fatigue_sensitivity': 1.0,
+        'recovery_speed': 1.0
+    }
+    
+    # === Ajuste por sleep responsiveness ===
+    sleep_resp = analyze_sleep_responsiveness(df_daily)
+    if sleep_resp['sleep_responsive'] is not None:
+        if sleep_resp['sleep_responsive']:
+            # Sueño te afecta mucho → aumenta peso
+            factors['sleep_weight'] = 0.35
+        else:
+            # Sueño no te afecta → baja peso
+            factors['sleep_weight'] = 0.15
+    
+    # === Ajuste por archetype ===
+    archetype = detect_user_archetype(df_daily)
+    if archetype['archetype'] == 'short_sleeper':
+        factors['sleep_weight'] = 0.15  # No necesitas tanto sueño
+        factors['recovery_speed'] = 1.2
+    elif archetype['archetype'] == 'needs_sleep':
+        factors['sleep_weight'] = 0.40  # Crítico
+    elif archetype['archetype'] == 'high_acwr_tolerator':
+        factors['acwr_weight'] = 0.08  # Toleras picos
+    elif archetype['archetype'] == 'acwr_sensitive':
+        factors['acwr_weight'] = 0.25  # ACWR te afecta mucho
+    
+    # === Fatigue sensitivity: si effort/rir impacta mucho readiness ===
+    if 'rir_weighted' in df_daily.columns and 'readiness_score' in df_daily.columns:
+        rir_data = df_daily[['rir_weighted', 'readiness_score']].dropna()
+        if len(rir_data) >= 7:
+            rir_corr, _ = stats.pearsonr(rir_data['rir_weighted'].values, rir_data['readiness_score'].values)
+            if abs(rir_corr) > 0.6:
+                factors['fatigue_sensitivity'] = 1.3  # Muy sensible a fatiga
+            elif abs(rir_corr) < 0.3:
+                factors['fatigue_sensitivity'] = 0.7  # Poco sensible
+    
+    # === Recovery speed: readiness media vs std ===
+    if 'readiness_score' in df_daily.columns:
+        readiness = df_daily['readiness_score'].dropna()
+        if len(readiness) >= 7 and readiness.std() < 8:
+            factors['recovery_speed'] = 1.1  # Recuperas predecible/rápido
+    
+    return factors
+
+
+def create_user_profile(df_daily: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Crea perfil completo del usuario basado en histórico.
+    Se guarda como JSON para que Streamlit lo lea en "Modo Hoy".
+    
+    Retorna:
+    {
+        'sleep_responsiveness': {...},
+        'archetype': {...},
+        'adjustment_factors': {...},
+        'insights': [...],  # Lista de insights clave
+        'last_updated': fecha,
+        'data_quality': {...}
+    }
+    """
+    
+    sleep_resp = analyze_sleep_responsiveness(df_daily)
+    archetype = detect_user_archetype(df_daily)
+    adjustment_factors = calculate_personal_adjustment_factors(df_daily)
+    
+    profile = {
+        'sleep_responsiveness': {
+            'correlation': float(sleep_resp['correlation']) if pd.notna(sleep_resp.get('correlation')) else None,
+            'strength': sleep_resp['strength'],
+            'p_value': float(sleep_resp['p_value']) if pd.notna(sleep_resp.get('p_value')) else None,
+            'n_samples': int(sleep_resp['n_samples']),
+            'interpretation': sleep_resp['interpretation'],
+            'sleep_responsive': bool(sleep_resp['sleep_responsive']) if sleep_resp['sleep_responsive'] is not None else None,
+            'recommendation': sleep_resp['recommendation']
+        },
+        'archetype': {
+            'archetype': archetype['archetype'],
+            'confidence': float(archetype['confidence']),
+            'reason': archetype['reason'],
+            'all_detected': archetype.get('all_detected', [])
+        },
+        'adjustment_factors': {
+            'sleep_weight': float(adjustment_factors['sleep_weight']),
+            'performance_weight': float(adjustment_factors['performance_weight']),
+            'acwr_weight': float(adjustment_factors['acwr_weight']),
+            'fatigue_sensitivity': float(adjustment_factors['fatigue_sensitivity']),
+            'recovery_speed': float(adjustment_factors['recovery_speed'])
+        },
+        'insights': [],
+        'last_updated': pd.Timestamp.now().isoformat(),
+        'data_quality': {
+            'total_days': int(len(df_daily)),
+            'days_with_sleep': int(df_daily['sleep_hours'].notna().sum() if 'sleep_hours' in df_daily.columns else 0),
+            'days_with_readiness': int(df_daily['readiness_score'].notna().sum() if 'readiness_score' in df_daily.columns else 0)
+        }
+    }
+    
+    # === Generar insights ===
+    if profile['archetype']['confidence'] > 0.7:
+        profile['insights'].append(f"✨ Eres **{profile['archetype']['archetype']}**: {profile['archetype']['reason']}")
+    
+    if profile['sleep_responsiveness']['sleep_responsive'] is not None:
+        profile['insights'].append(f"😴 {profile['sleep_responsiveness']['interpretation']}")
+    
+    # Insight sobre recuperación
+    if 'adjustment_factors' in profile:
+        factors = profile['adjustment_factors']
+        if factors.get('recovery_speed', 1.0) > 1.1:
+            profile['insights'].append("⚡ Tu recuperación es predecible y rápida. Aprovecha picos de carga.")
+        elif factors.get('fatigue_sensitivity', 1.0) > 1.2:
+            profile['insights'].append("⚠️ Eres muy sensible a fatiga acumulada. Respeta los deloads.")
+    
+    return profile
 
 
 def contextualize_readiness(readiness_score: int, baselines: Dict) -> Tuple[str, str, float]:
