@@ -6,6 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from ui.components import render_section_title
+from ui.loader import loading
 from charts.weekly_charts import create_weekly_volume_chart, create_weekly_strain_chart
 from charts.daily_charts import create_performance_chart
 
@@ -33,76 +34,86 @@ def render_semana(df_daily: pd.DataFrame, df_weekly: pd.DataFrame):
         st.stop()
     
     if df_weekly is not None and not df_weekly.empty:
-        # Mantener week_start como datetime para gráficos
-        df_weekly['week_start'] = pd.to_datetime(df_weekly['week_start'], errors='coerce')
-        # Use last 12 weeks for weekly view instead of daily 7-day filter
-        max_week = df_weekly['week_start'].max()
-        start_week = max_week - pd.Timedelta(weeks=12)
-        df_weekly_filtered = df_weekly[df_weekly['week_start'] >= start_week].copy()
-        
-        if df_weekly_filtered.empty:
-            st.warning(f"⚠️ Sin datos en el rango (últimas 12 semanas desde {max_week.strftime('%d/%m/%Y')}). Mostrando todas las semanas disponibles:")
-            df_weekly_filtered = df_weekly.copy()
-        
-        # Calcular readiness promedio por semana desde df_daily
-        df_weekly_display = df_weekly_filtered.sort_values('week_start', ascending=False).copy()
-        
-        # Crear una columna separada para el display formateado
-        df_weekly_display_formatted = df_weekly_display.copy()
-        df_weekly_display_formatted['Semana (inicio)'] = df_weekly_display['week_start'].dt.strftime('%d/%m/%Y')
-        
-        # Calcular readiness promedio por semana desde df_daily
-        try:
-            if 'readiness_score' in df_daily.columns:
-                df_daily_copy = df_daily.copy()
-                # Convertir date objects a datetime
-                df_daily_copy['date'] = pd.to_datetime(df_daily_copy['date'])
-                # Calcular week_start normalizando al lunes
-                df_daily_copy['week_start'] = df_daily_copy['date'] - pd.to_timedelta(df_daily_copy['date'].dt.dayofweek, unit='D')
-                
-                weekly_readiness = df_daily_copy.groupby('week_start')['readiness_score'].mean().reset_index()
-                weekly_readiness.columns = ['week_start', 'readiness_avg']
-                
-                # Merge con la tabla semanal (ambos datetime)
-                df_weekly_display_formatted = df_weekly_display.merge(
-                    weekly_readiness,
-                    on='week_start',
-                    how='left'
-                )
+        with loading("Analizando datos semanales..."):
+            # Mantener week_start como datetime para gráficos
+            df_weekly['week_start'] = pd.to_datetime(df_weekly['week_start'], errors='coerce')
+            # Use last 12 weeks for weekly view instead of daily 7-day filter
+            max_week = df_weekly['week_start'].max()
+            start_week = max_week - pd.Timedelta(weeks=12)
+            df_weekly_filtered = df_weekly[df_weekly['week_start'] >= start_week].copy()
+            
+            if df_weekly_filtered.empty:
+                df_weekly_filtered = df_weekly.copy()
+                show_all_weeks_warning = True
             else:
+                show_all_weeks_warning = False
+            
+            # Calcular readiness promedio por semana desde df_daily
+            df_weekly_display = df_weekly_filtered.sort_values('week_start', ascending=False).copy()
+            
+            # Crear una columna separada para el display formateado
+            df_weekly_display_formatted = df_weekly_display.copy()
+            df_weekly_display_formatted['Semana (inicio)'] = df_weekly_display['week_start'].dt.strftime('%d/%m/%Y')
+            
+            # Calcular readiness promedio por semana desde df_daily
+            try:
+                if 'readiness_score' in df_daily.columns:
+                    df_daily_copy = df_daily.copy()
+                    # Convertir date objects a datetime
+                    df_daily_copy['date'] = pd.to_datetime(df_daily_copy['date'])
+                    # Calcular week_start normalizando al lunes
+                    df_daily_copy['week_start'] = df_daily_copy['date'] - pd.to_timedelta(df_daily_copy['date'].dt.dayofweek, unit='D')
+                    
+                    weekly_readiness = df_daily_copy.groupby('week_start')['readiness_score'].mean().reset_index()
+                    weekly_readiness.columns = ['week_start', 'readiness_avg']
+                    
+                    # Merge con la tabla semanal (ambos datetime)
+                    df_weekly_display_formatted = df_weekly_display.merge(
+                        weekly_readiness,
+                        on='week_start',
+                        how='left'
+                    )
+                else:
+                    df_weekly_display_formatted = df_weekly_display.copy()
+                    df_weekly_display_formatted['readiness_avg'] = None
+                readiness_error = None
+            except Exception as e:
                 df_weekly_display_formatted = df_weekly_display.copy()
                 df_weekly_display_formatted['readiness_avg'] = None
-        except Exception as e:
-            st.warning(f"⚠️ Error al calcular readiness semanal: {e}")
-            df_weekly_display_formatted = df_weekly_display.copy()
-            df_weekly_display_formatted['readiness_avg'] = None
+                readiness_error = str(e)
+            
+            # Formatear para display
+            df_weekly_display_formatted['Semana (inicio)'] = df_weekly_display_formatted['week_start'].dt.strftime('%d/%m/%Y')
+            df_weekly_display_formatted = df_weekly_display_formatted.rename(columns={
+                'days': 'Días',
+                'volume_week': 'Volumen',
+                'effort_week_mean': 'Esfuerzo medio',
+                'rir_week_mean': 'RIR medio',
+                'monotony': 'Monotonía',
+                'strain': 'Strain',
+                'readiness_avg': 'Readiness'
+            })
+            
+            # Seleccionar columnas para mostrar
+            display_cols = ['Semana (inicio)', 'Días', 'Volumen', 'Esfuerzo medio', 'RIR medio', 'Monotonía', 'Strain', 'Readiness']
+            display_cols = [c for c in display_cols if c in df_weekly_display_formatted.columns]
+            df_weekly_table = df_weekly_display_formatted[display_cols].copy()
+            
+            # Formatear números
+            for col in ['Volumen', 'Strain']:
+                if col in df_weekly_table.columns:
+                    df_weekly_table[col] = df_weekly_table[col].round(0).astype('Int64')
+            for col in ['Esfuerzo medio', 'RIR medio', 'Monotonía', 'Readiness']:
+                if col in df_weekly_table.columns:
+                    df_weekly_table[col] = df_weekly_table[col].round(1)
+            if 'Días' in df_weekly_table.columns:
+                df_weekly_table['Días'] = df_weekly_table['Días'].astype('Int64')
         
-        # Formatear para display (FUERA del try/except)
-        df_weekly_display_formatted['Semana (inicio)'] = df_weekly_display_formatted['week_start'].dt.strftime('%d/%m/%Y')
-        df_weekly_display_formatted = df_weekly_display_formatted.rename(columns={
-            'days': 'Días',
-            'volume_week': 'Volumen',
-            'effort_week_mean': 'Esfuerzo medio',
-            'rir_week_mean': 'RIR medio',
-            'monotony': 'Monotonía',
-            'strain': 'Strain',
-            'readiness_avg': 'Readiness'
-        })
-        
-        # Seleccionar columnas para mostrar
-        display_cols = ['Semana (inicio)', 'Días', 'Volumen', 'Esfuerzo medio', 'RIR medio', 'Monotonía', 'Strain', 'Readiness']
-        display_cols = [c for c in display_cols if c in df_weekly_display_formatted.columns]
-        df_weekly_table = df_weekly_display_formatted[display_cols].copy()
-        
-        # Formatear números
-        for col in ['Volumen', 'Strain']:
-            if col in df_weekly_table.columns:
-                df_weekly_table[col] = df_weekly_table[col].round(0).astype('Int64')
-        for col in ['Esfuerzo medio', 'RIR medio', 'Monotonía', 'Readiness']:
-            if col in df_weekly_table.columns:
-                df_weekly_table[col] = df_weekly_table[col].round(1)
-        if 'Días' in df_weekly_table.columns:
-            df_weekly_table['Días'] = df_weekly_table['Días'].astype('Int64')
+        # Mostrar warnings después del loading
+        if show_all_weeks_warning:
+            st.warning(f"Sin datos en el rango (últimas 12 semanas desde {max_week.strftime('%d/%m/%Y')}). Mostrando todas las semanas disponibles:")
+        if readiness_error:
+            st.warning(f"Error al calcular readiness semanal: {readiness_error}")
         
         st.dataframe(df_weekly_table, use_container_width=True)
         

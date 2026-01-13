@@ -5,6 +5,7 @@ import streamlit as st
 import pandas as pd
 
 from ui.components import render_section_title
+from ui.loader import loading
 from data.loaders import load_user_profile
 from calculations.readiness import generate_personalized_insights
 
@@ -23,9 +24,10 @@ def render_perfil(df_daily: pd.DataFrame):
     render_section_title("Tu Perfil Personalizado", accent="#B266FF")
     
     # Cargar datos necesarios
-    baselines = calculate_personal_baselines(df_daily)
-    user_profile = load_user_profile()
-    adjustment_factors = user_profile.get('adjustment_factors', {})
+    with loading("Cargando perfil..."):
+        baselines = calculate_personal_baselines(df_daily)
+        user_profile = load_user_profile()
+        adjustment_factors = user_profile.get('adjustment_factors', {})
     
     if not baselines or baselines.get('_data_quality', {}).get('total_days', 0) < 7:
         st.info("Necesitas al menos 7 días de datos para generar tu perfil personalizado. Sigue registrando entrenamientos.")

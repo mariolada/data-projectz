@@ -8,6 +8,7 @@ import datetime
 
 from ui.styles import inject_mode_today_css, inject_mode_today_header
 from ui.components import render_section_title
+from ui.loader import loading
 from ui.helpers import (
     render_badge, render_card, clean_line,
     get_sleep_hours_level, get_sleep_quality_level,
@@ -325,7 +326,6 @@ def render_modo_hoy(df_daily: pd.DataFrame):
             pain_location = ""
         
     with col_flag2:
-        st.write("** Enfermo/Resfriado**")
         sick_flag = st.checkbox(
             "Estoy enfermo/resfriado",
             value=st.session_state.get('mood_sick_flag', False),
@@ -505,68 +505,69 @@ def render_modo_hoy(df_daily: pd.DataFrame):
         st.markdown("<div style='margin:40px 0 20px'></div>", unsafe_allow_html=True)
         
         # === PERSONALIZATION ENGINE: Baselines + adjustment factors ===
-        baselines = calculate_personal_baselines(df_daily)
-        user_profile = load_user_profile()
-        adjustment_factors = user_profile.get('adjustment_factors', {})
-        sleep_resp = user_profile.get('sleep_responsiveness', {})
-        
-        # Si no hay adjustment_factors, usar defaults
-        if not adjustment_factors:
-            adjustment_factors = {
-                'sleep_weight': 0.30,
-                'fatigue_sensitivity': 1.0,
-                'stress_sensitivity': 1.0,
-                'sleep_responsive': sleep_resp.get('sleep_responsive', True)
-            }
-        
-        # Calculate readiness with context
-        readiness_instant, readiness_breakdown = calculate_readiness_from_inputs_v2(
-            sleep_h, sleep_q, fatigue, soreness, stress, motivation, pain_flag,
-            nap_mins, sleep_disruptions, energy, stiffness, caffeine, alcohol, sick_level,
-            perceived_readiness=perceived_readiness,
-            baselines=baselines,
-            adjustment_factors=adjustment_factors
-        )
-        
-        # Get zone
-        zone, emoji, _ = get_readiness_zone(readiness_instant)
-        
-        # === PERSONALIZATION ENGINE ===
-        # Baselines ya calculadas arriba, ahora contextualizamos
-        readiness_context, readiness_rec, readiness_delta = contextualize_readiness(readiness_instant, baselines)
-        
-        # 2. Detect fatigue type (central vs peripheral) - ahora recibe readiness para coordinación
-        fatigue_analysis = detect_fatigue_type(
-            sleep_h, sleep_q, stress, fatigue, soreness, pain_flag, pain_location, baselines,
-            readiness_instant=readiness_instant
-        )
-        
-        # 3. Calculate injury risk - ahora considera pain_severity, stiffness, sick
-        # Obtener último performance_index válido (con fallback a 1.0 si no hay datos)
-        perf_vals = df_daily['performance_index'].dropna() if 'performance_index' in df_daily.columns else pd.Series()
-        last_perf = perf_vals.iloc[-1] if len(perf_vals) > 0 else 1.0
-        
-        # Obtener último acwr válido (con fallback a 1.0 si no hay datos)
-        acwr_vals = df_daily['acwr_7_28'].dropna() if 'acwr_7_28' in df_daily.columns else pd.Series()
-        last_acwr = acwr_vals.iloc[-1] if len(acwr_vals) > 0 else 1.0
-        
-        injury_risk = calculate_injury_risk_score_v2(
-            readiness_instant, last_acwr, sleep_h, last_perf, 
-            effort_level=max(stress, fatigue),
-            pain_flag=pain_flag,
-            pain_severity=pain_severity,
-            stiffness=stiffness,
-            sick_level=sick_level,
-            last_hard=last_hard,
-            baselines=baselines,
-            days_high_strain=0
-        )
-        
-        # Generate plan - ahora con pain_zone, pain_type, sick_level
-        zone_display, plan, rules = generate_actionable_plan_v2(
-            readiness_instant, pain_flag, pain_zone, pain_severity, pain_type, 
-            fatigue, soreness, stiffness, sick_level, session_goal, fatigue_analysis
-        )
+        with loading("Calculando readiness..."):
+            baselines = calculate_personal_baselines(df_daily)
+            user_profile = load_user_profile()
+            adjustment_factors = user_profile.get('adjustment_factors', {})
+            sleep_resp = user_profile.get('sleep_responsiveness', {})
+            
+            # Si no hay adjustment_factors, usar defaults
+            if not adjustment_factors:
+                adjustment_factors = {
+                    'sleep_weight': 0.30,
+                    'fatigue_sensitivity': 1.0,
+                    'stress_sensitivity': 1.0,
+                    'sleep_responsive': sleep_resp.get('sleep_responsive', True)
+                }
+            
+            # Calculate readiness with context
+            readiness_instant, readiness_breakdown = calculate_readiness_from_inputs_v2(
+                sleep_h, sleep_q, fatigue, soreness, stress, motivation, pain_flag,
+                nap_mins, sleep_disruptions, energy, stiffness, caffeine, alcohol, sick_level,
+                perceived_readiness=perceived_readiness,
+                baselines=baselines,
+                adjustment_factors=adjustment_factors
+            )
+            
+            # Get zone
+            zone, emoji, _ = get_readiness_zone(readiness_instant)
+            
+            # === PERSONALIZATION ENGINE ===
+            # Baselines ya calculadas arriba, ahora contextualizamos
+            readiness_context, readiness_rec, readiness_delta = contextualize_readiness(readiness_instant, baselines)
+            
+            # 2. Detect fatigue type (central vs peripheral) - ahora recibe readiness para coordinación
+            fatigue_analysis = detect_fatigue_type(
+                sleep_h, sleep_q, stress, fatigue, soreness, pain_flag, pain_location, baselines,
+                readiness_instant=readiness_instant
+            )
+            
+            # 3. Calculate injury risk - ahora considera pain_severity, stiffness, sick
+            # Obtener último performance_index válido (con fallback a 1.0 si no hay datos)
+            perf_vals = df_daily['performance_index'].dropna() if 'performance_index' in df_daily.columns else pd.Series()
+            last_perf = perf_vals.iloc[-1] if len(perf_vals) > 0 else 1.0
+            
+            # Obtener último acwr válido (con fallback a 1.0 si no hay datos)
+            acwr_vals = df_daily['acwr_7_28'].dropna() if 'acwr_7_28' in df_daily.columns else pd.Series()
+            last_acwr = acwr_vals.iloc[-1] if len(acwr_vals) > 0 else 1.0
+            
+            injury_risk = calculate_injury_risk_score_v2(
+                readiness_instant, last_acwr, sleep_h, last_perf, 
+                effort_level=max(stress, fatigue),
+                pain_flag=pain_flag,
+                pain_severity=pain_severity,
+                stiffness=stiffness,
+                sick_level=sick_level,
+                last_hard=last_hard,
+                baselines=baselines,
+                days_high_strain=0
+            )
+            
+            # Generate plan - ahora con pain_zone, pain_type, sick_level
+            zone_display, plan, rules = generate_actionable_plan_v2(
+                readiness_instant, pain_flag, pain_zone, pain_severity, pain_type, 
+                fatigue, soreness, stiffness, sick_level, session_goal, fatigue_analysis
+            )
         
         # Display results - TWO MODES
         st.markdown("---")

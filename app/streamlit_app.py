@@ -30,14 +30,16 @@ from charts.daily_charts import (
 )
 from ui.components import render_section_title
 from ui.styles import inject_main_css, inject_hero
-from views import render_modo_hoy, render_semana, render_perfil
+from ui.loader import loading, inject_loader_css
+from views import render_modo_hoy, render_semana, render_perfil, render_entrenamiento
 
 
 def main():
     st.set_page_config(page_title="Trainer Readiness Dashboard", layout="wide")
     
-    # Inyectar CSS principal y Hero
+    # Inyectar CSS principal, Hero y Loader
     inject_main_css(st)
+    inject_loader_css()
     inject_hero(st)
 
     daily_path = Path("data/processed/daily.csv")
@@ -49,19 +51,18 @@ def main():
     df_metrics = None
     df_recommendations = None
     
-    try:
-        df_metrics = load_csv(daily_path)  # daily.csv solo tiene métricas base
-    except FileNotFoundError:
-        st.warning("❌ Falta daily.csv. Ejecuta el `pipeline` primero.")
-        st.stop()
-        st.write("**DEBUG performance_7d_mean ejemplos (últimas 15 filas):**")
-        st.dataframe(df_metrics[['date', 'performance_7d_mean']].tail(15))
-    
-    try:
-        df_recommendations = load_csv(reco_path)  # recommendations_daily.csv contiene TODO: métricas + readiness + recomendaciones
-    except FileNotFoundError:
-        st.warning("❌ Falta recommendations_daily.csv. Ejecuta `decision_engine` primero.")
-        st.stop()
+    with loading("Cargando datos..."):
+        try:
+            df_metrics = load_csv(daily_path)  # daily.csv solo tiene métricas base
+        except FileNotFoundError:
+            st.warning("❌ Falta daily.csv. Ejecuta el `pipeline` primero.")
+            st.stop()
+        
+        try:
+            df_recommendations = load_csv(reco_path)  # recommendations_daily.csv contiene TODO: métricas + readiness + recomendaciones
+        except FileNotFoundError:
+            st.warning("❌ Falta recommendations_daily.csv. Ejecuta `decision_engine` primero.")
+            st.stop()
 
     # Combinar métricas base (daily.csv) con readiness/recomendaciones (recommendations_daily.csv)
     df_metrics['date'] = pd.to_datetime(df_metrics['date']).dt.date
@@ -109,7 +110,7 @@ def main():
 
     # Sidebar: view selector (day/week/today)
     st.sidebar.markdown("<div class='sidebar-title'>Configuración</div>", unsafe_allow_html=True)
-    view_mode = st.sidebar.radio("Vista", ["Día", "Modo Hoy", "Semana", "Perfil Personal"], key="view_mode")
+    view_mode = st.sidebar.radio("Vista", ["Día", "Modo Hoy", "Semana", "Entrenamiento", "Perfil Personal"], key="view_mode")
 
     # Sidebar: date range filter - Solo mostrar en modo Día
     dates = sorted(df_daily['date'].unique())
@@ -386,6 +387,10 @@ def main():
     # ============== WEEK VIEW ==============
     elif view_mode == "Semana":
         render_semana(df_daily, df_weekly)
+    
+    # ============== ENTRENAMIENTO VIEW ==============
+    elif view_mode == "Entrenamiento":
+        render_entrenamiento()
     
     # ============== PERFIL PERSONAL VIEW ==============
     elif view_mode == "Perfil Personal":
