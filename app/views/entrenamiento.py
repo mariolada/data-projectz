@@ -1,5 +1,5 @@
 """
-Vista Entrenamiento - Entrada de ejercicios estilo Excel.
+Vista Entrenamiento - Entrada de ejercicios estilo Excel con autocompletado.
 """
 import streamlit as st
 import pandas as pd
@@ -11,6 +11,16 @@ from ui.loader import loading
 
 TRAINING_CSV_PATH = Path("data/raw/training.csv")
 
+# Ejercicios base predefinidos (se amplían con el historial)
+EJERCICIOS_BASE = [
+    "Press Banca", "Press Inclinado", "Press Militar",
+    "Sentadilla", "Peso Muerto", "Peso Muerto Rumano",
+    "Dominadas", "Remo con Barra", "Remo con Mancuerna",
+    "Curl Bíceps", "Extensión Tríceps", "Press Francés",
+    "Hip Thrust", "Zancadas", "Prensa de Piernas",
+    "Elevaciones Laterales", "Face Pull", "Fondos"
+]
+
 
 def get_empty_row(date: datetime.date) -> dict:
     """Retorna una fila vacía con valores por defecto."""
@@ -20,8 +30,8 @@ def get_empty_row(date: datetime.date) -> dict:
         "sets": 3,
         "reps": 8,
         "weight": 0.0,
-        "rpe": 7.0,
-        "rir": 2.0
+        "rpe": 7,
+        "rir": 2
     }
 
 
@@ -55,6 +65,18 @@ def load_existing_training() -> pd.DataFrame:
     return pd.DataFrame(columns=['date', 'exercise', 'sets', 'reps', 'weight', 'rpe', 'rir'])
 
 
+def get_all_exercises() -> list[str]:
+    """Obtiene todos los ejercicios: base + historial del usuario + ejercicios de sesión."""
+    ejercicios = set(EJERCICIOS_BASE)
+    df_hist = load_existing_training()
+    if not df_hist.empty and 'exercise' in df_hist.columns:
+        ejercicios.update(df_hist['exercise'].dropna().unique().tolist())
+    # Añadir ejercicios nuevos de la sesión actual
+    if 'custom_exercises' in st.session_state:
+        ejercicios.update(st.session_state.custom_exercises)
+    return sorted(ejercicios)
+
+
 def save_training(df: pd.DataFrame, date: datetime.date) -> bool:
     """Guarda los ejercicios, reemplazando los de la fecha."""
     try:
@@ -74,6 +96,22 @@ def save_training(df: pd.DataFrame, date: datetime.date) -> bool:
     except Exception as e:
         st.error(f"Error: {e}")
         return False
+
+
+def _save_new_exercise(row_idx: int):
+    """Guarda un nuevo ejercicio desde el input de texto."""
+    key = f"ex_new_{row_idx}"
+    if key in st.session_state:
+        exercise_name = st.session_state[key].strip()
+        if exercise_name:
+            # Añadir a ejercicios personalizados
+            if 'custom_exercises' not in st.session_state:
+                st.session_state.custom_exercises = set()
+            st.session_state.custom_exercises.add(exercise_name)
+            
+            # Actualizar training_data
+            if 'training_data' in st.session_state and row_idx < len(st.session_state.training_data):
+                st.session_state.training_data.at[row_idx, 'exercise'] = exercise_name
 
 
 def render_entrenamiento():
@@ -131,81 +169,250 @@ def render_entrenamiento():
             - **3**: Te quedaban 3 reps
             """)
     
-    # === TABLA EXCEL ===
+    # === TABLA EXCEL CON AUTOCOMPLETADO ===
     st.markdown("### Ejercicios")
+    st.caption("Selecciona ejercicios guardados o añade uno nuevo")
     
-    # Obtener ejercicios guardados
-    df_hist = load_existing_training()
-    ejercicios_guardados = []
-    if not df_hist.empty and 'exercise' in df_hist.columns:
-        ejercicios_guardados = sorted(df_hist['exercise'].dropna().unique().tolist())
+    # Inicializar ejercicios personalizados en sesión
+    if 'custom_exercises' not in st.session_state:
+        st.session_state.custom_exercises = set()
     
-    # Añadir rápido desde historial
-    if ejercicios_guardados:
-        col_add, col_btn = st.columns([4, 1])
-        with col_add:
-            ejercicio_rapido = st.selectbox(
-                "Añadir ejercicio guardado",
-                options=[""] + ejercicios_guardados,
-                key="ejercicio_rapido",
-                label_visibility="collapsed",
-                placeholder="⚡ Añadir ejercicio guardado..."
-            )
-        with col_btn:
-            if st.button("➕", key="btn_add_rapido", help="Añadir a la tabla"):
-                if ejercicio_rapido:
-                    new_row = pd.DataFrame([get_empty_row(selected_date)])
-                    new_row['exercise'] = ejercicio_rapido
-                    st.session_state.training_data = pd.concat(
-                        [st.session_state.training_data, new_row], 
-                        ignore_index=True
-                    )
-                    st.rerun()
+    # Inicializar filas si no existen
+    if 'num_rows' not in st.session_state:
+        st.session_state.num_rows = max(1, len(st.session_state.training_data))
     
-    st.caption("O escribe directamente en la tabla (puedes añadir ejercicios nuevos)")
+    # Sincronizar num_rows con training_data
+    if len(st.session_state.training_data) != st.session_state.num_rows:
+        st.session_state.num_rows = max(1, len(st.session_state.training_data))
     
-    column_config = {
-        "date": None,
-        "exercise": st.column_config.TextColumn(
-            "Ejercicio",
-            help="Escribe cualquier nombre de ejercicio",
-            required=True,
-            width="large"
-        ),
-        "sets": st.column_config.NumberColumn(
-            "Series", min_value=1, max_value=20, step=1, default=3
-        ),
-        "reps": st.column_config.NumberColumn(
-            "Reps", min_value=1, max_value=50, step=1, default=8
-        ),
-        "weight": st.column_config.NumberColumn(
-            "Peso (kg)", min_value=0.0, max_value=500.0, step=2.5, format="%.1f"
-        ),
-        "rpe": st.column_config.NumberColumn(
-            "RPE", min_value=1.0, max_value=10.0, step=0.5, default=7.0
-        ),
-        "rir": st.column_config.NumberColumn(
-            "RIR", min_value=0.0, max_value=5.0, step=0.5, default=2.0
-        )
+    # CSS para estilo Excel/Tabla
+    st.markdown("""
+    <style>
+    /* Contenedor principal de la tabla */
+    .excel-table-container {
+        border: 1px solid rgba(178, 102, 255, 0.3);
+        border-radius: 8px;
+        overflow: hidden;
+        margin: 1rem 0;
     }
     
-    edited_df = st.data_editor(
-        st.session_state.training_data,
-        column_config=column_config,
-        num_rows="dynamic",
-        use_container_width=True,
-        hide_index=True,
-        key="training_editor"
-    )
+    /* Header de la tabla estilo Excel */
+    .table-header {
+        background: linear-gradient(180deg, rgba(178, 102, 255, 0.25) 0%, rgba(178, 102, 255, 0.15) 100%);
+        padding: 12px 8px;
+        border-bottom: 2px solid rgba(178, 102, 255, 0.4);
+        font-weight: 600;
+        font-size: 0.85em;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #E0E0E0;
+    }
     
-    st.session_state.training_data = edited_df
+    /* Filas de la tabla */
+    div[data-testid="column"] {
+        padding: 2px 4px !important;
+    }
+    
+    /* Inputs más compactos estilo celda */
+    div[data-testid="stNumberInput"] > div,
+    div[data-testid="stSelectbox"] > div {
+        background: rgba(20, 20, 30, 0.6) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 4px !important;
+    }
+    
+    div[data-testid="stNumberInput"] > div:hover,
+    div[data-testid="stSelectbox"] > div:hover {
+        border-color: rgba(178, 102, 255, 0.5) !important;
+        background: rgba(30, 30, 45, 0.8) !important;
+    }
+    
+    div[data-testid="stNumberInput"] > div:focus-within,
+    div[data-testid="stSelectbox"] > div:focus-within {
+        border-color: rgba(178, 102, 255, 0.8) !important;
+        box-shadow: 0 0 0 2px rgba(178, 102, 255, 0.2) !important;
+    }
+    
+    /* Líneas separadoras entre filas */
+    .row-separator {
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(178, 102, 255, 0.2), transparent);
+        margin: 4px 0;
+    }
+    
+    /* Número de fila estilo Excel */
+    .row-number {
+        background: rgba(178, 102, 255, 0.15);
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 0.75em;
+        font-weight: 600;
+        padding: 8px 12px;
+        text-align: center;
+        border-right: 1px solid rgba(178, 102, 255, 0.2);
+        min-width: 35px;
+    }
+    
+    /* Botón eliminar más discreto */
+    button[kind="secondary"] {
+        background: transparent !important;
+        border: none !important;
+        opacity: 0.5;
+    }
+    button[kind="secondary"]:hover {
+        opacity: 1;
+        background: rgba(255, 100, 100, 0.2) !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Header de la tabla con estilo Excel
+    st.markdown('<div class="table-header">', unsafe_allow_html=True)
+    cols_header = st.columns([0.3, 3, 1, 1, 1.2, 1, 1, 0.5])
+    headers = ["#", "Ejercicio", "Series", "Reps", "Peso (kg)", "RPE", "RIR", ""]
+    for col, header in zip(cols_header, headers):
+        col.markdown(f"<span style='font-size: 0.85em; font-weight: 600;'>{header}</span>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Renderizar filas
+    rows_data = []
+    rows_to_delete = []
+    
+    for i in range(st.session_state.num_rows):
+        # Obtener valores actuales de la fila
+        if i < len(st.session_state.training_data):
+            row = st.session_state.training_data.iloc[i]
+            current_exercise = row.get('exercise', '')
+            current_sets = int(row.get('sets', 3))
+            current_reps = int(row.get('reps', 8))
+            current_weight = float(row.get('weight', 0.0))
+            current_rpe = int(row.get('rpe', 7))
+            current_rir = int(row.get('rir', 2))
+        else:
+            current_exercise = ''
+            current_sets = 3
+            current_reps = 8
+            current_weight = 0.0
+            current_rpe = 7
+            current_rir = 2
+        
+        cols = st.columns([0.3, 3, 1, 1, 1.2, 1, 1, 0.5])
+        
+        # Número de fila
+        with cols[0]:
+            st.markdown(f"<div style='padding: 8px; text-align: center; color: rgba(178, 102, 255, 0.8); font-weight: 600;'>{i+1}</div>", unsafe_allow_html=True)
+        
+        # Obtener ejercicios actualizados (incluye los añadidos en esta sesión)
+        todos_ejercicios = get_all_exercises()
+        
+        # Columna Ejercicio - Selectbox con opción de escribir nuevo
+        with cols[1]:
+            # Crear opciones: ejercicios existentes + opción de nuevo
+            opciones = [""] + todos_ejercicios + ["➕ Nuevo ejercicio..."]
+            
+            # Determinar índice actual
+            if current_exercise in todos_ejercicios:
+                default_idx = todos_ejercicios.index(current_exercise) + 1
+            elif current_exercise and current_exercise not in ["", "➕ Nuevo ejercicio..."]:
+                # Es un ejercicio personalizado no en la lista
+                opciones = [""] + [current_exercise] + todos_ejercicios + ["➕ Nuevo ejercicio..."]
+                default_idx = 1
+            else:
+                default_idx = 0
+            
+            seleccion = st.selectbox(
+                f"Ejercicio {i+1}",
+                options=opciones,
+                index=default_idx,
+                key=f"ex_select_{i}",
+                label_visibility="collapsed",
+                placeholder="Buscar ejercicio..."
+            )
+            
+            # Si seleccionó "Nuevo ejercicio", mostrar input de texto con botón
+            if seleccion == "➕ Nuevo ejercicio...":
+                col_input, col_btn = st.columns([5, 1])
+                with col_input:
+                    new_exercise_name = st.text_input(
+                        "Nombre",
+                        value="",
+                        key=f"ex_new_{i}",
+                        label_visibility="collapsed",
+                        placeholder="Nombre del ejercicio...",
+                        on_change=lambda idx=i: _save_new_exercise(idx)
+                    )
+                with col_btn:
+                    if st.button("✓", key=f"add_ex_{i}", help="Añadir ejercicio", use_container_width=True):
+                        _save_new_exercise(i)
+                
+                exercise = new_exercise_name.strip() if new_exercise_name else ""
+            else:
+                exercise = seleccion
+        
+        # Columnas numéricas
+        with cols[2]:
+            sets = st.number_input("Sets", min_value=1, max_value=20, value=current_sets, 
+                                   key=f"sets_{i}", label_visibility="collapsed")
+        with cols[3]:
+            reps = st.number_input("Reps", min_value=1, max_value=50, value=current_reps, 
+                                   key=f"reps_{i}", label_visibility="collapsed")
+        with cols[4]:
+            weight = st.number_input("Peso", min_value=0.0, max_value=500.0, value=current_weight, 
+                                     step=2.5, format="%.1f", key=f"weight_{i}", label_visibility="collapsed")
+        with cols[5]:
+            rpe = st.number_input("RPE", min_value=1, max_value=10, value=current_rpe, 
+                                  step=1, key=f"rpe_{i}", label_visibility="collapsed")
+        with cols[6]:
+            rir = st.number_input("RIR", min_value=0, max_value=5, value=current_rir, 
+                                  step=1, key=f"rir_{i}", label_visibility="collapsed")
+        
+        # Botón eliminar fila
+        with cols[7]:
+            if st.button("🗑️", key=f"del_{i}", help="Eliminar fila"):
+                rows_to_delete.append(i)
+        
+        # Guardar datos de la fila
+        rows_data.append({
+            "date": selected_date,
+            "exercise": exercise,
+            "sets": sets,
+            "reps": reps,
+            "weight": weight,
+            "rpe": rpe,
+            "rir": rir
+        })
+        
+        # Separador entre filas (excepto la última)
+        if i < st.session_state.num_rows - 1:
+            st.markdown('<div class="row-separator"></div>', unsafe_allow_html=True)
+    
+    # Procesar eliminaciones
+    if rows_to_delete:
+        rows_data = [r for idx, r in enumerate(rows_data) if idx not in rows_to_delete]
+        st.session_state.training_data = pd.DataFrame(rows_data) if rows_data else pd.DataFrame([get_empty_row(selected_date)])
+        st.session_state.num_rows = len(st.session_state.training_data)
+        st.rerun()
+    
+    # Actualizar training_data con los valores actuales
+    st.session_state.training_data = pd.DataFrame(rows_data)
+    
+    # Botón añadir fila
+    col_add, col_space = st.columns([1, 4])
+    with col_add:
+        if st.button("➕ Añadir ejercicio", use_container_width=True):
+            st.session_state.num_rows += 1
+            new_row = pd.DataFrame([get_empty_row(selected_date)])
+            st.session_state.training_data = pd.concat(
+                [st.session_state.training_data, new_row], 
+                ignore_index=True
+            )
+            st.rerun()
     
     # === GUARDAR ===
     st.markdown("---")
     
-    df_to_save = edited_df.copy()
+    df_to_save = st.session_state.training_data.copy()
     df_to_save['date'] = selected_date
-    df_to_save = df_to_save[df_to_save['exercise'].notna() & (df_to_save['exercise'] != '')]
+    df_to_save = df_to_save[df_to_save['exercise'].notna() & (df_to_save['exercise'] != '') & (df_to_save['exercise'] != '➕ Nuevo ejercicio...')]
     
     if not df_to_save.empty:
         col_s1, col_s2, col_s3 = st.columns(3)
