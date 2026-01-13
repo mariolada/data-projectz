@@ -1667,8 +1667,9 @@ def main():
     df_weekly = None
     try:
         df_weekly = load_csv(weekly_path)
-    except:
-        pass
+    except Exception as e:
+        st.warning(f"❌ No pude cargar weekly.csv: {e}")
+        df_weekly = None
 
     # Sidebar: view selector (day/week/today)
     st.sidebar.markdown("<div class='sidebar-title'>Configuración</div>", unsafe_allow_html=True)
@@ -2762,6 +2763,56 @@ def main():
     # ============== WEEK VIEW ==============
     elif view_mode == "Semana":
         render_section_title("Semana — Macro", accent="#4ECDC4")
+        
+        # === DEBUG SECTION ===
+        with st.expander("🔍 DEBUG: Diagnóstico de datos semanales", expanded=False):
+            st.write("**df_weekly es None?:**", df_weekly is None)
+            
+            if df_weekly is None:
+                st.error("❌ weekly.csv no se cargó (df_weekly=None). Revisa si existe data/processed/weekly.csv")
+                st.stop()
+            
+            st.write(f"**Filas df_weekly:** {df_weekly.shape[0]}")
+            st.write(f"**Columnas df_weekly:** {list(df_weekly.columns)}")
+            st.dataframe(df_weekly.head(5))
+            
+            if 'week_start' not in df_weekly.columns:
+                st.error("❌ weekly.csv NO tiene la columna 'week_start'. No puedo hacer gráficas semanales.")
+                st.stop()
+            
+            df_weekly['week_start'] = pd.to_datetime(df_weekly['week_start'], errors='coerce')
+            st.write(f"**NaT en week_start:** {int(df_weekly['week_start'].isna().sum())}")
+            st.write(f"**Rango week_start:** {df_weekly['week_start'].min()} -> {df_weekly['week_start'].max()}")
+            
+            df_weekly = df_weekly.dropna(subset=['week_start'])
+            if df_weekly.empty:
+                st.error("❌ week_start es inválido en todas las filas (todo NaT).")
+                st.stop()
+            
+            max_week = df_weekly['week_start'].max()
+            start_week = max_week - pd.Timedelta(weeks=12)
+            df_weekly_filtered = df_weekly[df_weekly['week_start'] >= start_week].copy()
+            
+            st.write(f"**Filas df_weekly_filtered (últimas 12 semanas):** {df_weekly_filtered.shape[0]}")
+            
+            if df_weekly_filtered.empty:
+                st.info("ℹ️ No hay datos en las últimas 12 semanas. Mostraré todo el weekly.csv.")
+                df_weekly_filtered = df_weekly.copy()
+            
+            st.write(f"**Columnas en df_weekly_filtered:** {list(df_weekly_filtered.columns)}")
+            
+            # Intentar encontrar columna de volumen
+            volume_col = None
+            for c in ['volume_week', 'volume', 'weekly_volume', 'total_volume', 'volumen']:
+                if c in df_weekly_filtered.columns:
+                    volume_col = c
+                    st.success(f"✅ Columna de volumen encontrada: '{volume_col}'")
+                    break
+            
+            if volume_col is None:
+                st.warning(f"⚠️ No encuentro columna de volumen. Buscaba: volume_week, volume, weekly_volume...")
+        
+        st.markdown("---")
         
         if df_weekly is not None and not df_weekly.empty:
             # Mantener week_start como datetime para gráficos
