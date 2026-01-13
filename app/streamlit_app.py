@@ -218,9 +218,9 @@ def calculate_readiness_from_inputs(sleep_hours, sleep_quality, fatigue, sorenes
 def calculate_readiness_from_inputs_v2(
     sleep_hours, sleep_quality, fatigue, soreness, stress, motivation, pain_flag,
     nap_mins=0, sleep_disruptions=False, energy=7, stiffness=2, 
-    caffeine=0, alcohol=False, sick_flag=False, perceived_readiness=None
+    caffeine=0, alcohol=False, sick_level=0, perceived_readiness=None
 ):
-    """Versión mejorada: considera nap, energía, rigidez, cafeína, alcohol, enfermo, y PERCEPCIÓN PERSONAL."""
+    """Versión mejorada: considera nap, energía, rigidez, cafeína, alcohol, enfermo (0-5), y PERCEPCIÓN PERSONAL."""
     
     # === PERCEPCIÓN PERSONAL (25% si está presente) ===
     # Este es el factor clave: cómo TE SIENTES realmente, puede sobreescribir métricas objetivas
@@ -274,7 +274,11 @@ def calculate_readiness_from_inputs_v2(
     
     # === PENALIZACIONES FLAGS ===
     pain_penalty = 0.25 if pain_flag else 0
-    sick_penalty = 0.35 if sick_flag else 0  # Enfermo es muy grave
+    
+    # Enfermo: penalización escalonada según nivel (0-5)
+    # 0=Sano, 1-2=Leve (-10-15%), 3=Moderado (-25%), 4=Grave (-35%), 5=Muy grave (-50%)
+    sick_penalty_map = {0: 0.0, 1: 0.10, 2: 0.15, 3: 0.25, 4: 0.35, 5: 0.50}
+    sick_penalty = sick_penalty_map.get(sick_level, 0.0)
     
     # Cafeína: si es alta, puede estar enmascarando fatiga
     caffeine_mask = 0
@@ -661,10 +665,10 @@ def render_section_title(text, accent="#B266FF"):
 
 def calculate_injury_risk_score_v2(
     readiness_score, acwr, sleep_hours, performance_index, effort_level,
-    pain_flag=False, pain_severity=0, stiffness=0, sick_flag=False, 
+    pain_flag=False, pain_severity=0, stiffness=0, sick_level=0, 
     last_hard=False, baselines=None, days_high_strain=0
 ):
-    """Versión mejorada con pain_severity, stiffness, sick_flag."""
+    """Versión mejorada con pain_severity, stiffness, sick_level."""
     # calculate_injury_risk_score ya está importado al inicio del archivo
     
     # Usar función base
@@ -690,10 +694,16 @@ def calculate_injury_risk_score_v2(
         extra_score += 10
         extra_factors.append(f'Rigidez articular alta ({stiffness}/10)')
     
-    # Sick flag (enfermo = riesgo altísimo)
-    if sick_flag:
+    # Sick level (enfermo = riesgo escalonado: 0=nada, 1-2=leve, 3-4=moderado, 5=grave)
+    if sick_level >= 5:
+        extra_score += 35
+        extra_factors.append(f'⚠️ Estado grave de enfermedad (nivel {sick_level}/5)')
+    elif sick_level >= 3:
         extra_score += 25
-        extra_factors.append('⚠️ Estado de enfermedad detectado')
+        extra_factors.append(f'⚠️ Estado moderado de enfermedad (nivel {sick_level}/5)')
+    elif sick_level >= 1:
+        extra_score += 10
+        extra_factors.append(f'Estado leve de enfermedad (nivel {sick_level}/5)')
     
     # Last hard session (fatiga acumulada)
     if last_hard:
@@ -729,7 +739,7 @@ def calculate_injury_risk_score_v2(
 
 def generate_actionable_plan_v2(
     readiness, pain_flag, pain_zone, pain_severity, pain_type,
-    fatigue, soreness, stiffness, sick_flag, session_goal, fatigue_analysis
+    fatigue, soreness, stiffness, sick_level, session_goal, fatigue_analysis
 ):
     """Versión mejorada: genera plan ultra-específico con pain_zone y fatigue_type."""
     
@@ -737,15 +747,19 @@ def generate_actionable_plan_v2(
     rules = []
     zone_display = ""
     
-    # Override si enfermo
-    if sick_flag:
+    # Override si enfermo (nivel >= 3 es significativo)
+    if sick_level >= 3:
         zone_display = "ENFERMO - NO ENTRENAR"
-        plan.append("🤒 **Estado**: Enfermo detectado")
+        plan.append(f"🤒 **Estado**: Enfermo (nivel {sick_level}/5)")
         plan.append("⛔ **Recomendación**: DESCANSO TOTAL hasta recuperación")
         plan.append("💊 Prioriza: hidratación, sueño, nutrición")
         rules.append("❌ NO entrenar bajo ninguna circunstancia")
         rules.append("❌ Evita ejercicio hasta estar 100% sano")
         return zone_display, plan, rules
+    elif sick_level >= 1:
+        # Enfermo leve: advertencia pero puede hacer deload muy suave
+        plan.append(f"⚠️ Malestar leve detectado (nivel {sick_level}/5)")
+        plan.append("Considera deload o descanso si empeora")
     
     # Clasificar readiness
     if readiness >= 80:
@@ -1291,6 +1305,61 @@ def main():
             background: linear-gradient(180deg, #00D084, #B266FF);
             box-shadow: 0 0 15px rgba(0, 208, 132, 0.4);
         }
+        
+        /* === CUSTOM CARD ANIMATIONS === */
+        @keyframes neonPulse {
+            0%, 100% { box-shadow: 0 0 20px var(--card-accent)40, 0 0 40px var(--card-accent)20, inset 0 0 60px rgba(0,0,0,0.3); }
+            50% { box-shadow: 0 0 30px var(--card-accent)60, 0 0 60px var(--card-accent)30, inset 0 0 60px rgba(0,0,0,0.3); }
+        }
+        
+        @keyframes cardSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Card hover effect via CSS */
+        div[style*="border: 2px solid"] {
+            animation: cardSlideIn 0.4s ease-out;
+        }
+        
+        /* Input sections styling */
+        .input-section {
+            background: linear-gradient(135deg, rgba(20,20,30,0.6) 0%, rgba(30,30,45,0.4) 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border-left: 3px solid var(--purple);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .section-sleep {
+            border-left-color: var(--aqua);
+        }
+        
+        .section-state {
+            border-left-color: var(--amber);
+        }
+        
+        .section-flags {
+            border-left-color: var(--coral);
+        }
+        
+        .section-header {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            font-size: 1.15rem;
+            color: var(--text);
+            letter-spacing: 0.08em;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(178, 102, 255, 0.3);
+        }
     </style>
     """, unsafe_allow_html=True)
     
@@ -1814,10 +1883,13 @@ def main():
             _badge(txt, lvl)
         
         with col_st3:
-            soreness = st.slider("Agujetas/DOMS", 0, 10, st.session_state.get('mood_soreness', 2), 
-                                help="Dolor muscular general post-entreno", key="input_soreness")
-            txt, lvl = _soreness_level(soreness)
-            _badge(txt, lvl)
+            if not quick_mode:
+                soreness = st.slider("Agujetas/DOMS", 0, 10, st.session_state.get('mood_soreness', 2), 
+                                    help="Dolor muscular general post-entreno", key="input_soreness")
+                txt, lvl = _soreness_level(soreness)
+                _badge(txt, lvl)
+            else:
+                soreness = 2  # Valor por defecto en modo rápido
         
         with col_st4:
             if not quick_mode:
@@ -1874,28 +1946,37 @@ def main():
         col_flag1, col_flag2, col_flag3 = st.columns(3)
         
         with col_flag1:
-            st.write("**🩹 Dolor localizado**")
-            pain_flag = st.checkbox("Tengo dolor localizado", value=st.session_state.get('mood_pain_flag', False), key="pain_checkbox")
-                
-            if pain_flag:
-                zones = ["Hombro", "Codo", "Muñeca", "Espalda alta", "Espalda baja", "Cadera", "Rodilla", "Tobillo", "Otra"]
-                pain_zone = st.selectbox("Zona", zones, 
-                                        index=zones.index(st.session_state.get('mood_pain_zone', 'Hombro')) if st.session_state.get('mood_pain_zone') in zones else 0,
-                                        key="pain_zone_select")
-                sides = ["Izquierdo", "Derecho", "Ambos"]
-                pain_side = st.radio("Lado", sides, horizontal=True,
-                                    index=sides.index(st.session_state.get('mood_pain_side', 'Izquierdo')) if st.session_state.get('mood_pain_side') in sides else 0,
-                                    key="pain_side_radio")
-                pain_severity = st.slider("Severidad", 0, 10, st.session_state.get('mood_pain_severity', 5), key="pain_severity_slider",
-                                         help="0=Molestia, 5=Duele pero puedo, 10=No puedo moverlo")
-                types = ["Punzante", "Molestia", "Rigidez", "Ardor"]
-                pain_type = st.selectbox("Tipo", types,
-                                        index=types.index(st.session_state.get('mood_pain_type', 'Punzante')) if st.session_state.get('mood_pain_type') in types else 0,
-                                        key="pain_type_select")
-                
-                # Generar pain_location descriptivo
-                pain_location = f"{pain_zone} {pain_side.lower()} ({pain_type}, {pain_severity}/10)"
+            if not quick_mode:
+                st.write("**🩹 Dolor localizado**")
+                pain_flag = st.checkbox("Tengo dolor localizado", value=st.session_state.get('mood_pain_flag', False), key="pain_checkbox")
+                    
+                if pain_flag:
+                    zones = ["Hombro", "Codo", "Muñeca", "Espalda alta", "Espalda baja", "Cadera", "Rodilla", "Tobillo", "Otra"]
+                    pain_zone = st.selectbox("Zona", zones, 
+                                            index=zones.index(st.session_state.get('mood_pain_zone', 'Hombro')) if st.session_state.get('mood_pain_zone') in zones else 0,
+                                            key="pain_zone_select")
+                    sides = ["Izquierdo", "Derecho", "Ambos"]
+                    pain_side = st.radio("Lado", sides, horizontal=True,
+                                        index=sides.index(st.session_state.get('mood_pain_side', 'Izquierdo')) if st.session_state.get('mood_pain_side') in sides else 0,
+                                        key="pain_side_radio")
+                    pain_severity = st.slider("Severidad", 0, 10, st.session_state.get('mood_pain_severity', 5), key="pain_severity_slider",
+                                             help="0=Molestia, 5=Duele pero puedo, 10=No puedo moverlo")
+                    types = ["Punzante", "Molestia", "Rigidez", "Ardor"]
+                    pain_type = st.selectbox("Tipo", types,
+                                            index=types.index(st.session_state.get('mood_pain_type', 'Punzante')) if st.session_state.get('mood_pain_type') in types else 0,
+                                            key="pain_type_select")
+                    
+                    # Generar pain_location descriptivo
+                    pain_location = f"{pain_zone} {pain_side.lower()} ({pain_type}, {pain_severity}/10)"
+                else:
+                    pain_zone = None
+                    pain_side = None
+                    pain_severity = 0
+                    pain_type = None
+                    pain_location = ""
             else:
+                # Modo rápido: sin dolor localizado
+                pain_flag = False
                 pain_zone = None
                 pain_side = None
                 pain_severity = 0
@@ -1903,10 +1984,23 @@ def main():
                 pain_location = ""
             
         with col_flag2:
-            st.write("**🤒 Estado general**")
-            sick_flag = st.checkbox("Enfermo/resfriado", 
-                                   value=st.session_state.get('mood_sick_flag', False),
-                                   help="Fiebre, tos, malestar general", key="input_sick")
+            st.write("**🤒 Enfermo/Resfriado**")
+            sick_level = st.slider(
+                "Nivel de malestar", 0, 5, 
+                st.session_state.get('mood_sick_level', 0),
+                help="0=Sano, 1-2=Leve (mocos, ligera tos), 3-4=Moderado (malestar), 5=Grave (fiebre, muy mal)",
+                key="input_sick_level"
+            )
+            sick_labels = {
+                0: "Sano",
+                1: "Leve",
+                2: "Leve-Moderado",
+                3: "Moderado",
+                4: "Moderado-Grave",
+                5: "Grave"
+            }
+            st.caption(f"Estado: {sick_labels[sick_level]}")
+            
             last_hard = st.checkbox("Último entreno muy exigente", 
                                    value=st.session_state.get('mood_last_hard', False),
                                    help="Sesión de alta intensidad/volumen en últimas 48h", key="input_lasthard")
@@ -1965,7 +2059,7 @@ def main():
             st.session_state.mood_pain_side = pain_side
             st.session_state.mood_pain_severity = pain_severity
             st.session_state.mood_pain_type = pain_type
-            st.session_state.mood_sick_flag = sick_flag
+            st.session_state.mood_sick_level = sick_level
             st.session_state.mood_last_hard = last_hard
             st.session_state.mood_session_goal = session_goal
             st.session_state.mood_time_available = time_available
@@ -2034,7 +2128,7 @@ def main():
             pain_zone = st.session_state.get('mood_pain_zone')
             pain_severity = st.session_state.get('mood_pain_severity', 0)
             pain_type = st.session_state.get('mood_pain_type')
-            sick_flag = st.session_state.get('mood_sick_flag', False)
+            sick_level = st.session_state.get('mood_sick_level', 0)
             last_hard = st.session_state.get('mood_last_hard', False)
             session_goal = st.session_state.mood_session_goal
             time_available = st.session_state.get('mood_time_available', 60)
@@ -2044,7 +2138,7 @@ def main():
             # Calculate readiness
             readiness_instant = calculate_readiness_from_inputs_v2(
                 sleep_h, sleep_q, fatigue, soreness, stress, motivation, pain_flag,
-                nap_mins, sleep_disruptions, energy, stiffness, caffeine, alcohol, sick_flag,
+                nap_mins, sleep_disruptions, energy, stiffness, caffeine, alcohol, sick_level,
                 perceived_readiness=perceived_readiness
             )
             
@@ -2077,16 +2171,16 @@ def main():
                 pain_flag=pain_flag,
                 pain_severity=pain_severity,
                 stiffness=stiffness,
-                sick_flag=sick_flag,
+                sick_level=sick_level,
                 last_hard=last_hard,
                 baselines=baselines,
                 days_high_strain=0
             )
             
-            # Generate plan - ahora con pain_zone, pain_type, sick_flag
+            # Generate plan - ahora con pain_zone, pain_type, sick_level
             zone_display, plan, rules = generate_actionable_plan_v2(
                 readiness_instant, pain_flag, pain_zone, pain_severity, pain_type, 
-                fatigue, soreness, stiffness, sick_flag, session_goal, fatigue_analysis
+                fatigue, soreness, stiffness, sick_level, session_goal, fatigue_analysis
             )
             
             # Display results - TWO MODES
@@ -2146,24 +2240,47 @@ def main():
                 st.markdown("---")
                 render_section_title("Consejos de hoy", accent="#FFB81C")
 
-                def render_card(title: str, lines: list[str], accent: str = "#4ECDC4"):
+                def render_card(title: str, lines: list[str], accent: str = "#4ECDC4", icon: str = ""):
+                    # Calcular color de sombra (más oscuro que accent)
                     card_style = (
-                        "border-radius:12px; padding:16px; margin-bottom:12px; "
-                        "background-color: rgba(255,255,255,0.03); "
-                        "border-left: 4px solid " + accent + ";"
+                        "position: relative; "
+                        "border-radius: 16px; "
+                        "padding: 24px; "
+                        "margin-bottom: 20px; "
+                        "background: linear-gradient(135deg, rgba(20,20,30,0.95) 0%, rgba(30,30,45,0.85) 100%); "
+                        "border: 2px solid " + accent + "; "
+                        "box-shadow: 0 0 20px " + accent + "40, "
+                        "0 0 40px " + accent + "20, "
+                        "inset 0 0 60px rgba(0,0,0,0.3); "
+                        "transition: all 0.3s ease; "
+                        "backdrop-filter: blur(10px);"
                     )
                     title_style = (
-                        "display:flex; align-items:center; gap:8px; "
-                        "font-weight:700; text-transform:uppercase; letter-spacing:0.5px; "
-                        f"color:{accent}; margin-bottom:10px;"
+                        "display: flex; "
+                        "align-items: center; "
+                        "gap: 12px; "
+                        "font-weight: 800; "
+                        "font-size: 1.1rem; "
+                        "text-transform: uppercase; "
+                        "letter-spacing: 1.5px; "
+                        f"color: {accent}; "
+                        "margin-bottom: 16px; "
+                        f"text-shadow: 0 0 10px {accent}80, 0 0 20px {accent}40; "
+                        "font-family: 'Courier New', monospace;"
                     )
                     # filter out empty/whitespace lines to avoid blank bullets
                     safe_lines = [str(l).strip() for l in lines if str(l).strip()]
-                    bullet_html = "".join([f"<div>• {l}</div>" for l in safe_lines])
+                    bullet_html = "".join([
+                        f"<div style='margin-bottom:8px; padding-left:8px; border-left:2px solid {accent}50; padding-top:4px; padding-bottom:4px;'>"
+                        f"<span style='color:{accent}; margin-right:8px; font-weight:bold;'>▸</span>"
+                        f"<span style='color:#e0e0e0;'>{l}</span></div>" 
+                        for l in safe_lines
+                    ])
+                    icon_html = f"<span style='font-size:1.3rem; filter: drop-shadow(0 0 8px {accent});'>{icon}</span>" if icon else f"<span style='width:6px; height:6px; background:{accent}; display:inline-block; border-radius:50%; box-shadow: 0 0 8px {accent};'></span>"
                     st.markdown(
                         f"<div style='{card_style}'>"
-                        f"<div style='{title_style}'><span style='width:14px;height:3px;background:{accent};display:inline-block;border-radius:2px'></span>{title}</div>"
-                        f"<div style='font-size:0.95rem;color:#eaeaea;'>" + bullet_html + "</div>"
+                        f"<div style='{title_style}'>{icon_html}{title}</div>"
+                        f"<div style='font-size:0.95rem; line-height:1.6;'>" + bullet_html + "</div>"
                         + "</div>",
                         unsafe_allow_html=True,
                     )
@@ -2191,7 +2308,7 @@ def main():
                     render_card(
                         f"Tipo de Fatiga: {fatigue_analysis['type'].upper()}",
                         fatigue_lines,
-                        accent="#FFB81C",
+                        accent="#FFB81C"
                     )
 
                 with col_b:
