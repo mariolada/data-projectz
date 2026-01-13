@@ -756,7 +756,7 @@ def create_weekly_volume_chart(data, title="Volumen Semanal"):
     fig.update_layout(
         title=dict(
             text=title,
-            font=dict(size=18, color='#00D084', family='Orbitron, sans-serif', weight='bold'),
+            font=dict(size=18, color='#00D084', family='Orbitron, sans-serif'),
             x=0.05
         ),
         paper_bgcolor='rgba(7, 9, 15, 0.95)',
@@ -809,7 +809,7 @@ def create_weekly_strain_chart(data, title="Strain"):
     fig.update_layout(
         title=dict(
             text=title,
-            font=dict(size=18, color='#FF6B6B', family='Orbitron, sans-serif', weight='bold'),
+            font=dict(size=18, color='#FF6B6B', family='Orbitron, sans-serif'),
             x=0.05
         ),
         paper_bgcolor='rgba(7, 9, 15, 0.95)',
@@ -2764,59 +2764,47 @@ def main():
     elif view_mode == "Semana":
         render_section_title("Semana — Macro", accent="#4ECDC4")
         
-        # === DEBUG SECTION ===
+        # Check if weekly data exists and is valid
+        if df_weekly is None:
+            st.error("❌ weekly.csv no se cargó. Revisa si existe data/processed/weekly.csv")
+            st.stop()
+        
+        if df_weekly.empty:
+            st.warning("⚠️ weekly.csv está vacío")
+            st.stop()
+        
+        # === DEBUG SECTION (solo lectura, no modifica datos) ===
         with st.expander("🔍 DEBUG: Diagnóstico de datos semanales", expanded=False):
-            st.write("**df_weekly es None?:**", df_weekly is None)
-            
-            if df_weekly is None:
-                st.error("❌ weekly.csv no se cargó (df_weekly=None). Revisa si existe data/processed/weekly.csv")
-                st.stop()
-            
+            st.write("**df_weekly es None?:**", False)
             st.write(f"**Filas df_weekly:** {df_weekly.shape[0]}")
             st.write(f"**Columnas df_weekly:** {list(df_weekly.columns)}")
             st.dataframe(df_weekly.head(5))
             
-            if 'week_start' not in df_weekly.columns:
-                st.error("❌ weekly.csv NO tiene la columna 'week_start'. No puedo hacer gráficas semanales.")
-                st.stop()
+            if 'week_start' in df_weekly.columns:
+                # Analyze without modifying original
+                temp_df = df_weekly.copy()
+                temp_df['week_start'] = pd.to_datetime(temp_df['week_start'], errors='coerce')
+                nat_count = temp_df['week_start'].isna().sum()
+                st.write(f"**NaT en week_start:** {int(nat_count)}")
+                st.write(f"**Rango week_start:** {temp_df['week_start'].min()} -> {temp_df['week_start'].max()}")
+            else:
+                st.error("❌ weekly.csv NO tiene la columna 'week_start'")
             
-            df_weekly['week_start'] = pd.to_datetime(df_weekly['week_start'], errors='coerce')
-            st.write(f"**NaT en week_start:** {int(df_weekly['week_start'].isna().sum())}")
-            st.write(f"**Rango week_start:** {df_weekly['week_start'].min()} -> {df_weekly['week_start'].max()}")
-            
-            df_weekly = df_weekly.dropna(subset=['week_start'])
-            if df_weekly.empty:
-                st.error("❌ week_start es inválido en todas las filas (todo NaT).")
-                st.stop()
-            
-            max_week = df_weekly['week_start'].max()
-            start_week = max_week - pd.Timedelta(weeks=12)
-            df_weekly_filtered = df_weekly[df_weekly['week_start'] >= start_week].copy()
-            
-            st.write(f"**Filas df_weekly_filtered (últimas 12 semanas):** {df_weekly_filtered.shape[0]}")
-            
-            if df_weekly_filtered.empty:
-                st.info("ℹ️ No hay datos en las últimas 12 semanas. Mostraré todo el weekly.csv.")
-                df_weekly_filtered = df_weekly.copy()
-            
-            st.write(f"**Columnas en df_weekly_filtered:** {list(df_weekly_filtered.columns)}")
-            
-            # Intentar encontrar columna de volumen
+            # Check for volume columns
             volume_col = None
             for c in ['volume_week', 'volume', 'weekly_volume', 'total_volume', 'volumen']:
-                if c in df_weekly_filtered.columns:
+                if c in df_weekly.columns:
                     volume_col = c
                     st.success(f"✅ Columna de volumen encontrada: '{volume_col}'")
                     break
-            
             if volume_col is None:
-                st.warning(f"⚠️ No encuentro columna de volumen. Buscaba: volume_week, volume, weekly_volume...")
+                st.warning("⚠️ No encuentro columna de volumen (volume_week, volume, etc.)")
         
         st.markdown("---")
         
         if df_weekly is not None and not df_weekly.empty:
             # Mantener week_start como datetime para gráficos
-            df_weekly['week_start'] = pd.to_datetime(df_weekly['week_start'])
+            df_weekly['week_start'] = pd.to_datetime(df_weekly['week_start'], errors='coerce')
             # Use last 12 weeks for weekly view instead of daily 7-day filter
             max_week = df_weekly['week_start'].max()
             start_week = max_week - pd.Timedelta(weeks=12)
@@ -2893,9 +2881,17 @@ def main():
                 col1, col2 = st.columns(2)
                 with col1:
                     if 'volume_week' in df_weekly_filtered.columns:
-                        vol_data = df_weekly_filtered.set_index('week_start')['volume_week'].sort_index()
-                        fig = create_weekly_volume_chart(vol_data, "Volumen Semanal")
-                        st.plotly_chart(fig, use_container_width=True)
+                        vol_data = (
+                            df_weekly_filtered.set_index('week_start')['volume_week']
+                            .pipe(pd.to_numeric, errors='coerce')
+                            .dropna()
+                            .sort_index()
+                        )
+                        if not vol_data.empty:
+                            fig = create_weekly_volume_chart(vol_data, "Volumen Semanal")
+                            st.plotly_chart(fig, use_container_width=True)
+                        else:
+                            st.info("Sin datos válidos para Volumen Semanal")
                         
                         with st.expander("❓ ¿Qué significa Volumen Semanal?"):
                             st.write("""
@@ -2913,9 +2909,17 @@ def main():
                 
                 with col2:
                     if 'strain' in df_weekly_filtered.columns:
-                        strain_data = df_weekly_filtered.set_index('week_start')['strain'].sort_index()
-                        fig = create_weekly_strain_chart(strain_data, "Strain Semanal")
-                        st.plotly_chart(fig, use_container_width=True)
+                        strain_data = (
+                            df_weekly_filtered.set_index('week_start')['strain']
+                            .pipe(pd.to_numeric, errors='coerce')
+                            .dropna()
+                            .sort_index()
+                        )
+                        if not strain_data.empty:
+                            fig = create_weekly_strain_chart(strain_data, "Strain Semanal")
+                            st.plotly_chart(fig, use_container_width=True)
+                        else:
+                            st.info("Sin datos válidos para Strain Semanal")
                         
                         with st.expander("❓ ¿Qué significa Strain?"):
                             st.write("""
