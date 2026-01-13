@@ -7,5 +7,8 @@ __pycache__/
 .env
 .DS_Store
 .vscode/
-data/
+/data/
 outputs/
+
+# No ignorar el módulo app/data
+!app/data/
