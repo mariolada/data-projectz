@@ -179,7 +179,7 @@ Cuando abres **"🎯 Modo Hoy"**, la app:
 ├─ Sueño te afecta: Poco ⚠️
 │  └─ Correlación: 0.28
 ├─ Insights:
-│  • ✨ Eres short_sleeper: Tienes media ~6.2h pero readiness decente
+│  •  Eres short_sleeper: Tienes media ~6.2h pero readiness decente
 │  • 😴 Sueño tiene POCO efecto en tu readiness
 │  • ⚡ Tu recuperación es predecible y rápida
 ├─ Factores de personalización:

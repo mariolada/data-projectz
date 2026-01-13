@@ -124,7 +124,7 @@ Combina todo en un archivo:
 │  └─ Correlación: 0.28
 │
 ├─ Insights:
-│  • ✨ Eres short_sleeper: No necesitas 8h
+│  •  Eres short_sleeper: No necesitas 8h
 │  • 😴 Sueño tiene POCO efecto en tu readiness
 │  • ⚡ Tu recuperación es predecible y rápida
 │

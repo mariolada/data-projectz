@@ -482,14 +482,14 @@ def create_user_profile(df_daily: pd.DataFrame) -> Dict[str, Any]:
     
     # === Generar insights ===
     if profile['archetype']['confidence'] > 0.7:
-        profile['insights'].append(f"✨ Eres **{profile['archetype']['archetype']}**: {profile['archetype']['reason']}")
+        profile['insights'].append(f"Eres **{profile['archetype']['archetype']}**: {profile['archetype']['reason']}")
     
     if profile['sleep_responsiveness']['sleep_responsive'] is not None:
-        profile['insights'].append(f"😴 {profile['sleep_responsiveness']['interpretation']}")
+        profile['insights'].append(f"{profile['sleep_responsiveness']['interpretation']}")
     
     # NUEVO: Insight sobre percepción personal
     if perceived_analysis.get('trust_intuition') is not None:
-        profile['insights'].append(f"🧠 {perceived_analysis['interpretation']}")
+        profile['insights'].append(f"{perceived_analysis['interpretation']}")
     
     # Insight sobre recuperación
     if 'adjustment_factors' in profile:
@@ -497,7 +497,7 @@ def create_user_profile(df_daily: pd.DataFrame) -> Dict[str, Any]:
         if factors.get('recovery_speed', 1.0) > 1.1:
             profile['insights'].append("⚡ Tu recuperación es predecible y rápida. Aprovecha picos de carga.")
         elif factors.get('fatigue_sensitivity', 1.0) > 1.2:
-            profile['insights'].append("⚠️ Eres muy sensible a fatiga acumulada. Respeta los deloads.")
+            profile['insights'].append("Eres muy sensible a fatiga acumulada. Respeta los deloads.")
     
     return profile
 
@@ -756,7 +756,7 @@ def calculate_injury_risk_score(
     
     # Data quality assessment
     if data_points < 2:
-        factors.append('⚠️ Pocos datos para evaluación confiable')
+        factors.append('Pocos datos para evaluación confiable')
         confidence = 'low'
     elif data_points < 3:
         confidence = 'medium'

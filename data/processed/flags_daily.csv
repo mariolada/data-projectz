@@ -1,36 +1,36 @@
 date,readiness_score,recommendation,action_intensity,reason_codes,sleep_hours,sleep_quality,acwr_7_28,performance_index,performance_7d_mean,rir_weighted,effort_mean,fatigue_flag,flag_high_strain_day,flag_understim
-2025-12-07,69.0,Normal,Maintain (target RIR 1–2),NONE,7.3,4,,,,2.28,7.72,False,False,False
-2025-12-08,64.0,Reduce,"-20% volume, avoid RIR<=1",HIGH_EFFORT,6.6,5,,,,1.076,8.924,False,False,False
-2025-12-09,63.0,Reduce,"-20% volume, avoid RIR<=1",NONE,6.7,4,,,,2.974,7.119,False,False,False
-2025-12-10,71.0,Normal,Maintain (target RIR 1–2),NONE,7.4,5,,,,3.142,6.858,False,False,False
-2025-12-11,56.0,Reduce,"-20% volume, avoid RIR<=1",NONE,7.1,3,,,,3.495,6.505,False,False,False
-2025-12-12,60.0,Reduce,"-20% volume, avoid RIR<=1",HIGH_EFFORT,7.8,1,,,,1.39,8.61,False,False,False
-2025-12-13,64.0,Reduce,"-20% volume, avoid RIR<=1",NONE,6.5,4,,,,1.87,7.898,False,False,False
-2025-12-14,72.0,Normal,Maintain (target RIR 1–2),NONE,8.6,3,,,,2.172,8.015,False,False,False
-2025-12-15,75.0,Normal,Maintain (target RIR 1–2),NONE,8.1,5,,,,1.848,8.155,False,False,False
-2025-12-16,72.0,Normal,Maintain (target RIR 1–2),NONE,7.2,3,0.736,,,1.504,8.457,False,False,False
-2025-12-17,77.0,Normal,Maintain (target RIR 1–2),HIGH_EFFORT,7.5,3,0.682,,,1.281,8.826,False,False,False
-2025-12-18,74.0,Normal,Maintain (target RIR 1–2),HIGH_EFFORT,7.1,4,0.7,,,1.458,8.514,False,False,False
-2025-12-19,72.0,Normal,Maintain (target RIR 1–2),NONE,8.5,4,0.697,,,2.642,7.46,False,False,False
-2025-12-20,60.0,Reduce,"-20% volume, avoid RIR<=1",FATIGUE,6.8,2,0.635,,,1.958,8.121,True,False,False
-2025-12-21,52.0,Reduce,"-20% volume, avoid RIR<=1",NONE,6.9,1,0.572,,,2.055,7.945,False,False,False
-2025-12-22,74.0,Normal,Maintain (target RIR 1–2),NONE,7.5,4,0.566,,,2.512,7.631,False,False,False
-2025-12-23,44.0,Deload / Rest,"-40% volume, target RIR 3–5 OR rest",LOW_SLEEP|FATIGUE,5.7,2,0.545,,,2.036,7.81,True,False,False
-2025-12-24,55.0,Reduce,"-20% volume, avoid RIR<=1",LOW_SLEEP|HIGH_EFFORT,6.3,4,0.459,,,1.071,8.929,False,False,False
-2025-12-25,60.0,Reduce,"-20% volume, avoid RIR<=1",HIGH_EFFORT,8.4,3,0.408,,,1.353,8.647,False,False,False
-2025-12-26,55.0,Reduce,"-20% volume, avoid RIR<=1",LOW_SLEEP,6.3,3,0.375,,,2.636,7.336,False,False,False
-2025-12-27,70.0,Normal,Maintain (target RIR 1–2),HIGH_EFFORT,8.0,2,0.32,,,1.058,8.942,False,False,False
-2025-12-28,55.0,Reduce,"-20% volume, avoid RIR<=1",LOW_SLEEP|FATIGUE,5.8,5,0.355,,,1.763,8.118,True,False,False
-2025-12-29,57.0,Reduce,"-20% volume, avoid RIR<=1",LOW_SLEEP|HIGH_EFFORT|HIGH_STRAIN_DAY,6.2,4,0.273,,,0.991,9.009,False,True,False
-2025-12-30,75.0,Normal,Maintain (target RIR 1–2),HIGH_EFFORT|HIGH_STRAIN_DAY,8.3,4,0.231,,,0.718,9.282,False,True,False
-2025-12-31,71.0,Normal,Maintain (target RIR 1–2),NONE,7.1,4,0.257,,,2.486,7.522,False,False,False
-2026-01-01,71.0,Normal,Maintain (target RIR 1–2),HIGH_EFFORT|HIGH_STRAIN_DAY,8.1,4,0.271,,,0.898,9.123,False,True,False
-2026-01-02,74.0,Normal,Maintain (target RIR 1–2),NONE,7.1,5,0.265,,,2.127,7.886,False,False,False
-2026-01-03,80.0,Push day,+2.5% load (key lift) if PI>=1.01 else +1 set,NONE,8.8,4,0.259,,,2.143,7.857,False,False,False
-2026-01-04,75.0,Normal,Maintain (target RIR 1–2),NONE,7.4,5,0.223,,,3.271,6.729,False,False,False
-2026-01-05,80.0,Push day,+2.5% load (key lift) if PI>=1.01 else +1 set,NONE,8.2,5,0.259,,,1.574,8.341,False,False,False
-2026-01-06,75.0,Normal,Maintain (target RIR 1–2),NONE,7.3,5,0.274,,,2.47,7.53,False,False,False
-2026-01-07,71.0,Normal,Maintain (target RIR 1–2),NONE,7.1,4,0.271,,,1.639,8.399,False,False,False
-2026-01-08,79.0,Normal,Maintain (target RIR 1–2),NONE,7.6,5,0.234,,,3.013,6.987,False,False,False
-2026-01-09,68.0,Normal,Maintain (target RIR 1–2),NONE,8.0,3,0.218,,,2.982,7.014,False,False,False
-2026-01-10,77.0,Normal,Maintain (target RIR 1–2),NONE,9.1,3,0.214,,,1.932,8.068,False,False,False
+2025-12-07,63.0,Reduce,"-15% volume, keep technique, target RIR 2–3",HIGH_EFFORT|HIGH_STRAIN_DAY,7.1,3,,1.151,,0.58,9.42,False,True,False
+2025-12-08,64.0,Reduce,"-15% volume, keep technique, target RIR 2–3",HIGH_EFFORT|HIGH_STRAIN_DAY,6.7,4,,1.053,,0.78,9.22,False,True,False
+2025-12-09,82.0,Push day,+2.5% load (key lift) if PI>=1.01 else +1 set,HIGH_EFFORT,8.2,4,,1.319,1.174,1.292,8.708,False,False,False
+2025-12-10,88.0,Push day,+2.5% load (key lift) if PI>=1.01 else +1 set,NONE,8.1,5,,1.241,1.191,2.102,7.923,False,False,False
+2025-12-11,79.0,Normal,Maintain (target RIR 1–2),HIGH_EFFORT,8.1,5,,1.041,1.161,1.469,8.553,False,False,False
+2025-12-12,68.0,Normal,Maintain (target RIR 1–2),HIGH_EFFORT|HIGH_STRAIN_DAY,7.5,4,,,1.161,0.59,9.41,False,True,False
+2025-12-13,50.0,Reduce,"-20% volume, avoid RIR<=1",PERF_DROP|HIGH_EFFORT,7.3,4,,0.888,1.115,1.12,8.876,False,False,False
+2025-12-14,53.0,Reduce,"-20% volume, avoid RIR<=1",PERF_DROP,7.5,1,,0.836,1.063,1.97,8.09,False,False,False
+2025-12-15,68.0,Normal,Maintain (target RIR 1–2),HIGH_EFFORT,6.6,2,,1.156,1.08,1.413,8.566,False,False,False
+2025-12-16,76.0,Normal,Maintain (target RIR 1–2),HIGH_EFFORT|HIGH_STRAIN_DAY,7.4,4,0.809,,1.032,0.822,9.178,False,True,False
+2025-12-17,75.0,Normal,Maintain (target RIR 1–2),NONE,7.4,4,0.631,,0.98,2.102,7.898,False,False,False
+2025-12-18,60.0,Reduce,"-15% volume, keep technique, target RIR 2–3",FATIGUE,6.7,4,0.591,1.032,0.978,2.531,7.535,True,False,False
+2025-12-19,38.0,Deload / Rest,"-30–50% volume, target RIR 3–5",LOW_SLEEP|PERF_DROP|HIGH_EFFORT|HIGH_STRAIN_DAY,6.2,4,0.567,0.865,0.955,0.751,9.249,False,True,False
+2025-12-20,43.0,Deload / Rest,"-30–50% volume, target RIR 3–5",PERF_DROP|HIGH_EFFORT|HIGH_STRAIN_DAY,6.8,3,0.484,0.917,0.961,0.662,9.338,False,True,False
+2025-12-21,47.0,Deload / Rest,"-30–50% volume, target RIR 3–5",LOW_SLEEP|PERF_DROP,6.3,4,0.44,0.894,0.973,3.35,6.664,False,False,False
+2025-12-22,41.0,Deload / Rest,"-30–50% volume, target RIR 3–5",LOW_SLEEP|PERF_DROP,6.0,4,0.378,0.724,0.886,2.23,7.678,False,False,False
+2025-12-23,50.0,Reduce,"-20% volume, avoid RIR<=1",PERF_DROP|HIGH_EFFORT,7.9,4,0.375,0.951,0.897,1.331,8.645,False,False,False
+2025-12-24,55.0,Reduce,"-15% volume, keep technique, target RIR 2–3",LOW_SLEEP,5.9,3,0.376,1.053,0.919,2.93,7.07,False,False,False
+2025-12-25,88.0,Push day,+2.5% load (key lift) if PI>=1.01 else +1 set,NONE,8.4,4,0.345,1.127,0.933,2.514,7.491,False,False,False
+2025-12-26,82.0,Push day,+2.5% load (key lift) if PI>=1.01 else +1 set,NONE,8.1,2,0.402,1.057,0.96,2.106,7.734,False,False,False
+2025-12-27,74.0,Normal,Maintain (target RIR 1–2),NONE,8.9,3,0.38,,0.968,2.615,7.385,False,False,False
+2025-12-28,66.0,Normal,Maintain (target RIR 1–2),NONE,6.7,2,0.368,1.01,0.987,2.919,7.093,False,False,False
+2025-12-29,45.0,Deload / Rest,"-30–50% volume, target RIR 3–5",PERF_DROP|FATIGUE,6.7,3,0.372,0.831,1.005,2.076,7.735,True,False,False
+2025-12-30,60.0,Reduce,"-15% volume, keep technique, target RIR 2–3",FATIGUE,6.6,4,0.384,1.06,1.023,2.7,7.718,True,False,False
+2025-12-31,50.0,Reduce,"-20% volume, avoid RIR<=1",PERF_DROP|HIGH_EFFORT,7.7,3,0.392,0.973,1.01,1.505,8.502,False,False,False
+2026-01-01,63.0,Reduce,"-20% volume, avoid RIR<=1",PERF_DROP,8.1,4,0.364,0.931,0.977,1.572,8.154,False,False,False
+2026-01-02,55.0,Reduce,"-20% volume, avoid RIR<=1",PERF_DROP,7.1,4,0.311,0.748,0.925,2.074,7.577,False,False,False
+2026-01-03,50.0,Reduce,"-20% volume, avoid RIR<=1",PERF_DROP|HIGH_EFFORT|HIGH_STRAIN_DAY,7.9,4,0.333,0.901,0.922,0.793,9.185,False,True,False
+2026-01-04,66.0,Normal,Maintain (target RIR 1–2),HIGH_EFFORT,8.9,3,0.323,0.99,0.919,1.076,9.056,False,False,False
+2026-01-05,62.0,Reduce,"-20% volume, avoid RIR<=1",NONE,7.6,1,0.309,0.98,0.94,2.09,7.927,False,False,False
+2026-01-06,84.0,Push day,+2.5% load (key lift) if PI>=1.01 else +1 set,HIGH_EFFORT|HIGH_STRAIN_DAY,8.3,3,0.284,1.183,0.958,0.974,9.03,False,True,False
+2026-01-07,87.0,Push day,+2.5% load (key lift) if PI>=1.01 else +1 set,NONE,8.1,3,0.281,1.198,0.99,2.611,7.338,False,False,False
+2026-01-08,52.0,Reduce,"-20% volume, avoid RIR<=1",NONE,7.0,3,0.28,0.984,0.998,1.692,8.302,False,False,False
+2026-01-09,60.0,Reduce,"-20% volume, avoid RIR<=1",PERF_DROP,8.1,3,0.267,0.911,1.021,2.62,7.38,False,False,False
+2026-01-10,65.0,Normal,Maintain (target RIR 1–2),NONE,7.6,4,0.252,0.994,1.034,3.086,6.914,False,False,False

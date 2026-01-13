@@ -299,13 +299,13 @@ profile = {
 
 # Generar insights automáticamente
 if archetype['confidence'] > 0.7:
-    insights.append(f"✨ Eres {archetype['archetype']}: {archetype['reason']}")
+    insights.append(f" Eres {archetype['archetype']}: {archetype['reason']}")
 
 if sleep_responsive is True:
-    insights.append(f"😴 {sleep_resp['interpretation']}")
+    insights.append(f" {sleep_resp['interpretation']}")
 
 if recovery_speed > 1.1:
-    insights.append("⚡ Tu recuperación es rápida")
+    insights.append(" Tu recuperación es rápida")
 
 profile['insights'] = insights
 return profile
@@ -413,9 +413,9 @@ with st.expander("📊 Tu Perfil Personal"):
   "sleep_responsiveness": {"strength": "moderate", "confidence": 0.72},
   "archetype": {"archetype": "short_sleeper", "confidence": 0.85},
   "insights": [
-    "✨ Eres short_sleeper",
-    "😴 Sueño tiene efecto MODERADO",
-    "⚡ Tu recuperación es predecible"
+    " Eres short_sleeper",
+    " Sueño tiene efecto MODERADO",
+    " Tu recuperación es predecible"
   ]
 }
 ```

@@ -31,7 +31,7 @@ def load_csv(path: str):
     return df
 
 
-@st.cache_data
+@st.cache_data(ttl=60)  # Cache expira cada 60 segundos para reflejar cambios
 def load_user_profile(profile_path: str = "data/processed/user_profile.json"):
     """Carga el perfil personalizado del usuario desde JSON."""
     p = Path(profile_path)
@@ -103,10 +103,10 @@ def format_reason_codes(reason_codes_str):
     codes = str(reason_codes_str).split('|')
     
     code_map = {
-        'LOW_SLEEP': '😴 Sueño insuficiente',
-        'HIGH_ACWR': '📈 Carga aguda muy alta',
-        'PERF_DROP': '📉 Rendimiento en caída',
-        'HIGH_EFFORT': '💪 Esfuerzo muy alto',
+        'LOW_SLEEP': ' Sueño insuficiente',
+        'HIGH_ACWR': ' Carga aguda muy alta',
+        'PERF_DROP': ' Rendimiento en caída',
+        'HIGH_EFFORT': 'Esfuerzo muy alto',
         'FATIGA': '⚠️ Fatiga detectada'
     }
     
@@ -375,11 +375,11 @@ def generate_personalized_insights(baselines, adjustment_factors, user_profile, 
     # Archetype
     user_arch = user_profile.get('archetype', {}).get('archetype', 'unknown')
     if user_arch == 'short_sleeper':
-        insights['archetype'] = "📌 Eres SHORT SLEEPER: Rindes bien con <7h. Aprovechia para máximo volumen, pero cuidado con fatiga acumulada."
+        insights['archetype'] = " Eres SHORT SLEEPER: Rindes bien con <7h. Aprovechia para máximo volumen, pero cuidado con fatiga acumulada."
     elif user_arch == 'acwr_sensitive':
-        insights['archetype'] = "📌 Eres ACWR-SENSIBLE: ACWR alto (>1.5) te reduce readiness rápido. Monitorea ACWR semanal."
+        insights['archetype'] = " Eres ACWR-SENSIBLE: ACWR alto (>1.5) te reduce readiness rápido. Monitorea ACWR semanal."
     elif user_arch == 'consistent_performer':
-        insights['archetype'] = "📌 Eres CONSISTENT: Tu readiness es predecible. Ventaja: puedes planificar bloques con confianza."
+        insights['archetype'] = " Eres CONSISTENT: Tu readiness es predecible. Ventaja: puedes planificar bloques con confianza."
     
     return insights
 
@@ -474,11 +474,11 @@ def generate_actionable_plan(readiness, pain_flag, pain_location, fatigue, soren
     
     # Fatiga management
     if fatigue >= 7:
-        rules.append("😴 Fatiga alta: reduce volumen en 20%, alarga descansos")
+        rules.append(" Fatiga alta: reduce volumen en 20%, alarga descansos")
     
     # Soreness management
     if soreness >= 7:
-        rules.append("🤕 Agujetas: calentamiento largo, movimiento ligero, accesorios >12 reps")
+        rules.append(" Agujetas: calentamiento largo, movimiento ligero, accesorios >12 reps")
     
     return f"{emoji} {zone}", plan, rules
 
@@ -940,9 +940,9 @@ def generate_actionable_plan_v2(
     # Override si enfermo (nivel >= 3 es significativo)
     if sick_level >= 3:
         zone_display = "ENFERMO - NO ENTRENAR"
-        plan.append(f"🤒 **Estado**: Enfermo (nivel {sick_level}/5)")
+        plan.append(f" **Estado**: Enfermo (nivel {sick_level}/5)")
         plan.append("⛔ **Recomendación**: DESCANSO TOTAL hasta recuperación")
-        plan.append("💊 Prioriza: hidratación, sueño, nutrición")
+        plan.append(" Prioriza: hidratación, sueño, nutrición")
         rules.append("❌ NO entrenar bajo ninguna circunstancia")
         rules.append("❌ Evita ejercicio hasta estar 100% sano")
         return zone_display, plan, rules
@@ -1583,26 +1583,6 @@ def main():
     except FileNotFoundError:
         st.warning("❌ Falta daily.csv. Ejecuta el `pipeline` primero.")
         st.stop()
-    
-    # DEBUG: Verificar performance_index y performance_7d_mean ANTES del merge
-    with st.expander("🔍 DEBUG: daily.csv (df_metrics) - ANTES del merge", expanded=False):
-        st.write("**Columnas df_metrics:**", list(df_metrics.columns))
-        
-        # Debug performance_index
-        if 'performance_index' in df_metrics.columns:
-            perf_count = int(df_metrics['performance_index'].notna().sum())
-            st.write(f"**Performance_index non-null en daily.csv:** {perf_count} de {len(df_metrics)}")
-            if perf_count > 0:
-                st.write("**Ejemplos performance_index (últimas 15 filas):**")
-                st.dataframe(df_metrics[['date', 'performance_index']].tail(15))
-            else:
-                st.warning("⚠️ daily.csv tiene la columna performance_index pero todos los valores son NaN")
-        else:
-            st.warning("❌ daily.csv NO tiene la columna performance_index")
-        
-        # Debug performance_7d_mean
-        st.write("---")
-        st.write(f"**DEBUG performance_7d_mean non-null:** {int(df_metrics['performance_7d_mean'].notna().sum())}")
         st.write("**DEBUG performance_7d_mean ejemplos (últimas 15 filas):**")
         st.dataframe(df_metrics[['date', 'performance_7d_mean']].tail(15))
     
@@ -1635,21 +1615,6 @@ def main():
     df_daily = df_metrics.merge(
         df_recommendations[merge_cols], on='date', how='left'
     )
-    
-    # DEBUG: Verificar performance_index DESPUÉS del merge
-    with st.expander("🔍 DEBUG: df_daily - DESPUÉS del merge", expanded=False):
-        st.write(f"**Shape df_daily:** {df_daily.shape}")
-        st.write("**Columnas df_daily:**", list(df_daily.columns))
-        if 'performance_index' in df_daily.columns:
-            perf_count = int(df_daily['performance_index'].notna().sum())
-            st.write(f"**Performance non-null en df_daily:** {perf_count} de {len(df_daily)}")
-            if perf_count > 0:
-                st.write("**Ejemplos performance_index (últimas 15 filas):**")
-                st.dataframe(df_daily[['date', 'performance_index']].tail(15))
-            else:
-                st.warning("⚠️ df_daily tiene la columna pero todos los valores son NaN después del merge")
-        else:
-            st.error("❌ df_daily NO tiene la columna performance_index después del merge (se perdió!)")
     
     # Agregar columnas faltantes si no existen (para compatibilidad)
     if 'action_intensity' not in df_daily.columns:
@@ -1732,9 +1697,9 @@ def main():
                 if get_anti_fatigue_flag(df_daily, selected_date):
                     alerts.append("⚠️ **Consecutivos de alta exigencia**: considera descanso parcial hoy")
                 if pd.notna(r.get('sleep_hours', None)) and r['sleep_hours'] < 6.5:
-                    alerts.append("😴 **Sueño bajo**: reduce volumen hoy")
+                    alerts.append(" **Sueño bajo**: reduce volumen hoy")
                 if pd.notna(r.get('acwr_7_28', None)) and r['acwr_7_28'] > 1.5:
-                    alerts.append("📈 **Carga aguda muy alta**: evita máximos hoy")
+                    alerts.append(" **Carga aguda muy alta**: evita máximos hoy")
                 
                 for alert in alerts:
                     st.warning(alert)
@@ -2009,7 +1974,16 @@ def main():
                 with col_sleep:
                     sleep_resp = user_profile.get('sleep_responsiveness', {})
                     if sleep_resp.get('sleep_responsive') is not None:
-                        st.markdown(f"**Sueño te afecta:** {'Mucho ✅' if sleep_resp['sleep_responsive'] else 'Poco ⚠️'}")
+                        # Mostrar nivel basado en strength del análisis
+                        strength = sleep_resp.get('strength', 'unknown')
+                        strength_labels = {
+                            'none': 'Bajo',
+                            'weak': 'Débil', 
+                            'moderate': 'Moderado',
+                            'strong': 'Alto',
+                            'unknown': 'Desconocido'
+                        }
+                        st.markdown(f"**Impacto del sueño:** {strength_labels.get(strength, 'Desconocido')}")
                         st.caption(f"Correlación: {sleep_resp.get('correlation', 0):.2f}")
                 
                 # Mostrar insights clave
@@ -2031,6 +2005,28 @@ def main():
                     with col_f3:
                         st.metric("Fatigue Sensitivity", f"{factors.get('fatigue_sensitivity', 1.0):.2f}x",
                                  delta=f"{factors.get('fatigue_sensitivity', 1.0) - 1.0:+.2f}x vs normal")
+                    
+                    # Expander explicativo
+                    with st.expander("¿Qué significan estos factores?"):
+                        st.markdown("""
+**Sleep Weight** (Peso del sueño)
+- Valor por defecto: 0.25
+- Cuánto influye el sueño en tu cálculo de readiness
+- Si es **mayor** que 0.25: el sueño te afecta más que a la media, priorízalo
+- Si es **menor** que 0.25: el sueño no es tu factor clave, otros aspectos te impactan más
+
+**Performance Weight** (Peso del rendimiento)
+- Valor por defecto: 0.25  
+- Cuánto pesa tu tendencia de rendimiento reciente (subiendo/bajando)
+- Si es **mayor**: tu progresión es muy predecible, aprovecha rachas buenas
+- Si es **menor**: tu rendimiento fluctúa por otros factores
+
+**Fatigue Sensitivity** (Sensibilidad a la fatiga)
+- Valor por defecto: 1.0x
+- Cómo te afecta la fatiga acumulada (RIR bajo, esfuerzo alto)
+- Si es **mayor que 1.0x**: eres muy sensible, respeta los deloads
+- Si es **menor que 1.0x**: toleras bien la fatiga, puedes sostener cargas altas
+                        """)
         
         # === MODE TOGGLE (PILL STYLE) ===
         col_toggle, col_reset = st.columns([4, 1])
@@ -2159,18 +2155,18 @@ def main():
             with col_st5:
                 motivation = st.slider("Motivación/Ganas", 0, 10, st.session_state.get('mood_motivation', 7), 
                                       help="0=Ninguna, 10=Máxima", key="input_motivation")
-                st.caption(f"🔥 {motivation}/10")
+                st.caption(f" {motivation}/10")
             
             with col_st6:
                 stiffness = st.slider("Rigidez articular", 0, 10, st.session_state.get('mood_stiffness', 2), 
                                      help="Movilidad limitada, calentar costará más", key="input_stiffness")
-                st.caption(f"🦴 {stiffness}/10")
+                st.caption(f" {stiffness}/10")
             
             with col_st7:
                 caffeine = st.selectbox("Cafeína (últimas 6h)", [0, 1, 2, 3], 
                                        index=st.session_state.get('mood_caffeine', 0),
                                        help="Cafés/energéticos consumidos", key="input_caffeine")
-                st.caption(f"☕ {caffeine} dosis")
+                st.caption(f" {caffeine} dosis")
             
             with col_st8:
                 alcohol = st.checkbox("Alcohol anoche", 
@@ -2236,7 +2232,7 @@ def main():
                 pain_location = ""
             
         with col_flag2:
-            st.write("**🤒 Enfermo/Resfriado**")
+            st.write("** Enfermo/Resfriado**")
             sick_flag = st.checkbox(
                 "Estoy enfermo/resfriado",
                 value=st.session_state.get('mood_sick_flag', False),
@@ -2293,7 +2289,7 @@ def main():
             unsafe_allow_html=True
         )
         submitted = st.button(
-            "⚡ CALCULAR READINESS & PLAN",
+            " CALCULAR READINESS & PLAN",
             use_container_width=True,
             key="submit_readiness",
             type="primary",
@@ -2497,11 +2493,11 @@ def main():
                 comp_data = []
                 for key, val in components.items():
                     if key == 'sleep':
-                        label = "🛏️ Sueño"
+                        label = " Sueño"
                     elif key == 'state':
-                        label = "⚡ Estado (Fatiga/Estrés)"
+                        label = " Estado (Fatiga/Estrés)"
                     elif key == 'motivation':
-                        label = "🔥 Motivación"
+                        label = " Motivación"
                     else:
                         label = key.capitalize()
                     
@@ -2518,11 +2514,11 @@ def main():
                     for key, val in adjustments.items():
                         if val != 0:
                             if key == 'pain_penalty':
-                                label = "🩹 Dolor"
+                                label = " Dolor"
                             elif key == 'sick_penalty':
-                                label = "🤒 Enfermedad"
+                                label = " Enfermedad"
                             elif key == 'caffeine_mask':
-                                label = "☕ Cafeína"
+                                label = " Cafeína"
                             else:
                                 label = key
                             adj_data.append({'Ajuste': label, 'Impacto': f'{val:.1f}%'})
@@ -2536,20 +2532,20 @@ def main():
                 
                 # Sleep responsiveness
                 if adjustment_factors.get('sleep_responsive'):
-                    st.info("🎯 **ERES SENSIBLE AL SUEÑO**\nPrioriza dormir bien para optimizar readiness", icon="💤")
+                    st.info(" **ERES SENSIBLE AL SUEÑO**\nPrioriza dormir bien para optimizar readiness", icon="💤")
                 else:
-                    st.success("💪 **NO ERES TAN SENSIBLE AL SUEÑO**\nTienes flexibilidad con horas, pero calidad importa", icon="🎯")
+                    st.success(" **NO ERES TAN SENSIBLE AL SUEÑO**\nTienes flexibilidad con horas, pero calidad importa", icon="🎯")
                 
                 # Baseline comparison
                 if baselines.get('readiness', {}).get('p50'):
                     p50 = baselines['readiness']['p50']
                     delta = readiness_instant - p50
                     if delta > 5:
-                        st.success(f"📈 Hoy +{delta:.0f} vs tu media ({p50:.0f})", icon="✅")
+                        st.success(f" Hoy +{delta:.0f} vs tu media ({p50:.0f})", icon="✅")
                     elif delta > -5:
-                        st.info(f"📊 Hoy ~igual a media ({p50:.0f})", icon="ℹ️")
+                        st.info(f" Hoy ~igual a media ({p50:.0f})", icon="ℹ️")
                     else:
-                        st.warning(f"📉 Hoy {delta:.0f} vs media ({p50:.0f})", icon="⚠️")
+                        st.warning(f" Hoy {delta:.0f} vs media ({p50:.0f})", icon="⚠️")
             
             # Notas contextuales
             if readiness_breakdown.get('notes'):
@@ -2773,35 +2769,6 @@ def main():
             st.warning("⚠️ weekly.csv está vacío")
             st.stop()
         
-        # === DEBUG SECTION (solo lectura, no modifica datos) ===
-        with st.expander("🔍 DEBUG: Diagnóstico de datos semanales", expanded=False):
-            st.write("**df_weekly es None?:**", False)
-            st.write(f"**Filas df_weekly:** {df_weekly.shape[0]}")
-            st.write(f"**Columnas df_weekly:** {list(df_weekly.columns)}")
-            st.dataframe(df_weekly.head(5))
-            
-            if 'week_start' in df_weekly.columns:
-                # Analyze without modifying original
-                temp_df = df_weekly.copy()
-                temp_df['week_start'] = pd.to_datetime(temp_df['week_start'], errors='coerce')
-                nat_count = temp_df['week_start'].isna().sum()
-                st.write(f"**NaT en week_start:** {int(nat_count)}")
-                st.write(f"**Rango week_start:** {temp_df['week_start'].min()} -> {temp_df['week_start'].max()}")
-            else:
-                st.error("❌ weekly.csv NO tiene la columna 'week_start'")
-            
-            # Check for volume columns
-            volume_col = None
-            for c in ['volume_week', 'volume', 'weekly_volume', 'total_volume', 'volumen']:
-                if c in df_weekly.columns:
-                    volume_col = c
-                    st.success(f"✅ Columna de volumen encontrada: '{volume_col}'")
-                    break
-            if volume_col is None:
-                st.warning("⚠️ No encuentro columna de volumen (volume_week, volume, etc.)")
-        
-        st.markdown("---")
-        
         if df_weekly is not None and not df_weekly.empty:
             # Mantener week_start como datetime para gráficos
             df_weekly['week_start'] = pd.to_datetime(df_weekly['week_start'], errors='coerce')
@@ -2877,7 +2844,7 @@ def main():
             st.dataframe(df_weekly_table, use_container_width=True)
             
             # === MÉTRICAS PRINCIPALES ===
-            render_section_title("📊 Métricas Semanales", accent="#00D084")
+            render_section_title(" Métricas Semanales", accent="#00D084")
             col1, col2 = st.columns(2)
             with col1:
                 if 'volume_week' in df_weekly_filtered.columns:
@@ -2937,7 +2904,7 @@ def main():
             
             # === READINESS Y PERFORMANCE ===
             st.markdown("---")
-            render_section_title("🎯 Readiness & Performance", accent="#B266FF")
+            render_section_title(" Readiness & Performance", accent="#B266FF")
             col3, col4 = st.columns(2)
             
             with col3:
@@ -3012,7 +2979,7 @@ def main():
             
             # === ESFUERZO Y MONOTONÍA ===
             st.markdown("---")
-            render_section_title("⚙️ Esfuerzo & Monotonía", accent="#FF6B6B")
+            render_section_title(" Esfuerzo & Monotonía", accent="#FF6B6B")
             col5, col6 = st.columns(2)
             
             with col5:
@@ -3100,7 +3067,7 @@ def main():
             
             # === SUEÑO Y FATIGA ===
             st.markdown("---")
-            render_section_title("😴 Sueño & Fatiga", accent="#4ECDC4")
+            render_section_title(" Sueño & Fatiga", accent="#4ECDC4")
             col7, col8 = st.columns(2)
             
             with col7:
@@ -3233,7 +3200,7 @@ def main():
     
     st.dataframe(styled, use_container_width=True)
     # ============== CHARTS ==============
-    # Solo mostrar esta sección si NO estamos en Modo Hoy (para evitar duplicación)
+    # Solo mostrar esta sección si NO estamos en Modo Hoy (para evitar duplicación
     if view_mode != "Modo Hoy":
         render_section_title("Gráficas", accent="#FF6B6B")
         col1, col2 = st.columns(2)
@@ -3262,25 +3229,6 @@ def main():
                     """)
 
         with col2:
-            # DEBUG: mostrar info sobre performance_index
-            if 'performance_index' in df_filtered.columns:
-                with st.expander("🔍 Debug: Performance Index", expanded=False):
-                    st.write(f"**df_filtered filas:** {df_filtered.shape[0]}")
-                    st.write(f"**Rango filtrado:** {df_filtered['date'].min()} a {df_filtered['date'].max()}")
-                    perf_non_null = int(df_filtered['performance_index'].notna().sum())
-                    st.write(f"**Performance non-null en rango:** {perf_non_null}")
-                    if perf_non_null > 0:
-                        st.write("**Ejemplos (últimas 15):**")
-                        st.dataframe(df_filtered[['date','performance_index']].tail(15))
-                    else:
-                        st.write("⚠️ Todos los valores son NaN en el rango filtrado")
-                        st.write("**Verificando df_daily completo:**")
-                        perf_total = int(df_daily['performance_index'].notna().sum())
-                        st.write(f"**Performance non-null en TODO df_daily:** {perf_total}")
-                        if perf_total > 0:
-                            st.write("**Últimas 10 del histórico completo:**")
-                            st.dataframe(df_daily[['date','performance_index']].tail(10))
-            
             if 'performance_index' in df_filtered.columns:
                 # Convertir a numérico, limpiar NaN, y ordenar
                 pi = (df_filtered
@@ -3305,9 +3253,9 @@ def main():
                         fig = create_performance_chart(pi_all, "Performance Index (Histórico Completo)")
                         st.plotly_chart(fig, use_container_width=True)
                     else:
-                        st.warning("📊 Performance Index sin datos disponibles. Verifica que daily.csv tenga la columna 'performance_index' con valores numéricos o ejecuta el pipeline que lo calcule.")
+                        st.warning(" Performance Index sin datos disponibles. Verifica que daily.csv tenga la columna 'performance_index' con valores numéricos o ejecuta el pipeline que lo calcule.")
             else:
-                st.warning("📊 Performance Index no existe en los datos (falta la columna performance_index).")
+                st.warning(" Performance Index no existe en los datos (falta la columna performance_index).")
                 
                 with st.expander("❓ ¿Qué significa Performance Index?"):
                     st.write("""
