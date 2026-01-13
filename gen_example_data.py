@@ -131,11 +131,24 @@ for i in range(0, len(dates), 7):
     week_df = df_daily[df_daily['date'].isin([d.strftime('%Y-%m-%d') for d in week_dates])]
     
     if len(week_df) > 0:
+        volumes = week_df['volume'].values
+        volume_mean = volumes.mean()
+        volume_std = volumes.std() if len(volumes) > 1 else 1.0
+        monotony = volume_mean / volume_std if volume_std > 0 else 1.0
+        
+        effort_mean = week_df['effort_mean'].mean()
+        strain = volume_mean * monotony
+        
         weekly_data.append({
             'week_start': week_dates[0].strftime('%Y-%m-%d'),
+            'days': len(week_df),
             'volume_week': week_df['volume'].sum(),
+            'effort_week_mean': effort_mean,
+            'rir_week_mean': week_df['rir_weighted'].mean(),
+            'monotony': monotony,
+            'strain': strain,
+            'performance_index': week_df['performance_index'].mean(),
             'avg_sleep': week_df['sleep_hours'].mean(),
-            'avg_performance': week_df['performance_index'].mean(),
             'fatigue_days': week_df['fatigue_flag'].sum()
         })
 
