@@ -13,7 +13,8 @@ from ui.helpers import (
     render_badge, render_card, clean_line,
     get_sleep_hours_level, get_sleep_quality_level,
     get_fatigue_level, get_stress_level, get_soreness_level,
-    get_energy_level, get_perceived_level
+    get_energy_level, get_perceived_level,
+    render_overload_alert, render_overload_summary
 )
 from data.loaders import load_user_profile, save_mood_to_csv, load_neural_overload_flags
 from calculations.readiness import (
@@ -730,58 +731,25 @@ def render_modo_hoy(df_daily: pd.DataFrame):
             overload_data = load_neural_overload_flags()
             if overload_data.get('flags') and len(overload_data['flags']) > 0:
                 st.markdown("---")
-                render_section_title("⚠️ Alertas de Sobrecarga Neuromuscular", accent="#FF4500")
+                render_section_title("🧠 Fatiga Neural Detectada", accent="#FF4500")
                 
                 summary = overload_data.get('summary', {})
                 total_score = summary.get('total_overload_score', 0)
                 primary_cause = summary.get('primary_cause', 'UNKNOWN')
+                n_flags = summary.get('n_flags_detected', len(overload_data['flags']))
                 
-                # Mostrar resumen general
-                if total_score >= 60:
-                    st.error(f"🚨 **SOBRECARGA SEVERA** — Score: {total_score}/100 ({primary_cause})")
-                    st.markdown("> Tu sistema nervioso necesita descanso urgente. Readiness limitado a 45 máx.")
-                elif total_score >= 45:
-                    st.warning(f"⚠️ **SOBRECARGA MODERADA** — Score: {total_score}/100 ({primary_cause})")
-                    st.markdown("> Acumulación de fatiga neural detectada. Readiness limitado a 55 máx.")
-                elif total_score >= 30:
-                    st.info(f"💡 **ALERTA TEMPRANA** — Score: {total_score}/100 ({primary_cause})")
-                    st.markdown("> Señales de fatiga en algunos lifts. Readiness limitado a 65 máx.")
+                # Mostrar resumen con estilo neon
+                render_overload_summary(total_score, primary_cause, n_flags)
                 
-                # Mostrar flags individuales por ejercicio
+                # Mostrar flags individuales por ejercicio con estilo gaming
                 for flag in overload_data['flags']:
-                    flag_type = flag.get('flag_type', '')
-                    exercise = flag.get('exercise', '').upper()
-                    severity = flag.get('severity', 0)
-                    evidence = flag.get('evidence', {})
-                    recommendations = flag.get('recommendations', [])
-                    
-                    # Iconos según tipo
-                    type_icons = {
-                        'SUSTAINED_NEAR_FAILURE': '🔥',
-                        'FIXED_LOAD_DRIFT': '📉',
-                        'HIGH_VOLATILITY': '🎢',
-                        'PLATEAU_EFFORT_RISE': '📈'
-                    }
-                    icon = type_icons.get(flag_type, '⚠️')
-                    
-                    with st.expander(f"{icon} **{exercise}** — {flag_type.replace('_', ' ')} (Sev: {severity})", expanded=True):
-                        # Mostrar evidencia clave
-                        col_ev1, col_ev2 = st.columns(2)
-                        with col_ev1:
-                            st.write("**Evidencia:**")
-                            if 'mean_rir' in evidence:
-                                st.write(f"• RIR promedio: {evidence['mean_rir']:.1f}")
-                            if 'near_failure_proportion' in evidence:
-                                st.write(f"• Sesiones al fallo: {evidence['near_failure_proportion']:.0%}")
-                            if 'baseline_reps' in evidence and 'last_reps' in evidence:
-                                st.write(f"• Reps: {evidence['baseline_reps']:.1f} → {evidence['last_reps']:.0f}")
-                            if 'baseline_e1rm' in evidence and 'last_e1rm' in evidence:
-                                st.write(f"• e1RM: {evidence['baseline_e1rm']:.1f} → {evidence['last_e1rm']:.1f}")
-                        
-                        with col_ev2:
-                            st.write("**Recomendaciones:**")
-                            for rec in recommendations[:3]:  # Max 3 recomendaciones
-                                st.write(f"• {rec}")
+                    render_overload_alert(
+                        flag_type=flag.get('flag_type', ''),
+                        exercise=flag.get('exercise', ''),
+                        severity=flag.get('severity', 0),
+                        evidence=flag.get('evidence', {}),
+                        recommendations=flag.get('recommendations', [])
+                    )
         
         # Save option (both modes now show full output)
         if not quick_mode:
