@@ -15,6 +15,17 @@ from personalization_engine import (
     create_user_profile
 )
 
+# Importar neural overload detector
+from neural_overload_detector import (
+    analyze_neuromuscular_overload,
+    merge_overload_into_daily,
+    apply_overload_caps,
+    extract_top_sets,
+    classify_advanced_lifts,
+    OverloadConfig,
+    AdvancedConfig
+)
+
 
 REQUIRED_DAILY_COLUMNS = [
     "date", "volume", "volume_7d", "volume_28d", "acwr_7_28",
@@ -22,9 +33,10 @@ REQUIRED_DAILY_COLUMNS = [
     "sleep_hours", "sleep_quality", "fatigue_flag"
 ]
 
-# Columnas mínimas para sesiones de ejercicio (por-ejemplo OHP)
+# Columnas mínimas para sesiones de ejercicio (flexibles)
+# Soporta tanto formato "top set" como formato agregado
 EXERCISE_MIN_COLUMNS = [
-    "date", "exercise", "load_top", "reps_top", "rir_top"
+    "date", "exercise"
 ]
 
 
@@ -40,7 +52,13 @@ def load_processed_daily(path: str) -> pd.DataFrame:
 
 
 def load_exercise_sessions(path: Path) -> pd.DataFrame:
-    """Carga sesiones por ejercicio si el archivo existe; si falta, retorna None."""
+    """
+    Carga sesiones por ejercicio. Soporta múltiples formatos:
+    
+    Formato 1 (agregado): date, exercise, volume, e1rm_max, effort_mean, rir_w
+    Formato 2 (set-level): date, exercise, load_kg, reps, rir
+    Formato 3 (top-set): date, exercise, load_top, reps_top, rir_top
+    """
     if not path.exists():
         return None
     df = pd.read_csv(path)
@@ -297,24 +315,36 @@ def generate_recommendations(df: pd.DataFrame) -> pd.DataFrame:
         if pd.isna(rs):
             return "Need data", "Log sleep + session", "MISSING_DATA"
 
+        # Verificar si hay sobrecarga neuromuscular
+        overload_score = row.get("overload_score", 0)
+        has_overload = overload_score >= 30 if pd.notna(overload_score) else False
+
         # Reglas inteligentes: distinguimos fatiga vs poco estímulo
         if rs >= 80:
+            if has_overload:
+                return "Normal+", "Mantén carga, evita RIR0 en lifts afectados", "HIGH_READINESS|NEURAL_CAUTION"
             if row["flag_understim"]:
                 return "Push day", "+1 set (key lift) OR target RIR 1–2", "UNDERSTIM|HIGH_READINESS"
             return "Push day", "+2.5% load (key lift) if PI>=1.01 else +1 set", "HIGH_READINESS"
 
         if 65 <= rs < 80:
+            if has_overload:
+                return "Normal", "Mantén volumen, RIR 2-3, no máximos", "MOD_READINESS|NEURAL_RECOVERY"
             if row["acwr_7_28"] > 1.3:
                 return "Normal", "Maintain load, -10% volume", "MOD_READINESS|ELEVATED_ACWR"
             return "Normal", "Maintain (target RIR 1–2)", "MOD_READINESS"
 
         if 50 <= rs < 65:
+            if has_overload:
+                return "Reduce", "-20% vol en lifts afectados, RIR 3+", "LOW_READINESS|NEURAL_OVERLOAD"
             # Reduce volumen, no hace falta bajar todo el peso si PI está ok
             if row["performance_index"] >= 1.00:
                 return "Reduce", "-15% volume, keep technique, target RIR 2–3", "LOW_READINESS|VOLUME_CUT"
             return "Reduce", "-20% volume, avoid RIR<=1", "LOW_READINESS|PERF_SOFT"
 
         # < 50
+        if has_overload:
+            return "Deload", "Deload obligatorio: -40% vol, evita lifts afectados", "VERY_LOW_READINESS|NEURAL_CRITICAL"
         if row["sleep_hours"] < 6.0:
             return "Deload / Rest", "-40% volume, target RIR 3–5 OR rest", "VERY_LOW_READINESS|LOW_SLEEP"
         return "Deload / Rest", "-30–50% volume, target RIR 3–5", "VERY_LOW_READINESS"
@@ -340,18 +370,31 @@ def generate_recommendations(df: pd.DataFrame) -> pd.DataFrame:
             codes.append("HIGH_STRAIN_DAY")
         if bool(row.get("flag_understim")):
             codes.append("UNDERSTIM")
+        
+        # Añadir códigos de sobrecarga neuromuscular
+        overload_flags = row.get("overload_flags", "")
+        if overload_flags and isinstance(overload_flags, str) and overload_flags.strip():
+            codes.append("NEURAL_OVERLOAD")
+            
         return "|".join(codes) if codes else "NONE"
 
     out["reason_codes"] = out.apply(reason_codes, axis=1)
 
     # explicación humana breve
-    out["explanation"] = out.apply(
-        lambda r: (
-            f"Readiness {int(r['readiness_score']) if pd.notna(r['readiness_score']) else 'NA'}: "
-            f"{r['recommendation']} — {r['action_intensity']} (reasons: {r['reason_codes']})."
-        ),
-        axis=1
-    )
+    def build_explanation(row):
+        rs = row['readiness_score'] if pd.notna(row['readiness_score']) else 'NA'
+        base = f"Readiness {int(rs) if isinstance(rs, (int, float)) else rs}: {row['recommendation']} — {row['action_intensity']}"
+        
+        # Añadir info de sobrecarga si existe
+        overload_flags = row.get("overload_flags", "")
+        if overload_flags and isinstance(overload_flags, str) and overload_flags.strip():
+            flags_short = overload_flags.split("|")[:2]  # Máx 2 flags
+            base += f" [Sobrecarga: {', '.join(flags_short)}]"
+        
+        base += f" (reasons: {row['reason_codes']})."
+        return base
+
+    out["explanation"] = out.apply(build_explanation, axis=1)
 
     return out
 
@@ -544,13 +587,80 @@ def main(daily_path: str, out_dir: str) -> None:
     df = compute_readiness_with_personalisation(df, adjustment_factors)
     
     df = generate_recommendations(df)
+    
+    # === NUEVO: Análisis de sobrecarga neuromuscular ===
+    exercise_path = Path(daily_path).parent / "daily_exercise.csv"
+    training_path = Path(daily_path).parent.parent / "raw" / "training.csv"
+    overload_result = None
+    
+    # Intentar cargar datos de ejercicios (preferir set-level si existe)
+    exercise_df = None
+    if training_path.exists():
+        try:
+            exercise_df = pd.read_csv(training_path)
+            exercise_df["date"] = pd.to_datetime(exercise_df["date"])
+            exercise_df["exercise"] = exercise_df["exercise"].str.lower().str.strip()
+            # Renombrar columnas para compatibilidad
+            if "weight" in exercise_df.columns and "load_kg" not in exercise_df.columns:
+                exercise_df["load_kg"] = exercise_df["weight"]
+            print(f"   Usando datos set-level de {training_path.name}")
+        except Exception as e:
+            print(f"   ⚠️ Error cargando training.csv: {e}")
+            exercise_df = None
+    
+    if exercise_df is None and exercise_path.exists():
+        try:
+            exercise_df = load_exercise_sessions(exercise_path)
+            print(f"   Usando datos agregados de {exercise_path.name}")
+        except Exception as e:
+            print(f"   ⚠️ Error cargando daily_exercise.csv: {e}")
+    
+    if exercise_df is not None and not exercise_df.empty:
+        try:
+            print(f"\n🧠 Analizando sobrecarga neuromuscular...")
+            
+            overload_result = analyze_neuromuscular_overload(
+                df_exercise=exercise_df,
+                df_daily=df,
+                config=OverloadConfig()
+            )
+            
+            # Mostrar resumen
+            summary = overload_result["summary"]
+            print(f"   Lifts clave analizados: {summary['n_key_lifts_analyzed']}")
+            print(f"   Lifts avanzados: {summary['n_advanced_lifts']}")
+            print(f"   Flags detectados: {summary['n_flags_detected']}")
+            print(f"   Overload score total: {summary['total_overload_score']}")
+            print(f"   Causa principal: {summary['primary_cause']}")
+            
+            if overload_result["flags"]:
+                print(f"\n   ⚠️  Señales de sobrecarga detectadas:")
+                for flag in overload_result["flags"]:
+                    print(f"      - {flag.flag_type}: {flag.exercise}")
+                    print(f"        Severidad: {flag.severity}, Recos: {flag.recommendations[0][:50]}...")
+            
+            # Integrar en DataFrame diario
+            df = merge_overload_into_daily(df, overload_result["overload_df"])
+            
+            # Exportar flags detallados
+            export_overload_flags(overload_result, out_dir)
+            
+        except Exception as exc:
+            print(f"⚠️  Error en análisis de sobrecarga: {exc}")
+            import traceback
+            traceback.print_exc()
+    else:
+        print(f"\n⚠️  No se encontraron datos de ejercicios - análisis de sobrecarga omitido")
+        df["overload_score"] = 0
+        df["overload_flags"] = ""
+        df["exercise_specific_recos"] = ""
+    
     export_outputs(df, out_dir)
     
     # === NUEVO: Guardar perfil del usuario ===
     export_user_profile(df, out_dir)
 
-    # === NUEVO: Detectar patrones OHP si hay datos de ejercicio ===
-    exercise_path = Path(daily_path).parent / "daily_exercise.csv"
+    # === LEGACY: Detectar patrones OHP (mantener compatibilidad) ===
     ohp_flags = []
     try:
         exercise_df = load_exercise_sessions(exercise_path)
@@ -560,7 +670,37 @@ def main(daily_path: str, out_dir: str) -> None:
             if ohp_flags:
                 export_ohp_flags(ohp_flags, out_dir)
     except Exception as exc:
-        print(f"⚠️  No se pudieron calcular flags OHP: {exc}")
+        pass  # Ya manejado arriba
+
+
+def export_overload_flags(overload_result: dict, out_dir: str) -> None:
+    """Exporta flags de sobrecarga neuromuscular a JSON."""
+    out_path = Path(out_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+    
+    # Convertir flags a dict serializable
+    flags_data = []
+    for flag in overload_result["flags"]:
+        flags_data.append({
+            "flag_type": flag.flag_type,
+            "exercise": flag.exercise,
+            "severity": flag.severity,
+            "evidence": flag.evidence,
+            "recommendations": flag.recommendations,
+            "date_detected": flag.date_detected
+        })
+    
+    output = {
+        "summary": overload_result["summary"],
+        "flags": flags_data,
+        "advanced_lifts": overload_result["advanced_map"]
+    }
+    
+    out_file = out_path / "neural_overload_flags.json"
+    with open(out_file, "w", encoding="utf-8") as f:
+        json.dump(output, f, indent=2, ensure_ascii=False, default=str)
+    
+    print(f"✓ Neural overload flags guardados en {out_file}")
 
 
 if __name__ == "__main__":

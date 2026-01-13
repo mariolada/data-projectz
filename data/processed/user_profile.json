@@ -1,42 +1,43 @@
 {
   "sleep_responsiveness": {
-    "correlation": 0.6260040060656383,
-    "strength": "moderate",
-    "p_value": 5.7684590259905405e-05,
+    "correlation": 0.4859641212855881,
+    "strength": "weak",
+    "p_value": 0.003079928976823903,
     "n_samples": 35,
-    "interpretation": "Sueño tiene efecto MODERADO en tu readiness (r=0.63). Importante pero no determinante.",
-    "sleep_responsive": true,
-    "recommendation": "Prioriza sueño"
+    "interpretation": "Sueño tiene efecto DÉBIL en tu readiness (r=0.49). No es tu factor clave.",
+    "sleep_responsive": false,
+    "recommendation": "Investiga otros factores (cafeína, estrés, carga)"
   },
   "perceived_vs_metrics": {
     "correlation_sleep": 0.10847401734055886,
-    "correlation_volume": 0.012661519651845823,
+    "correlation_volume": 0.012661519651845848,
     "trust_intuition": true,
-    "discrepancy_rate": 0.34285714285714286,
+    "discrepancy_rate": 0.6285714285714286,
     "interpretation": "Tu percepción NO correlaciona con sueño (r=0.11). Confías en otros factores (estrés, carga, café).",
     "recommendation": "Tu intuición es valiosa, sigue registrándola"
   },
   "archetype": {
-    "archetype": "standard",
-    "confidence": 0.75,
-    "reason": "Tu media es ~7.2h (normal)",
+    "archetype": "consistent_performer",
+    "confidence": 0.85,
+    "reason": "Tu readiness es muy predecible",
     "all_detected": [
-      "standard"
+      "standard",
+      "consistent_performer"
     ]
   },
   "adjustment_factors": {
-    "sleep_weight": 0.35,
+    "sleep_weight": 0.15,
     "performance_weight": 0.25,
     "acwr_weight": 0.15,
     "fatigue_sensitivity": 0.7,
-    "recovery_speed": 1.0
+    "recovery_speed": 1.1
   },
   "insights": [
-    "Eres **standard**: Tu media es ~7.2h (normal)",
-    "Sueño tiene efecto MODERADO en tu readiness (r=0.63). Importante pero no determinante.",
+    "Eres **consistent_performer**: Tu readiness es muy predecible",
+    "Sueño tiene efecto DÉBIL en tu readiness (r=0.49). No es tu factor clave.",
     "Tu percepción NO correlaciona con sueño (r=0.11). Confías en otros factores (estrés, carga, café)."
   ],
-  "last_updated": "2026-01-13T12:58:31.479623",
+  "last_updated": "2026-01-13T22:07:01.726933",
   "data_quality": {
     "total_days": 35,
     "days_with_sleep": 35,

@@ -83,3 +83,34 @@ def save_mood_to_csv(date, sleep_hours, sleep_quality, fatigue, soreness, stress
     
     df_mood.to_csv(mood_path, index=False)
     return True
+
+
+@st.cache_data(ttl=60)
+def load_neural_overload_flags(flags_path: str = "data/processed/neural_overload_flags.json"):
+    """
+    Carga los flags de sobrecarga neuromuscular/SNC desde JSON.
+    Retorna estructura con 'summary', 'flags', y 'advanced_lifts'.
+    """
+    p = Path(flags_path)
+    default = {
+        'summary': {
+            'n_key_lifts_analyzed': 0,
+            'n_flags_detected': 0,
+            'total_overload_score': 0,
+            'primary_cause': None,
+            'flags_by_type': {},
+            'affected_exercises': []
+        },
+        'flags': [],
+        'advanced_lifts': {}
+    }
+    
+    if not p.exists():
+        return default
+    
+    try:
+        with p.open('r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data
+    except Exception:
+        return default
