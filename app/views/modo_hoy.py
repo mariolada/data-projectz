@@ -15,7 +15,9 @@ from ui.helpers import (
     get_fatigue_level, get_stress_level, get_soreness_level,
     get_energy_level, get_perceived_level,
     render_neural_fatigue_section,
-    render_consejos_section
+    render_consejos_section,
+    render_desglose_section,
+    render_readiness_section
 )
 from data.loaders import load_user_profile, save_mood_to_csv, load_neural_overload_flags
 from calculations.readiness import (
@@ -574,154 +576,62 @@ def render_modo_hoy(df_daily: pd.DataFrame):
         # Display results - TWO MODES
         st.markdown("---")
         
-        # ===== DESGLOSE PERSONALIZADO =====
+        # ===== DESGLOSE PERSONALIZADO (nuevo diseño) =====
         render_section_title("Desglose Personalizado de tu Readiness", accent="#FFB81C")
         
-        col_bd1, col_bd2 = st.columns([2, 1.5])
+        components = readiness_breakdown.get('components', {})
+        adjustments = readiness_breakdown.get('context_adjustments', {})
+        notes = readiness_breakdown.get('notes', [])
+        p50 = baselines.get('readiness', {}).get('p50', 50)
+        p75 = baselines.get('readiness', {}).get('p75', 55)
+        n_days = baselines.get('readiness', {}).get('n', 0)
+        sleep_responsive = adjustment_factors.get('sleep_responsive', False)
         
-        with col_bd1:
-            # Mostrar componentes
-            st.write("**Componentes del cálculo:**")
-            components = readiness_breakdown.get('components', {})
-            adjustments = readiness_breakdown.get('context_adjustments', {})
-            
-            # Crear tabla visual
-            comp_data = []
-            for key, val in components.items():
-                if key == 'sleep':
-                    label = " Sueño"
-                elif key == 'state':
-                    label = " Estado (Fatiga/Estrés)"
-                elif key == 'motivation':
-                    label = " Motivación"
-                else:
-                    label = key.capitalize()
-                
-                comp_data.append({'Componente': label, 'Aporte': f'{val:.1f}%'})
-            
-            if comp_data:
-                df_comp = pd.DataFrame(comp_data)
-                st.dataframe(df_comp, use_container_width=True, hide_index=True)
-            
-            # Penalizaciones
-            if adjustments and any(v != 0 for v in adjustments.values()):
-                st.write("**Penalizaciones/Ajustes:**")
-                adj_data = []
-                for key, val in adjustments.items():
-                    if val != 0:
-                        if key == 'pain_penalty':
-                            label = " Dolor"
-                        elif key == 'sick_penalty':
-                            label = " Enfermedad"
-                        elif key == 'caffeine_mask':
-                            label = " Cafeína"
-                        else:
-                            label = key
-                        adj_data.append({'Ajuste': label, 'Impacto': f'{val:.1f}%'})
-                
-                if adj_data:
-                    df_adj = pd.DataFrame(adj_data)
-                    st.dataframe(df_adj, use_container_width=True, hide_index=True)
+        render_desglose_section(
+            components=components,
+            adjustments=adjustments,
+            sleep_responsive=sleep_responsive,
+            readiness=readiness_instant,
+            p50=p50,
+            p75=p75,
+            n_days=n_days,
+            notes=notes
+        )
         
-        with col_bd2:
-            st.write("**Contexto Personal:**")
-            
-            # Sleep responsiveness
-            if adjustment_factors.get('sleep_responsive'):
-                st.info(" **ERES SENSIBLE AL SUEÑO**\nPrioriza dormir bien para optimizar readiness", icon="💤")
-            else:
-                st.success(" **NO ERES TAN SENSIBLE AL SUEÑO**\nTienes flexibilidad con horas, pero calidad importa", icon="🎯")
-            
-            # Baseline comparison
-            if baselines.get('readiness', {}).get('p50'):
-                p50 = baselines['readiness']['p50']
-                delta = readiness_instant - p50
-                if delta > 5:
-                    st.success(f" Hoy +{delta:.0f} vs tu media ({p50:.0f})", icon="✅")
-                elif delta > -5:
-                    st.info(f" Hoy ~igual a media ({p50:.0f})", icon="ℹ️")
-                else:
-                    st.warning(f" Hoy {delta:.0f} vs media ({p50:.0f})", icon="⚠️")
+        # ===== TU READINESS HOY (nuevo diseño) =====
+        st.markdown("---")
+        render_section_title("Tu Readiness HOY", accent="#00D084")
         
-        # Notas contextuales
-        if readiness_breakdown.get('notes'):
-            st.markdown("---")
-            st.write("**Notas del analisis:**")
-            for note in readiness_breakdown['notes']:
-                st.caption(note)
+        render_readiness_section(
+            readiness=readiness_instant,
+            emoji=emoji,
+            baselines=baselines,
+            injury_risk=injury_risk,
+            adjustment_factors=adjustment_factors
+        )
         
-        # ===== INFORMACIÓN COMPLETA (MODO RÁPIDO Y PRECISO) =====
-        if True:  # Show full output in both modes
-            # ===== MODO PRECISO: Output completo con gráficos =====
-            render_section_title("Tu Readiness HOY", accent="#00D084")
-            
-            col_result1, col_result2, col_result3 = st.columns([2, 1.5, 1.5])
-            with col_result1:
-                readiness_text = f"{emoji} {readiness_instant}/100"
-                st.markdown(f"# {readiness_text}")
-            with col_result2:
-                st.write("")
-                render_section_title("Contexto Personal", accent="#00D084")
-                # Mostrar delta visual
-                if baselines.get('readiness', {}).get('p50'):
-                    p50 = baselines['readiness']['p50']
-                    p75 = baselines['readiness']['p75']
-                    delta = readiness_instant - p50
-                    
-                    if delta >= 0:
-                        delta_color = "🟢"
-                    else:
-                        delta_color = "🔴"
-                    
-                    st.markdown(f"**Tu media:** {p50:.0f} | **Alto (p75):** {p75:.0f}")
-                    st.markdown(f"{delta_color} **Hoy:** {delta:+.0f} vs media")
-                    
-                    # Barra de comparación visual
-                    progress_val = max(0, min(100, (readiness_instant / 100)))
-                    st.progress(progress_val)
-                    
-                    # Nota sobre comparación si hay suficientes datos
-                    n_days = baselines.get('readiness', {}).get('n', 0)
-                    if n_days < 14:
-                        st.caption(f"⏳ Basado en {n_days} días (más historia = mejor contexto)")
-                else:
-                    st.write("⏳ *Necesita más historia*")
-                    st.caption("(Mínimo 7 días para calcular tu baseline)")
-            with col_result3:
-                st.write("")
-                render_section_title("Riesgo de Lesión", accent="#FF6B6B")
-                st.write(f"{injury_risk['emoji']} **{injury_risk['risk_level'].upper()}**")
-                st.caption(f"Score: {injury_risk['score']:.0f}/100\n({injury_risk['confidence']} confianza)")
-            
-            # Show injury risk factors if not low
-            if injury_risk['risk_level'] != 'low':
-                st.warning(f"⚠️ **{injury_risk['action']}**")
-                with st.expander("Factores de riesgo"):
-                    for factor in injury_risk['factors']:
-                        st.write(f"• {factor}")
-            
-            # Advice Cards (nuevo diseño premium)
-            st.markdown("---")
-            render_section_title("Consejos de hoy", accent="#FFB81C")
+        # Advice Cards (nuevo diseño premium)
+        st.markdown("---")
+        render_section_title("Consejos de hoy", accent="#FFB81C")
 
-            # Nueva sección unificada con Summary Strip + Cards + Checklist
-            render_consejos_section(
-                fatigue_analysis=fatigue_analysis,
-                zone_display=zone_display,
-                plan=plan,
-                rules=rules,
-                sleep_h=sleep_h,
-                stress=stress
-            )
+        # Nueva sección unificada con Summary Strip + Cards + Checklist
+        render_consejos_section(
+            fatigue_analysis=fatigue_analysis,
+            zone_display=zone_display,
+            plan=plan,
+            rules=rules,
+            sleep_h=sleep_h,
+            stress=stress
+        )
+        
+        # === ALERTAS DE SOBRECARGA NEUROMUSCULAR ===
+        overload_data = load_neural_overload_flags()
+        if overload_data.get('flags') and len(overload_data['flags']) > 0:
+            st.markdown("---")
+            render_section_title("🧠 Fatiga Neural Detectada", accent="#E07040")
             
-            # === ALERTAS DE SOBRECARGA NEUROMUSCULAR ===
-            overload_data = load_neural_overload_flags()
-            if overload_data.get('flags') and len(overload_data['flags']) > 0:
-                st.markdown("---")
-                render_section_title("🧠 Fatiga Neural Detectada", accent="#E07040")
-                
-                # Renderizar sección completa con nuevo diseño premium
-                render_neural_fatigue_section(overload_data)
+            # Renderizar sección completa con nuevo diseño premium
+            render_neural_fatigue_section(overload_data)
         
         # Save option (both modes now show full output)
         if not quick_mode:

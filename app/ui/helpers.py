@@ -945,3 +945,497 @@ def render_consejos_section(fatigue_analysis: dict, zone_display: str, plan: lis
     # 3. Reglas checklist (full width, más compacto)
     st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
     render_reglas_checklist(rules)
+
+
+# =============================================================================
+# DESGLOSE PERSONALIZADO + READINESS HOY - Componentes Premium
+# =============================================================================
+
+def _get_readiness_color(readiness: int) -> dict:
+    """Retorna colores según el valor de readiness."""
+    if readiness >= 75:
+        return {'accent': '#50C878', 'bg': 'rgba(80,200,120,0.08)', 'label': 'ALTA', 'glow': 'rgba(80,200,120,0.25)'}
+    elif readiness >= 55:
+        return {'accent': '#E0A040', 'bg': 'rgba(224,160,64,0.08)', 'label': 'MEDIA', 'glow': 'rgba(224,160,64,0.20)'}
+    else:
+        return {'accent': '#E05555', 'bg': 'rgba(224,85,85,0.08)', 'label': 'BAJA', 'glow': 'rgba(224,85,85,0.20)'}
+
+
+def _get_risk_color(risk_level: str) -> dict:
+    """Retorna colores según nivel de riesgo."""
+    level = risk_level.lower()
+    if level == 'low':
+        return {'accent': '#50C878', 'bg': 'rgba(80,200,120,0.08)', 'emoji': '✅'}
+    elif level == 'medium':
+        return {'accent': '#E0A040', 'bg': 'rgba(224,160,64,0.08)', 'emoji': '⚠️'}
+    else:
+        return {'accent': '#E05555', 'bg': 'rgba(224,85,85,0.08)', 'emoji': '🚨'}
+
+
+def render_component_rows(components: dict, adjustments: dict = None):
+    """
+    Renderiza los componentes del readiness como card-rows con barras.
+    Reemplaza la tabla tradicional.
+    """
+    # Iconos por componente
+    component_icons = {
+        'sleep': '🌙',
+        'state': '🧠',
+        'motivation': '🔥',
+    }
+    component_labels = {
+        'sleep': 'Sueño',
+        'state': 'Estado (Fatiga/Estrés)',
+        'motivation': 'Motivación',
+    }
+    
+    rows_html = ""
+    max_val = max(components.values()) if components else 30
+    
+    for key, val in components.items():
+        icon = component_icons.get(key, '📊')
+        label = component_labels.get(key, key.capitalize())
+        bar_width = min(100, (val / max_val) * 100) if max_val > 0 else 0
+        
+        rows_html += (
+            f'<div style="display:flex;align-items:center;justify-content:space-between;'
+            f'padding:12px 14px;margin-bottom:8px;background:rgba(255,255,255,0.02);'
+            f'border-radius:10px;border:1px solid rgba(255,255,255,0.04);">'
+            
+            # Left: icon + label
+            f'<div style="display:flex;align-items:center;gap:10px;flex:1;">'
+            f'<span style="font-size:1.1rem;opacity:0.7;">{icon}</span>'
+            f'<span style="color:#b0b0b0;font-size:0.85rem;">{label}</span>'
+            f'</div>'
+            
+            # Right: percentage + bar
+            f'<div style="text-align:right;min-width:100px;">'
+            f'<div style="font-size:1.1rem;font-weight:700;color:#e0e0e0;margin-bottom:4px;">{val:.1f}%</div>'
+            f'<div style="height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;">'
+            f'<div style="height:100%;width:{bar_width}%;background:linear-gradient(90deg,#50C878,#80D0A0);'
+            f'border-radius:2px;"></div>'
+            f'</div>'
+            f'</div>'
+            
+            f'</div>'
+        )
+    
+    # Penalizaciones si existen
+    if adjustments:
+        adj_icons = {'pain_penalty': '🩹', 'sick_penalty': '🤒', 'caffeine_mask': '☕'}
+        adj_labels = {'pain_penalty': 'Dolor', 'sick_penalty': 'Enfermedad', 'caffeine_mask': 'Cafeína'}
+        
+        for key, val in adjustments.items():
+            if val != 0:
+                icon = adj_icons.get(key, '⚡')
+                label = adj_labels.get(key, key)
+                color = '#E05555' if val < 0 else '#E0A040'
+                
+                rows_html += (
+                    f'<div style="display:flex;align-items:center;justify-content:space-between;'
+                    f'padding:10px 14px;margin-bottom:6px;background:rgba(224,85,85,0.05);'
+                    f'border-radius:8px;border-left:2px solid {color};">'
+                    f'<div style="display:flex;align-items:center;gap:10px;">'
+                    f'<span style="font-size:0.95rem;">{icon}</span>'
+                    f'<span style="color:#a0a0a0;font-size:0.82rem;">{label}</span>'
+                    f'</div>'
+                    f'<span style="color:{color};font-size:0.95rem;font-weight:600;">{val:+.1f}%</span>'
+                    f'</div>'
+                )
+    
+    html = (
+        f'<div style="margin-bottom:16px;">'
+        f'<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1.5px;'
+        f'color:#666;margin-bottom:12px;font-weight:600;">Componentes del cálculo</div>'
+        f'{rows_html}'
+        f'</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_insights_stack(sleep_responsive: bool, readiness: int, p50: float, p75: float, n_days: int = 0):
+    """
+    Renderiza el stack de insights personalizados.
+    """
+    delta = readiness - p50 if p50 else 0
+    
+    # Insight principal (sensibilidad al sueño)
+    if sleep_responsive:
+        main_icon = "💤"
+        main_title = "ERES SENSIBLE AL SUEÑO"
+        main_subtitle = "Prioriza dormir bien para optimizar readiness"
+        main_color = "#80A0E0"
+    else:
+        main_icon = "🎯"
+        main_title = "NO ERES TAN SENSIBLE AL SUEÑO"
+        main_subtitle = "Flexibilidad con horas, pero calidad importa"
+        main_color = "#50C878"
+    
+    # Insight secundario (delta vs media)
+    if delta > 5:
+        delta_icon = "✅"
+        delta_color = "#50C878"
+        delta_text = f"Hoy +{delta:.0f} vs tu media ({p50:.0f})"
+    elif delta >= -5:
+        delta_icon = "ℹ️"
+        delta_color = "#80A0C0"
+        delta_text = f"Hoy ~igual a media ({p50:.0f})"
+    else:
+        delta_icon = "⚠️"
+        delta_color = "#E0A040"
+        delta_text = f"Hoy {delta:.0f} vs media ({p50:.0f})"
+    
+    # P75 display
+    p75_display = f"p75≈{p75:.0f}" if p75 and abs(p75 - p50) < 3 else f"p75: {p75:.0f}" if p75 else ""
+    if n_days < 14 and n_days > 0:
+        p75_display += f" (histórico corto: {n_days}d)"
+    
+    html = (
+        f'<div style="display:flex;flex-direction:column;gap:12px;">'
+        
+        # Main insight
+        f'<div style="padding:16px;background:linear-gradient(135deg,rgba(26,24,30,0.95),rgba(22,20,26,0.98));'
+        f'border-radius:12px;border-left:3px solid {main_color};box-shadow:0 2px 10px rgba(0,0,0,0.2);">'
+        f'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">'
+        f'<div style="display:flex;align-items:center;gap:8px;">'
+        f'<span style="font-size:1.1rem;">{main_icon}</span>'
+        f'<span style="font-size:0.9rem;font-weight:600;color:#e0e0e0;">{main_title}</span>'
+        f'</div>'
+        f'<span style="padding:3px 8px;border-radius:4px;background:rgba(128,160,192,0.15);'
+        f'color:#80A0C0;font-size:0.65rem;font-weight:600;">PERSONALIZADO</span>'
+        f'</div>'
+        f'<div style="color:#909090;font-size:0.82rem;padding-left:28px;">{main_subtitle}</div>'
+        f'</div>'
+        
+        # Delta insight
+        f'<div style="padding:14px;background:rgba(255,255,255,0.02);'
+        f'border-radius:10px;border-left:3px solid {delta_color};">'
+        f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+        f'<div style="display:flex;align-items:center;gap:8px;">'
+        f'<span style="font-size:1rem;">{delta_icon}</span>'
+        f'<span style="font-size:0.88rem;font-weight:500;color:#c0c0c0;">{delta_text}</span>'
+        f'</div>'
+        f'<span style="padding:3px 8px;border-radius:4px;background:rgba(224,160,64,0.12);'
+        f'color:#E0A040;font-size:0.65rem;font-weight:600;">TENDENCIA</span>'
+        f'</div>'
+        f'</div>'
+        
+        # P75 note if relevant
+        + (f'<div style="color:#666;font-size:0.75rem;padding-left:4px;">{p75_display}</div>' if p75_display else '')
+        +
+        f'</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_notes_compact(notes: list):
+    """
+    Renderiza notas del análisis de forma compacta.
+    Primera nota visible, resto en expander.
+    """
+    if not notes:
+        return
+    
+    # Primera nota siempre visible
+    first_note = notes[0] if notes else ""
+    remaining = notes[1:] if len(notes) > 1 else []
+    
+    html = (
+        f'<div style="margin-top:12px;padding:10px 14px;background:rgba(80,200,120,0.06);'
+        f'border-radius:8px;border-left:2px solid #50C87880;">'
+        f'<div style="display:flex;align-items:flex-start;gap:8px;">'
+        f'<span style="color:#50C878;font-size:0.9rem;">✓</span>'
+        f'<span style="color:#a0a0a0;font-size:0.82rem;line-height:1.5;">{first_note}</span>'
+        f'</div>'
+        f'</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+    
+    # Resto en expander si hay más
+    if remaining:
+        with st.expander(f"Ver {len(remaining)} nota(s) más"):
+            for note in remaining:
+                st.caption(f"• {note}")
+
+
+def render_readiness_hero(readiness: int, zone_label: str, confidence: str = "medium"):
+    """
+    Renderiza el bloque hero del readiness con gauge circular y badges.
+    Columna 1 del nuevo layout.
+    """
+    colors = _get_readiness_color(readiness)
+    
+    # Calcular ángulo para el gauge (0-100 -> 0-360)
+    gauge_pct = min(readiness, 100)
+    
+    # Microtexto según zona
+    zone_microtexts = {
+        'ALTA': 'Listo para push / PRs',
+        'MEDIA': 'Listo para entrenar normal',
+        'BAJA': 'Considera deload o descanso',
+    }
+    microtext = zone_microtexts.get(colors['label'], 'Evalúa según sensaciones')
+    
+    # Confidence chip
+    conf_colors = {
+        'high': {'bg': 'rgba(80,200,120,0.12)', 'text': '#50C878'},
+        'medium': {'bg': 'rgba(224,160,64,0.12)', 'text': '#E0A040'},
+        'low': {'bg': 'rgba(224,85,85,0.12)', 'text': '#E05555'},
+    }
+    conf = conf_colors.get(confidence.lower(), conf_colors['medium'])
+    
+    html = (
+        f'<div style="background:linear-gradient(135deg,rgba(22,22,28,0.98),rgba(28,26,32,0.95));'
+        f'border-radius:16px;padding:24px;border-left:4px solid {colors["accent"]};'
+        f'box-shadow:0 4px 20px rgba(0,0,0,0.3),0 0 30px {colors["glow"]};text-align:center;">'
+        
+        # Gauge circular
+        f'<div style="position:relative;width:120px;height:120px;margin:0 auto 16px;">'
+        f'<svg width="120" height="120" style="transform:rotate(-90deg);">'
+        f'<circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10"/>'
+        f'<circle cx="60" cy="60" r="50" fill="none" stroke="{colors["accent"]}" stroke-width="10" '
+        f'stroke-dasharray="{gauge_pct * 3.14} 314" stroke-linecap="round"/>'
+        f'</svg>'
+        f'<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">'
+        f'<div style="font-size:2.2rem;font-weight:800;color:{colors["accent"]};line-height:1;">{readiness}</div>'
+        f'<div style="font-size:0.7rem;color:#666;margin-top:2px;">/100</div>'
+        f'</div>'
+        f'</div>'
+        
+        # Chips row
+        f'<div style="display:flex;justify-content:center;gap:8px;margin-bottom:10px;">'
+        
+        # Zona chip
+        f'<span style="padding:5px 12px;border-radius:6px;background:{colors["bg"]};'
+        f'border:1px solid {colors["accent"]}50;color:{colors["accent"]};'
+        f'font-size:0.75rem;font-weight:600;">ZONA: {colors["label"]}</span>'
+        
+        # Confidence chip
+        f'<span style="padding:5px 10px;border-radius:6px;background:{conf["bg"]};'
+        f'color:{conf["text"]};font-size:0.7rem;font-weight:500;">CONF: {confidence.upper()}</span>'
+        
+        f'</div>'
+        
+        # Microtext
+        f'<div style="color:#808080;font-size:0.8rem;">{microtext}</div>'
+        
+        f'</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_baseline_comparison(readiness: int, p50: float, p75: float, n_days: int = 0):
+    """
+    Renderiza la comparación con baseline personal.
+    Columna 2 del nuevo layout - barra con 3 marcadores.
+    """
+    delta = readiness - p50 if p50 else 0
+    delta_color = '#50C878' if delta >= 0 else '#E05555'
+    
+    # Posiciones en la barra (0-100 scale)
+    # Normalizar todo a un rango visual razonable
+    min_val = min(p50 - 20, readiness - 10) if p50 else 30
+    max_val = max(p75 + 10, readiness + 10) if p75 else 90
+    range_val = max_val - min_val if max_val > min_val else 60
+    
+    def to_pct(val):
+        return max(5, min(95, ((val - min_val) / range_val) * 100))
+    
+    p50_pos = to_pct(p50) if p50 else 40
+    p75_pos = to_pct(p75) if p75 else 60
+    today_pos = to_pct(readiness)
+    
+    # P75 display text
+    if p75 and abs(p75 - p50) < 3:
+        p75_text = f"p75≈{p75:.0f}"
+    else:
+        p75_text = f"p75: {p75:.0f}" if p75 else ""
+    
+    # History note
+    history_note = f"Basado en {n_days} días" if n_days > 0 and n_days < 30 else ""
+    
+    # Pre-compute formatted values
+    p50_display = f"{p50:.0f}" if p50 else "—"
+    p75_display = f"{p75:.0f}" if p75 else "—"
+    delta_display = f"{delta:+.0f}"
+    p75_label = p75_text.split(":")[0] if p75_text else "p75"
+    
+    html = (
+        f'<div style="background:linear-gradient(135deg,rgba(26,24,30,0.95),rgba(22,20,26,0.98));'
+        f'border-radius:14px;padding:20px;border:1px solid rgba(255,255,255,0.04);height:100%;">'
+        
+        f'<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1.5px;'
+        f'color:#666;margin-bottom:16px;font-weight:600;">Contexto Personal</div>'
+        
+        # Stats row
+        f'<div style="display:flex;justify-content:space-between;margin-bottom:16px;">'
+        f'<div>'
+        f'<div style="color:#777;font-size:0.72rem;">Tu media</div>'
+        f'<div style="color:#b0b0b0;font-size:1.1rem;font-weight:600;">{p50_display}</div>'
+        f'</div>'
+        f'<div style="text-align:center;">'
+        f'<div style="color:#777;font-size:0.72rem;">{p75_label}</div>'
+        f'<div style="color:#b0b0b0;font-size:1.1rem;font-weight:600;">{p75_display}</div>'
+        f'</div>'
+        f'<div style="text-align:right;">'
+        f'<div style="color:#777;font-size:0.72rem;">Hoy</div>'
+        f'<div style="color:{delta_color};font-size:1.1rem;font-weight:700;">{delta_display}</div>'
+        f'</div>'
+        f'</div>'
+        
+        # Visual bar with markers
+        f'<div style="position:relative;height:24px;margin-bottom:12px;">'
+        
+        # Background bar
+        f'<div style="position:absolute;top:10px;left:0;right:0;height:4px;'
+        f'background:rgba(255,255,255,0.08);border-radius:2px;"></div>'
+        
+        # P50 marker
+        f'<div style="position:absolute;top:6px;left:{p50_pos}%;transform:translateX(-50%);">'
+        f'<div style="width:2px;height:12px;background:#808080;border-radius:1px;"></div>'
+        f'<div style="font-size:0.6rem;color:#666;margin-top:2px;white-space:nowrap;">p50</div>'
+        f'</div>'
+    )
+    
+    # P75 marker (conditional)
+    if p75 and abs(p75_pos - p50_pos) > 8:
+        html += (
+            f'<div style="position:absolute;top:6px;left:{p75_pos}%;transform:translateX(-50%);">'
+            f'<div style="width:2px;height:12px;background:#A0A0A0;border-radius:1px;"></div>'
+            f'<div style="font-size:0.6rem;color:#888;margin-top:2px;">p75</div>'
+            f'</div>'
+        )
+    
+    # Today marker (highlighted)
+    today_shadow = delta_color + "60"
+    html += (
+        f'<div style="position:absolute;top:4px;left:{today_pos}%;transform:translateX(-50%);">'
+        f'<div style="width:8px;height:16px;background:{delta_color};border-radius:4px;'
+        f'box-shadow:0 0 8px {today_shadow};"></div>'
+        f'<div style="font-size:0.65rem;color:{delta_color};margin-top:2px;font-weight:600;">HOY</div>'
+        f'</div>'
+        f'</div>'
+    )
+    
+    # History note
+    if history_note:
+        html += f'<div style="color:#555;font-size:0.7rem;text-align:center;">{history_note}</div>'
+    
+    html += '</div>'
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_injury_risk_card(risk_level: str, score: float, confidence: str, 
+                            action: str = None, factors: list = None):
+    """
+    Renderiza el bloque de riesgo de lesión.
+    Columna 3 del nuevo layout.
+    """
+    colors = _get_risk_color(risk_level)
+    
+    # Si score es 0 y risk es low, mostrar versión minimal
+    is_minimal = (score == 0 or score < 5) and risk_level.lower() == 'low'
+    
+    # Confidence chip
+    conf_map = {'high': '#50C878', 'medium': '#E0A040', 'low': '#E05555'}
+    conf_color = conf_map.get(confidence.lower(), '#808080')
+    
+    html = (
+        f'<div style="background:linear-gradient(135deg,rgba(26,24,30,0.95),rgba(22,20,26,0.98));'
+        f'border-radius:14px;padding:18px;border:1px solid rgba(255,255,255,0.04);'
+        f'{"opacity:0.85;" if is_minimal else ""}height:100%;">'
+        
+        f'<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1.5px;'
+        f'color:#666;margin-bottom:14px;font-weight:600;">Riesgo de Lesión</div>'
+        
+        # Badge grande
+        f'<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px;">'
+        f'<span style="font-size:1.5rem;">{colors["emoji"]}</span>'
+        f'<span style="padding:6px 16px;border-radius:8px;background:{colors["bg"]};'
+        f'border:1px solid {colors["accent"]}60;color:{colors["accent"]};'
+        f'font-size:1rem;font-weight:700;">{risk_level.upper()}</span>'
+        f'</div>'
+        
+        # Score y confidence
+        f'<div style="display:flex;justify-content:center;gap:16px;margin-bottom:8px;">'
+        f'<div style="text-align:center;">'
+        f'<div style="color:#777;font-size:0.7rem;">Score</div>'
+        f'<div style="color:#b0b0b0;font-size:1rem;font-weight:600;">{score:.0f}/100</div>'
+        f'</div>'
+        f'<div style="text-align:center;">'
+        f'<div style="color:#777;font-size:0.7rem;">Confianza</div>'
+        f'<span style="padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.05);'
+        f'color:{conf_color};font-size:0.75rem;font-weight:500;">{confidence.upper()}</span>'
+        f'</div>'
+        f'</div>'
+        
+        f'</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+    
+    # Action y factors fuera del HTML (usando streamlit nativo)
+    if action and risk_level.lower() != 'low':
+        st.warning(f"⚠️ **{action}**")
+        if factors:
+            with st.expander("Factores de riesgo"):
+                for factor in factors:
+                    st.caption(f"• {factor}")
+
+
+def render_desglose_section(components: dict, adjustments: dict, 
+                            sleep_responsive: bool, readiness: int,
+                            p50: float, p75: float, n_days: int, notes: list):
+    """
+    Función principal que renderiza toda la sección "Desglose Personalizado".
+    """
+    col1, col2 = st.columns([1.3, 1])
+    
+    with col1:
+        render_component_rows(components, adjustments)
+    
+    with col2:
+        render_insights_stack(sleep_responsive, readiness, p50, p75, n_days)
+    
+    # Notas compactas
+    if notes:
+        render_notes_compact(notes)
+
+
+def render_readiness_section(readiness: int, emoji: str, baselines: dict, 
+                             injury_risk: dict, adjustment_factors: dict):
+    """
+    Función principal que renderiza toda la sección "Tu Readiness Hoy".
+    Layout de 3 columnas: Hero | Contexto | Riesgo
+    """
+    p50 = baselines.get('readiness', {}).get('p50', 50)
+    p75 = baselines.get('readiness', {}).get('p75', 55)
+    n_days = baselines.get('readiness', {}).get('n', 0)
+    
+    # Determinar confidence basado en n_days
+    if n_days >= 21:
+        confidence = "high"
+    elif n_days >= 7:
+        confidence = "medium"
+    else:
+        confidence = "low"
+    
+    col1, col2, col3 = st.columns([1.2, 1.3, 1])
+    
+    with col1:
+        colors = _get_readiness_color(readiness)
+        render_readiness_hero(readiness, colors['label'], confidence)
+    
+    with col2:
+        if p50:
+            render_baseline_comparison(readiness, p50, p75, n_days)
+        else:
+            st.info("⏳ Necesita más historia (mínimo 7 días)")
+    
+    with col3:
+        render_injury_risk_card(
+            risk_level=injury_risk.get('risk_level', 'low'),
+            score=injury_risk.get('score', 0),
+            confidence=injury_risk.get('confidence', 'medium'),
+            action=injury_risk.get('action'),
+            factors=injury_risk.get('factors', [])
+        )
