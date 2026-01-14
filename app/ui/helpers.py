@@ -137,7 +137,7 @@ def render_card(title: str, lines: list, accent: str = "#4ECDC4", icon: str = ""
 def render_overload_alert(flag_type: str, exercise: str, severity: int, 
                           evidence: dict, recommendations: list, accent: str = "#FF4500"):
     """
-    Renderiza una alerta de sobrecarga neuromuscular con estilo gaming neon.
+    Renderiza una alerta de sobrecarga neuromuscular con estilo sutil.
     
     Args:
         flag_type: Tipo de flag (SUSTAINED_NEAR_FAILURE, FIXED_LOAD_DRIFT, etc.)
@@ -163,58 +163,51 @@ def render_overload_alert(flag_type: str, exercise: str, severity: int,
     icon = type_icons.get(flag_type, '⚠️')
     label = type_labels.get(flag_type, flag_type.replace('_', ' '))
     
-    # Determinar color según severidad
+    # Determinar color según severidad (tonos más suaves)
     if severity >= 30:
-        accent = "#FF0000"  # Rojo intenso
-        glow_intensity = "60"
+        accent = "#E05555"  # Rojo suave
     elif severity >= 20:
-        accent = "#FF4500"  # Naranja-rojo
-        glow_intensity = "50"
+        accent = "#E07040"  # Naranja suave
     else:
-        accent = "#FFB81C"  # Amarillo-naranja
-        glow_intensity = "40"
+        accent = "#D4A030"  # Amarillo suave
     
     card_style = (
         "position: relative; "
-        "border-radius: 16px; "
-        "padding: 20px; "
-        "margin-bottom: 16px; "
-        "background: linear-gradient(135deg, rgba(40,10,10,0.95) 0%, rgba(50,20,20,0.85) 100%); "
-        f"border: 2px solid {accent}; "
-        f"box-shadow: 0 0 25px {accent}{glow_intensity}, "
-        f"0 0 50px {accent}30, "
-        "inset 0 0 60px rgba(0,0,0,0.4); "
-        "backdrop-filter: blur(10px);"
+        "border-radius: 12px; "
+        "padding: 18px; "
+        "margin-bottom: 14px; "
+        "background: rgba(35,25,25,0.85); "
+        f"border: 1px solid {accent}80; "
+        "box-shadow: 0 2px 8px rgba(0,0,0,0.3); "
+        "backdrop-filter: blur(8px);"
     )
     
     header_style = (
         "display: flex; "
         "justify-content: space-between; "
         "align-items: center; "
-        "margin-bottom: 16px; "
-        "padding-bottom: 12px; "
-        f"border-bottom: 1px solid {accent}40;"
+        "margin-bottom: 14px; "
+        "padding-bottom: 10px; "
+        f"border-bottom: 1px solid {accent}30;"
     )
     
     title_style = (
-        "font-weight: 800; "
-        "font-size: 1.1rem; "
+        "font-weight: 700; "
+        "font-size: 1rem; "
         "text-transform: uppercase; "
-        "letter-spacing: 2px; "
+        "letter-spacing: 1px; "
         f"color: {accent}; "
-        f"text-shadow: 0 0 15px {accent}, 0 0 30px {accent}80; "
-        "font-family: 'Courier New', monospace;"
+        "font-family: inherit;"
     )
     
     severity_style = (
-        "padding: 4px 12px; "
-        "border-radius: 20px; "
-        f"background: {accent}30; "
-        f"border: 1px solid {accent}; "
+        "padding: 4px 10px; "
+        "border-radius: 12px; "
+        f"background: {accent}20; "
+        f"border: 1px solid {accent}60; "
         f"color: {accent}; "
-        "font-weight: bold; "
-        "font-size: 0.85rem; "
-        f"box-shadow: 0 0 10px {accent}50;"
+        "font-weight: 600; "
+        "font-size: 0.8rem;"
     )
     
     # Construir evidencia HTML
@@ -240,8 +233,8 @@ def render_overload_alert(flag_type: str, exercise: str, severity: int,
     
     # Construir recomendaciones HTML
     reco_html = "".join([
-        f"<div style='margin-bottom:8px; padding-left:10px; border-left:3px solid {accent}; padding-top:4px; padding-bottom:4px;'>"
-        f"<span style='color:#e0e0e0;'>{rec}</span></div>" 
+        f"<div style='margin-bottom:6px; padding-left:10px; border-left:2px solid {accent}80; padding-top:3px; padding-bottom:3px;'>"
+        f"<span style='color:#d0d0d0;'>{rec}</span></div>" 
         for rec in recommendations[:3]
     ])
     
@@ -249,23 +242,23 @@ def render_overload_alert(flag_type: str, exercise: str, severity: int,
     <div style='{card_style}'>
         <div style='{header_style}'>
             <div style='{title_style}'>
-                <span style='font-size:1.4rem; margin-right:10px; filter: drop-shadow(0 0 10px {accent});'>{icon}</span>
+                <span style='font-size:1.2rem; margin-right:8px;'>{icon}</span>
                 {exercise.upper()}
             </div>
             <div style='{severity_style}'>SEV: {severity}</div>
         </div>
-        <div style='display:grid; grid-template-columns:1fr 1fr; gap:20px;'>
+        <div style='display:grid; grid-template-columns:1fr 1fr; gap:16px;'>
             <div>
-                <div style='color:{accent}; font-weight:bold; margin-bottom:8px; font-size:0.85rem; letter-spacing:1px;'>
+                <div style='color:{accent}; font-weight:600; margin-bottom:6px; font-size:0.85rem;'>
                     📊 {label}
                 </div>
-                <div style='font-size:0.9rem;'>{evidence_html}</div>
+                <div style='font-size:0.85rem;'>{evidence_html}</div>
             </div>
             <div>
-                <div style='color:{accent}; font-weight:bold; margin-bottom:8px; font-size:0.85rem; letter-spacing:1px;'>
+                <div style='color:{accent}; font-weight:600; margin-bottom:6px; font-size:0.85rem;'>
                     💡 ACCIONES
                 </div>
-                <div style='font-size:0.9rem;'>{reco_html}</div>
+                <div style='font-size:0.85rem;'>{reco_html}</div>
             </div>
         </div>
     </div>
@@ -275,48 +268,47 @@ def render_overload_alert(flag_type: str, exercise: str, severity: int,
 
 def render_overload_summary(total_score: int, primary_cause: str, n_flags: int):
     """
-    Renderiza el resumen de sobrecarga con estilo neon.
+    Renderiza el resumen de sobrecarga con estilo sutil.
     """
-    # Determinar nivel y colores
+    # Determinar nivel y colores (tonos más suaves)
     if total_score >= 60:
         level = "CRÍTICO"
-        accent = "#FF0000"
+        accent = "#E05555"
         emoji = "🚨"
         msg = "Sistema nervioso sobrecargado. Readiness limitado a 45 máx."
     elif total_score >= 45:
         level = "MODERADO"
-        accent = "#FF4500"
+        accent = "#E07040"
         emoji = "⚠️"
         msg = "Acumulación de fatiga neural. Readiness limitado a 55 máx."
     elif total_score >= 30:
         level = "ALERTA"
-        accent = "#FFB81C"
+        accent = "#D4A030"
         emoji = "💡"
         msg = "Señales tempranas de fatiga. Readiness limitado a 65 máx."
     else:
         level = "BAJO"
-        accent = "#00FF00"
+        accent = "#50B050"
         emoji = "✅"
         msg = "Sin señales significativas de sobrecarga."
     
     summary_style = (
-        "border-radius: 12px; "
-        "padding: 16px 24px; "
-        "margin-bottom: 20px; "
-        "background: linear-gradient(90deg, rgba(20,20,30,0.9) 0%, rgba(40,20,20,0.8) 100%); "
-        f"border-left: 4px solid {accent}; "
-        f"box-shadow: 0 0 20px {accent}40; "
+        "border-radius: 10px; "
+        "padding: 14px 20px; "
+        "margin-bottom: 16px; "
+        "background: rgba(30,25,30,0.85); "
+        f"border-left: 3px solid {accent}; "
+        "box-shadow: 0 2px 6px rgba(0,0,0,0.25); "
         "display: flex; "
         "justify-content: space-between; "
         "align-items: center;"
     )
     
     score_style = (
-        "font-size: 2rem; "
-        "font-weight: 900; "
+        "font-size: 1.6rem; "
+        "font-weight: 700; "
         f"color: {accent}; "
-        f"text-shadow: 0 0 20px {accent}, 0 0 40px {accent}80; "
-        "font-family: 'Courier New', monospace;"
+        "font-family: inherit;"
     )
     
     cause_map = {
@@ -330,11 +322,11 @@ def render_overload_summary(total_score: int, primary_cause: str, n_flags: int):
     html = f"""
     <div style='{summary_style}'>
         <div>
-            <div style='font-size:1.2rem; font-weight:bold; color:{accent}; margin-bottom:4px;'>
+            <div style='font-size:1.1rem; font-weight:600; color:{accent}; margin-bottom:4px;'>
                 {emoji} SOBRECARGA {level}
             </div>
-            <div style='color:#aaa; font-size:0.9rem;'>{msg}</div>
-            <div style='color:#888; font-size:0.8rem; margin-top:4px;'>
+            <div style='color:#b0b0b0; font-size:0.85rem;'>{msg}</div>
+            <div style='color:#909090; font-size:0.8rem; margin-top:4px;'>
                 Causa: {cause_label} | {n_flags} ejercicio(s) afectado(s)
             </div>
         </div>
