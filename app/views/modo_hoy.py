@@ -14,7 +14,7 @@ from ui.helpers import (
     get_sleep_hours_level, get_sleep_quality_level,
     get_fatigue_level, get_stress_level, get_soreness_level,
     get_energy_level, get_perceived_level,
-    render_overload_alert, render_overload_summary
+    render_neural_fatigue_section
 )
 from data.loaders import load_user_profile, save_mood_to_csv, load_neural_overload_flags
 from calculations.readiness import (
@@ -731,25 +731,10 @@ def render_modo_hoy(df_daily: pd.DataFrame):
             overload_data = load_neural_overload_flags()
             if overload_data.get('flags') and len(overload_data['flags']) > 0:
                 st.markdown("---")
-                render_section_title("🧠 Fatiga Neural Detectada", accent="#FF4500")
+                render_section_title("🧠 Fatiga Neural Detectada", accent="#E07040")
                 
-                summary = overload_data.get('summary', {})
-                total_score = summary.get('total_overload_score', 0)
-                primary_cause = summary.get('primary_cause', 'UNKNOWN')
-                n_flags = summary.get('n_flags_detected', len(overload_data['flags']))
-                
-                # Mostrar resumen con estilo neon
-                render_overload_summary(total_score, primary_cause, n_flags)
-                
-                # Mostrar flags individuales por ejercicio con estilo gaming
-                for flag in overload_data['flags']:
-                    render_overload_alert(
-                        flag_type=flag.get('flag_type', ''),
-                        exercise=flag.get('exercise', ''),
-                        severity=flag.get('severity', 0),
-                        evidence=flag.get('evidence', {}),
-                        recommendations=flag.get('recommendations', [])
-                    )
+                # Renderizar sección completa con nuevo diseño premium
+                render_neural_fatigue_section(overload_data)
         
         # Save option (both modes now show full output)
         if not quick_mode:
