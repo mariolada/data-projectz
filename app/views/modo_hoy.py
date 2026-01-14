@@ -14,7 +14,8 @@ from ui.helpers import (
     get_sleep_hours_level, get_sleep_quality_level,
     get_fatigue_level, get_stress_level, get_soreness_level,
     get_energy_level, get_perceived_level,
-    render_neural_fatigue_section
+    render_neural_fatigue_section,
+    render_consejos_section
 )
 from data.loaders import load_user_profile, save_mood_to_csv, load_neural_overload_flags
 from calculations.readiness import (
@@ -699,33 +700,19 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                     for factor in injury_risk['factors']:
                         st.write(f"• {factor}")
             
-            # Advice Cards (compact UI)
+            # Advice Cards (nuevo diseño premium)
             st.markdown("---")
             render_section_title("Consejos de hoy", accent="#FFB81C")
 
-            col_a, col_b = st.columns(2)
-
-            with col_a:
-                fatigue_lines = [
-                    f"Diagnóstico: {fatigue_analysis['reason']}",
-                    f"Split recomendado: {fatigue_analysis['target_split'].upper()}",
-                ]
-                if 'intensity_hint' in fatigue_analysis:
-                    fatigue_lines.append(f"Intensidad sugerida: {fatigue_analysis['intensity_hint']}")
-                fatigue_lines.append("Acciones específicas:")
-                fatigue_lines.extend(fatigue_analysis.get('recommendations', []))
-                render_card(
-                    f"Tipo de Fatiga: {fatigue_analysis['type'].upper()}",
-                    fatigue_lines,
-                    accent="#FFB81C"
-                )
-
-            with col_b:
-                plan_clean = [s for s in (clean_line(p) for p in plan) if s]
-                render_card("Plan accionable", plan_clean, accent="#FFB81C")
-
-            rules_clean = [s for s in (clean_line(r) for r in rules) if s]
-            render_card("Reglas de hoy", rules_clean, accent="#FF6B6B")
+            # Nueva sección unificada con Summary Strip + Cards + Checklist
+            render_consejos_section(
+                fatigue_analysis=fatigue_analysis,
+                zone_display=zone_display,
+                plan=plan,
+                rules=rules,
+                sleep_h=sleep_h,
+                stress=stress
+            )
             
             # === ALERTAS DE SOBRECARGA NEUROMUSCULAR ===
             overload_data = load_neural_overload_flags()

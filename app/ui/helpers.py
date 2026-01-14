@@ -519,3 +519,429 @@ def clean_line(s: str) -> str:
     # remove bold markers
     s = s.replace("**", "")
     return s
+
+
+# =============================================================================
+# CONSEJOS DE HOY - Nuevo Sistema de Componentes Premium
+# =============================================================================
+
+def _get_zone_color(zone: str) -> dict:
+    """Retorna colores según la zona de readiness."""
+    zone_lower = zone.lower()
+    if 'alta' in zone_lower or 'high' in zone_lower or '🟢' in zone:
+        return {'accent': '#50C878', 'bg': 'rgba(80,200,120,0.08)', 'label': 'ALTA'}
+    elif 'media' in zone_lower or 'medium' in zone_lower or '🟡' in zone:
+        return {'accent': '#E0A040', 'bg': 'rgba(224,160,64,0.08)', 'label': 'MEDIA'}
+    else:
+        return {'accent': '#E05555', 'bg': 'rgba(224,85,85,0.08)', 'label': 'BAJA'}
+
+
+def _get_fatigue_color(fatigue_type: str) -> dict:
+    """Retorna colores según el tipo de fatiga."""
+    ftype = fatigue_type.lower()
+    if ftype == 'fresh':
+        return {'accent': '#50C878', 'bg': 'rgba(80,200,120,0.10)', 'emoji': '✨'}
+    elif ftype == 'central':
+        return {'accent': '#E07040', 'bg': 'rgba(224,112,64,0.08)', 'emoji': '🧠'}
+    elif ftype == 'peripheral':
+        return {'accent': '#D4A030', 'bg': 'rgba(212,160,48,0.08)', 'emoji': '💪'}
+    elif ftype == 'mixed':
+        return {'accent': '#E05555', 'bg': 'rgba(224,85,85,0.08)', 'emoji': '⚠️'}
+    elif ftype == 'fatigued':
+        return {'accent': '#E07040', 'bg': 'rgba(224,112,64,0.08)', 'emoji': '😴'}
+    else:
+        return {'accent': '#888888', 'bg': 'rgba(136,136,136,0.08)', 'emoji': '❓'}
+
+
+def render_consejos_summary_strip(fatigue_type: str, zone_display: str, 
+                                   target_split: str, intensity_hint: str,
+                                   volume: str, diagnosis_short: str):
+    """
+    Renderiza la Summary Strip horizontal con badges/chips.
+    Es lo primero que ve el usuario - estado en 2 segundos.
+    """
+    fatigue_colors = _get_fatigue_color(fatigue_type)
+    zone_colors = _get_zone_color(zone_display)
+    
+    # Extraer RIR del intensity_hint (ej: "RIR 2–3" de "Normal: RIR 2–3")
+    rir_match = intensity_hint if 'RIR' in intensity_hint else 'RIR 2-3'
+    if ':' in rir_match:
+        rir_match = rir_match.split(':')[-1].strip()
+    
+    # Construir chips
+    chips = [
+        {'label': fatigue_type.upper(), 'color': fatigue_colors['accent'], 'bg': fatigue_colors['bg'], 'primary': True},
+        {'label': f"ZONA: {zone_colors['label']}", 'color': zone_colors['accent'], 'bg': zone_colors['bg']},
+        {'label': f"SPLIT: {target_split.upper()}", 'color': '#80A0C0', 'bg': 'rgba(128,160,192,0.08)'},
+        {'label': rir_match.upper(), 'color': '#A080C0', 'bg': 'rgba(160,128,192,0.08)'},
+        {'label': f"VOL: {volume.upper() if len(volume) < 15 else 'ESTÁNDAR'}", 'color': '#80C0A0', 'bg': 'rgba(128,192,160,0.08)'},
+    ]
+    
+    chips_html = ""
+    for chip in chips:
+        primary_style = "font-weight:700;font-size:0.85rem;" if chip.get('primary') else "font-weight:500;font-size:0.78rem;"
+        chips_html += (
+            f'<span style="display:inline-flex;align-items:center;padding:6px 14px;'
+            f'background:{chip["bg"]};border:1px solid {chip["color"]}50;border-radius:6px;'
+            f'color:{chip["color"]};{primary_style}margin-right:8px;margin-bottom:6px;">'
+            f'{chip["label"]}'
+            f'</span>'
+        )
+    
+    html = (
+        f'<div style="background:linear-gradient(135deg,rgba(22,22,28,0.95),rgba(28,26,32,0.90));'
+        f'border-radius:12px;padding:16px 20px;margin-bottom:20px;'
+        f'border-left:3px solid {fatigue_colors["accent"]};box-shadow:0 2px 12px rgba(0,0,0,0.3);">'
+        
+        # Chips row
+        f'<div style="display:flex;flex-wrap:wrap;align-items:center;margin-bottom:10px;">'
+        f'{chips_html}'
+        f'</div>'
+        
+        # Diagnosis line
+        f'<div style="color:#a0a0a0;font-size:0.85rem;padding-left:2px;">'
+        f'<span style="color:{fatigue_colors["accent"]};margin-right:6px;">—</span>'
+        f'{diagnosis_short}'
+        f'</div>'
+        
+        f'</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_card_diagnostico(fatigue_type: str, diagnosis: str, recommendations: list, 
+                             intensity_hint: str = None):
+    """
+    Card 1: Diagnóstico - ¿Qué me pasa y por qué?
+    Incluye tipo de fatiga, razón y acciones específicas.
+    """
+    colors = _get_fatigue_color(fatigue_type)
+    
+    # Limpiar recomendaciones
+    clean_recs = []
+    for rec in recommendations[:4]:
+        r = str(rec).strip()
+        if r.startswith('- ') or r.startswith('• '):
+            r = r[2:]
+        clean_recs.append(r)
+    
+    # Construir acciones HTML
+    actions_html = ""
+    for i, action in enumerate(clean_recs):
+        is_primary = (i == 0)
+        bullet = '▸' if is_primary else '·'
+        text_color = '#e0e0e0' if is_primary else '#b0b0b0'
+        actions_html += (
+            f'<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;">'
+            f'<span style="color:{colors["accent"]};font-size:0.9rem;">{bullet}</span>'
+            f'<span style="color:{text_color};font-size:0.85rem;line-height:1.5;">{action}</span>'
+            f'</div>'
+        )
+    
+    # Hint de intensidad si existe
+    intensity_html = ""
+    if intensity_hint:
+        intensity_html = (
+            f'<div style="margin-top:12px;padding:8px 12px;background:rgba(255,255,255,0.03);'
+            f'border-radius:6px;border-left:2px solid {colors["accent"]}50;">'
+            f'<span style="color:#888;font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;">Intensidad sugerida</span>'
+            f'<div style="color:#c0c0c0;font-size:0.85rem;margin-top:4px;">{intensity_hint}</div>'
+            f'</div>'
+        )
+    
+    html = (
+        f'<div style="background:linear-gradient(180deg,rgba(26,24,30,0.95),rgba(22,20,26,0.98));'
+        f'border-radius:12px;border-left:3px solid {colors["accent"]};overflow:hidden;'
+        f'box-shadow:0 2px 10px rgba(0,0,0,0.25);height:100%;">'
+        
+        # Header
+        f'<div style="padding:16px 18px;background:rgba(255,255,255,0.02);'
+        f'border-bottom:1px solid rgba(255,255,255,0.04);">'
+        f'<div style="display:flex;align-items:center;justify-content:space-between;">'
+        f'<div style="display:flex;align-items:center;gap:10px;">'
+        f'<span style="font-size:1.2rem;">{colors["emoji"]}</span>'
+        f'<span style="font-size:0.95rem;font-weight:600;color:#e0e0e0;">Diagnóstico</span>'
+        f'</div>'
+        f'<span style="padding:4px 10px;border-radius:5px;background:{colors["bg"]};'
+        f'border:1px solid {colors["accent"]}40;color:{colors["accent"]};'
+        f'font-size:0.75rem;font-weight:600;">{fatigue_type.upper()}</span>'
+        f'</div>'
+        f'</div>'
+        
+        # Body
+        f'<div style="padding:16px 18px;">'
+        
+        # Diagnosis text
+        f'<div style="color:#909090;font-size:0.8rem;margin-bottom:14px;line-height:1.5;">{diagnosis}</div>'
+        
+        # Actions section
+        f'<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1.5px;'
+        f'color:#666;margin-bottom:10px;font-weight:600;">Acciones específicas</div>'
+        f'{actions_html}'
+        
+        f'{intensity_html}'
+        
+        f'</div>'
+        f'</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_card_plan_ejecucion(zone_display: str, reco_base: str, intensity: str, 
+                                volume: str, target_split: str, extras: list = None):
+    """
+    Card 2: Plan de Ejecución - ¿Qué hago exactamente?
+    Formato de bloques en 2 columnas: Qué (zona/split) | Cómo (intensidad/volumen).
+    """
+    zone_colors = _get_zone_color(zone_display)
+    
+    # Limpiar zona display (quitar emoji si ya está)
+    zone_label = zone_colors['label']
+    
+    # Extras (pain, stiffness, etc)
+    extras_html = ""
+    if extras:
+        for extra in extras[:3]:
+            extras_html += (
+                f'<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;'
+                f'padding:6px 10px;background:rgba(255,255,255,0.02);border-radius:6px;">'
+                f'<span style="color:#c0c0c0;font-size:0.82rem;line-height:1.4;">{extra}</span>'
+                f'</div>'
+            )
+    
+    html = (
+        f'<div style="background:linear-gradient(180deg,rgba(26,24,30,0.95),rgba(22,20,26,0.98));'
+        f'border-radius:12px;border-left:3px solid {zone_colors["accent"]};overflow:hidden;'
+        f'box-shadow:0 2px 10px rgba(0,0,0,0.25);height:100%;">'
+        
+        # Header
+        f'<div style="padding:16px 18px;background:rgba(255,255,255,0.02);'
+        f'border-bottom:1px solid rgba(255,255,255,0.04);">'
+        f'<div style="display:flex;align-items:center;gap:10px;">'
+        f'<span style="font-size:1.2rem;">📋</span>'
+        f'<span style="font-size:0.95rem;font-weight:600;color:#e0e0e0;">Plan de Ejecución</span>'
+        f'</div>'
+        f'</div>'
+        
+        # Body - 2 columns grid
+        f'<div style="padding:16px 18px;">'
+        
+        f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">'
+        
+        # Column 1: QUÉ
+        f'<div>'
+        f'<div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:1.5px;'
+        f'color:#555;margin-bottom:10px;font-weight:600;">Qué</div>'
+        
+        # Zona
+        f'<div style="margin-bottom:12px;">'
+        f'<div style="color:#777;font-size:0.75rem;margin-bottom:4px;">Zona</div>'
+        f'<span style="display:inline-block;padding:5px 12px;border-radius:6px;'
+        f'background:{zone_colors["bg"]};border:1px solid {zone_colors["accent"]}50;'
+        f'color:{zone_colors["accent"]};font-size:0.85rem;font-weight:600;">{zone_label}</span>'
+        f'</div>'
+        
+        # Split
+        f'<div>'
+        f'<div style="color:#777;font-size:0.75rem;margin-bottom:4px;">Split</div>'
+        f'<span style="display:inline-block;padding:5px 12px;border-radius:6px;'
+        f'background:rgba(128,160,192,0.08);border:1px solid rgba(128,160,192,0.4);'
+        f'color:#80A0C0;font-size:0.85rem;font-weight:600;">{target_split.upper()}</span>'
+        f'</div>'
+        
+        f'</div>'
+        
+        # Column 2: CÓMO
+        f'<div>'
+        f'<div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:1.5px;'
+        f'color:#555;margin-bottom:10px;font-weight:600;">Cómo</div>'
+        
+        # Intensidad
+        f'<div style="margin-bottom:12px;">'
+        f'<div style="color:#777;font-size:0.75rem;margin-bottom:4px;">Intensidad</div>'
+        f'<span style="color:#c0c0c0;font-size:0.85rem;">{intensity}</span>'
+        f'</div>'
+        
+        # Volumen
+        f'<div>'
+        f'<div style="color:#777;font-size:0.75rem;margin-bottom:4px;">Volumen</div>'
+        f'<span style="color:#c0c0c0;font-size:0.85rem;">{volume}</span>'
+        f'</div>'
+        
+        f'</div>'
+        
+        f'</div>'  # End grid
+        
+        # Recomendación base
+        f'<div style="padding:10px 12px;background:rgba(255,255,255,0.02);border-radius:8px;'
+        f'border-left:2px solid {zone_colors["accent"]}60;margin-bottom:12px;">'
+        f'<span style="color:#a0a0a0;font-size:0.82rem;">{reco_base}</span>'
+        f'</div>'
+        
+        # Extras (pain, stiffness, etc)
+        f'{extras_html}'
+        
+        f'</div>'
+        f'</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_reglas_checklist(rules: list, title: str = "Reglas de hoy"):
+    """
+    Renderiza las reglas como checklist operativo compacto.
+    Formato de checks antes de entrenar.
+    """
+    # Categorizar reglas por tipo
+    obligatorias = []
+    recomendadas = []
+    advertencias = []
+    
+    for rule in rules:
+        r = str(rule).strip()
+        if r.startswith('❌') or 'NO ' in r.upper() or 'STOP' in r.upper():
+            obligatorias.append(r)
+        elif r.startswith('⚠️'):
+            advertencias.append(r)
+        else:
+            recomendadas.append(r)
+    
+    # Limpiar emojis iniciales para uniformidad
+    def clean_rule(r):
+        for prefix in ['✅ ', '❌ ', '⚠️ ', '🧊 ', '🔥 ']:
+            if r.startswith(prefix):
+                return r[len(prefix):]
+        return r
+    
+    def render_rule_item(rule, icon, color):
+        cleaned = clean_rule(rule)
+        return (
+            f'<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;'
+            f'padding:8px 12px;background:rgba(255,255,255,0.02);border-radius:8px;'
+            f'border:1px solid rgba(255,255,255,0.03);">'
+            f'<span style="color:{color};font-size:1rem;flex-shrink:0;">{icon}</span>'
+            f'<span style="color:#c0c0c0;font-size:0.85rem;line-height:1.5;">{cleaned}</span>'
+            f'</div>'
+        )
+    
+    rules_html = ""
+    
+    # Obligatorias primero (rojas)
+    for rule in obligatorias:
+        rules_html += render_rule_item(rule, '⛔', '#E05555')
+    
+    # Advertencias
+    for rule in advertencias:
+        rules_html += render_rule_item(rule, '⚠️', '#E0A040')
+    
+    # Recomendadas
+    for rule in recomendadas:
+        rules_html += render_rule_item(rule, '✓', '#50C878')
+    
+    n_rules = len(rules)
+    
+    html = (
+        f'<div style="background:linear-gradient(180deg,rgba(26,24,30,0.95),rgba(22,20,26,0.98));'
+        f'border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.25);'
+        f'border:1px solid rgba(255,255,255,0.04);">'
+        
+        # Header
+        f'<div style="padding:14px 18px;background:rgba(255,255,255,0.02);'
+        f'border-bottom:1px solid rgba(255,255,255,0.04);'
+        f'display:flex;justify-content:space-between;align-items:center;">'
+        f'<div style="display:flex;align-items:center;gap:10px;">'
+        f'<span style="font-size:1.1rem;">📝</span>'
+        f'<span style="font-size:0.95rem;font-weight:600;color:#e0e0e0;">{title}</span>'
+        f'</div>'
+        f'<span style="color:#666;font-size:0.75rem;">{n_rules} checks antes de entrenar</span>'
+        f'</div>'
+        
+        # Body
+        f'<div style="padding:14px 16px;">'
+        f'{rules_html}'
+        f'</div>'
+        
+        f'</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_consejos_section(fatigue_analysis: dict, zone_display: str, plan: list, rules: list,
+                            sleep_h: float = 0, stress: int = 0):
+    """
+    Función principal que orquesta toda la sección "Consejos de hoy".
+    Reemplaza el bloque antiguo con el nuevo diseño.
+    
+    Args:
+        fatigue_analysis: Dict del motor de personalización
+        zone_display: Zona de readiness (ej: "🟡 MEDIA")
+        plan: Lista de líneas del plan accionable
+        rules: Lista de reglas de hoy
+        sleep_h: Horas de sueño (para diagnosis short)
+        stress: Nivel de estrés (para diagnosis short)
+    """
+    # Extraer datos del fatigue_analysis
+    fatigue_type = fatigue_analysis.get('type', 'unknown')
+    diagnosis = fatigue_analysis.get('reason', '')
+    target_split = fatigue_analysis.get('target_split', 'full')
+    intensity_hint = fatigue_analysis.get('intensity_hint', 'RIR 2-3')
+    recommendations = fatigue_analysis.get('recommendations', [])
+    
+    # Parsear plan para extraer zona, intensidad, volumen
+    reco_base = "Mantén técnica impecable"
+    volume = "Estándar"
+    intensity = "RIR 2-3"
+    extras = []
+    
+    for line in plan:
+        line_clean = clean_line(line)
+        if 'Recomendación base' in line_clean:
+            reco_base = line_clean.replace('Recomendación base:', '').strip()
+        elif 'Volumen' in line_clean:
+            volume = line_clean.replace('Volumen:', '').strip()
+        elif 'Intensidad' in line_clean and 'RIR' in line_clean:
+            intensity = line_clean.replace('Intensidad:', '').strip()
+        elif 'Dolor detectado' in line_clean or 'Evita hoy' in line_clean or 'Puedes hacer' in line_clean:
+            extras.append(line_clean)
+        elif 'Rigidez' in line_clean:
+            extras.append(line_clean)
+    
+    # Construir diagnosis short
+    diagnosis_short = f"Bien descansado ({sleep_h}h, estrés {stress}/10)" if fatigue_type == 'fresh' else diagnosis
+    if len(diagnosis_short) > 80:
+        diagnosis_short = diagnosis_short[:77] + "..."
+    
+    # 1. Summary Strip
+    render_consejos_summary_strip(
+        fatigue_type=fatigue_type,
+        zone_display=zone_display,
+        target_split=target_split,
+        intensity_hint=intensity_hint,
+        volume=volume,
+        diagnosis_short=diagnosis_short
+    )
+    
+    # 2. Two cards side by side
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        render_card_diagnostico(
+            fatigue_type=fatigue_type,
+            diagnosis=diagnosis,
+            recommendations=recommendations,
+            intensity_hint=intensity_hint
+        )
+    
+    with col2:
+        render_card_plan_ejecucion(
+            zone_display=zone_display,
+            reco_base=reco_base,
+            intensity=intensity,
+            volume=volume,
+            target_split=target_split,
+            extras=extras if extras else None
+        )
+    
+    # 3. Reglas checklist (full width, más compacto)
+    st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
+    render_reglas_checklist(rules)
