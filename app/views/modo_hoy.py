@@ -27,7 +27,7 @@ from ui.helpers import (
 )
 from data.loaders import load_user_profile, save_mood_to_csv, load_neural_overload_flags
 from calculations.readiness import (
-    calculate_readiness_from_inputs_v2,
+    calculate_readiness_from_inputs_v3_compat,  # v3 ahora es el algoritmo principal (NASA)
     generate_personalized_insights,
     get_readiness_zone,
     generate_actionable_plan_v2,
@@ -959,7 +959,6 @@ def render_modo_hoy(df_daily: pd.DataFrame):
             user_profile = load_user_profile()
             adjustment_factors = user_profile.get('adjustment_factors', {})
             sleep_resp = user_profile.get('sleep_responsiveness', {})
-            
             # Si no hay adjustment_factors, usar defaults
             if not adjustment_factors:
                 adjustment_factors = {
@@ -968,14 +967,14 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                     'stress_sensitivity': 1.0,
                     'sleep_responsive': sleep_resp.get('sleep_responsive', True)
                 }
-            
-            # Calculate readiness with context
-            readiness_instant, readiness_breakdown = calculate_readiness_from_inputs_v2(
+            # Usar readiness v3 (wrapper compatible)
+            readiness_instant, readiness_breakdown = calculate_readiness_from_inputs_v3_compat(
                 sleep_h, sleep_q, fatigue, soreness, stress, motivation, pain_flag,
                 nap_mins, sleep_disruptions, energy, stiffness, caffeine, alcohol, sick_level,
                 perceived_readiness=perceived_readiness,
                 baselines=baselines,
-                adjustment_factors=adjustment_factors
+                adjustment_factors=adjustment_factors,
+                df_daily=df_daily
             )
             
             # DEBUG: Mostrar breakdown detallado

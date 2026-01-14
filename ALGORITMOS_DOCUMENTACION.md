@@ -560,7 +560,7 @@ class AdvancedConfig(OverloadConfig):  # Para atletas avanzados
 
 **Por qué diferente para avanzados**:
 - Progresan más lento (mantener carga es normal, no señal de problema)
-- Mayor sensibilidad a fatiga neural (años de entrenamiento acumulado)
+- Mayor sensibilidad a fatiga neural (años de entrenamiento acumululado)
 - Señales "finas" son más relevantes (pequeñas caídas importan más)
 
 ### Clasificación Automática de Nivel
@@ -725,6 +725,262 @@ Readiness 79 + No overload + ACWR 1.1 (ok)
 - Requiere ~14+ días de datos para personalización efectiva
 - Los baselines de sueño asumen consistencia (shift workers pueden tener ruido)
 - El neural overload detector funciona mejor con datos de ejercicios principales (no accesorios)
+
+---
+
+## 5. READINESS v3 "NASA"
+
+### 📍 Ubicación: `app/calculations/readiness_v3.py` → `calculate_readiness_from_inputs_v3()`
+
+### Concepto
+
+Readiness v3 es una evolución del algoritmo v2 con las siguientes mejoras:
+
+1. **Curvas sigmoides** en lugar de lineales (transiciones suaves)
+2. **Confidence score** según datos disponibles
+3. **Consistency bonus** por estabilidad en los últimos 7 días
+4. **Momentum bonus** por tendencia positiva
+5. **Penalizaciones proporcionales** (no fijas)
+6. **Explicaciones humanas** del score
+
+### Funciones de Curvas
+
+```python
+# Sigmoid: transición suave centrada
+sigmoid(x, center=0.5, steepness=10.0)
+#   Retorna 0→1 con curva S centrada en 'center'
+
+# Smoothstep: interpolación Hermite
+smoothstep(x, edge0=0.0, edge1=1.0) = 3t² - 2t³
+#   Transición ultra suave entre edge0 y edge1
+
+# Smootherstep: aún más suave
+smootherstep(x) = 6t⁵ - 15t⁴ + 10t³
+
+# Soft clip: recorte gradual (no abrupto)
+soft_clip(x, lo, hi, softness=0.1)
+#   Usa tanh para suavizar en los bordes
+
+# Saturating curve: sube rápido, luego satura
+saturating_curve(x, saturation_point=0.8) = 1 - e^(-kx)
+#   90% del máximo en saturation_point
+```
+
+### Arquitectura v3
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                    CORE READINESS (80%)                     │
+│                                                             │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐        │
+│  │ Sueño   │  │ Estado  │  │Percepción│  │Motivación│       │
+│  │  32%    │  │  36%    │  │   18%   │  │   14%   │        │
+│  │(curvas) │  │(sigmoid)│  │(smooth) │  │(satur.) │        │
+│  └────┬────┘  └────┬────┘  └────┬────┘  └────┬────┘        │
+│       │            │            │            │              │
+│       └────────────┴─────┬──────┴────────────┘              │
+│                          ▼                                  │
+│                   SCORE BASE                                │
+└────────────────────────────┬───────────────────────────────┘
+                             │
+┌────────────────────────────┴───────────────────────────────┐
+│                   MODIFIERS (+0-8%)                         │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐                        │
+│  │ Consistency  │  │   Momentum   │                        │
+│  │   0-6 pts    │  │   0-3 pts    │                        │
+│  └──────────────┘  └──────────────┘                        │
+└────────────────────────────┬───────────────────────────────┘
+                             │
+┌────────────────────────────┴───────────────────────────────┐
+│                 PENALIZACIONES (suaves)                     │
+│                                                             │
+│  Pain: 0-20% (proporcional a contexto)                     │
+│  Sick: 0-40% (curva sigmoid, no escalones)                 │
+│  Alcohol: 0-15% (según impacto en sueño)                   │
+│  Sleep disruption: 0-8%                                    │
+│  Caffeine mask: 0-3% (solo si cafeína+fatiga altas)        │
+└────────────────────────────────────────────────────────────┘
+```
+
+### Scoring por Componente
+
+#### Sueño (32%)
+
+```python
+# Centrado en tu baseline personal (o 7h fallback)
+# Asimétrico: penaliza más dormir menos que dormir más
+
+if hours < center:
+    score = smootherstep(normalized, -0.2, 0.6) * 0.85
+else:
+    score = 0.85 + saturating_curve(bonus) * 0.15
+```
+
+| Horas vs Baseline | Score Aprox |
+|-------------------|-------------|
+| +1h o más | 0.95-1.0 |
+| +0 a +1h | 0.85-0.95 |
+| -0.5h a 0 | 0.75-0.85 |
+| -1.5h | 0.55-0.65 |
+| -2h o más | 0.30-0.50 |
+
+#### Fatiga/Estrés (con sigmoid)
+
+```python
+# Sigmoid centrada en 0.6 (fatiga 6/10 es el punto crítico)
+raw_score = 1.0 - sigmoid(fatigue/10, center=0.60, steepness=6.0)
+
+# Fatiga 0-2 siempre da score alto (≥0.92)
+```
+
+| Fatiga | Score |
+|--------|-------|
+| 0-2 | 0.92-1.0 |
+| 3-4 | 0.78-0.88 |
+| 5-6 | 0.55-0.70 |
+| 7-8 | 0.30-0.45 |
+| 9-10 | 0.15-0.25 |
+
+#### Energía (saturating curve)
+
+```python
+# Sube rápido de 0-6, luego satura
+score = saturating_curve(energy/10, saturation_point=0.65)
+
+# Boost para energía ≥7
+if energy >= 7:
+    score += (energy/10 - 0.7) * 0.25
+```
+
+#### Motivación (saturante)
+
+```python
+# Motivación 6 ya es "suficiente" (satura en 0.6)
+score = saturating_curve(motivation/10, saturation_point=0.6)
+```
+
+**Justificación**: Motivación 10 no debe "salvar" un día con mal sueño y alta fatiga.
+
+### Confidence Score
+
+```python
+def calculate_confidence(df_daily, inputs):
+    # 60% basado en días de histórico
+    if days >= 28: days_score = 0.95
+    elif days >= 14: days_score = 0.70
+    elif days >= 7: days_score = 0.45
+    else: days_score = 0.20
+    
+    # 40% basado en completitud de inputs
+    completeness = inputs_presentes / inputs_clave
+    
+    score = days_score * 0.60 + completeness * 0.40
+```
+
+| Días | Confidence | Nivel |
+|------|------------|-------|
+| <7 | 0.25-0.45 | low |
+| 7-14 | 0.45-0.65 | medium |
+| 14-28 | 0.65-0.85 | medium-high |
+| ≥28 | 0.85-0.97 | high |
+
+**Uso del Confidence**:
+- `confidence_mod = 0.5 + confidence_score * 0.5` (rango 0.5-1.0)
+- Penalizaciones se multiplican por `confidence_mod`
+- Si confidence es baja, el sistema es más conservador
+
+### Consistency Bonus
+
+```python
+# Bonus por estabilidad en últimos 7 días (máx +6 pts)
+
+# Sueño estable (std < 0.5h): +2 pts
+# Fatiga controlada (0 días >7): +2 pts
+# Readiness sin dientes de sierra (std < 8): +2 pts
+```
+
+**Filosofía**: Premia hábitos buenos, pero NO castiga inconsistencia (solo no da bonus).
+
+### Momentum Bonus
+
+```python
+# Bonus por tendencia positiva (máx +3 pts)
+
+# Performance Index mejorando: +2 pts
+# Readiness subiendo vs semana anterior: +1 pt
+```
+
+### Penalizaciones v3 (proporcionales)
+
+#### Pain (0-20%)
+
+```python
+base_penalty = 0.08  # 8% base si hay dolor
+
+# Agravantes:
+if soreness > 6: +30%
+if stiffness > 5: +20%
+if zona crítica (espalda/hombro/rodilla): +25%
+
+# Cap máximo: 20%
+```
+
+#### Sick (curva sigmoid)
+
+```python
+# En vez de escalones {1: 5%, 2: 8%, 3: 15%...}
+penalty = sigmoid(sick_level/5, center=0.35, steepness=6.0) * 0.40
+```
+
+| Sick Level | Penalización |
+|------------|--------------|
+| 1 | ~5% |
+| 2 | ~12% |
+| 3 | ~22% |
+| 4 | ~32% |
+| 5 | ~38% |
+
+### Output de v3
+
+```python
+{
+    'readiness_score': 79,  # 0-100
+    'readiness_0_1': 0.79,
+    'confidence': 'high',
+    'confidence_score': 0.92,
+    'components': {
+        'sleep': 25.0,
+        'state': 30.0,
+        'perceived': 16.0,
+        'motivation': 13.0,
+        'bonuses': 6.0,
+        'penalties': -3.0
+    },
+    'explanations': [
+        "Sueño: +25 pts (7.0h cerca de tu mediana, cal normal)",
+        "Estado: +30 pts (energía buena, fatiga normal, estrés normal)",
+        "Percepción: +16 pts (bien)",
+        "Motivación: +13 pts (alta)",
+        "Consistencia: +6 pts (sueño estable, fatiga controlada)",
+        "Confidence: high (30 días de datos)"
+    ],
+    'debug': {...}
+}
+```
+
+### Comparativa v2 vs v3
+
+| Aspecto | v2 | v3 |
+|---------|----|----|
+| Transiciones | Lineales | Sigmoides/smooth |
+| Pain penalty | -15 fijo | 8-20% proporcional |
+| Sick penalty | Escalones | Curva continua |
+| Baseline aware | Parcial | Completo con confidence |
+| Bonus estabilidad | No | +0-6 pts |
+| Bonus momentum | No | +0-3 pts |
+| Explicaciones | Ninguna | 4-6 strings |
+| Punitivo | Moderado | Mínimo |
 
 ---
 

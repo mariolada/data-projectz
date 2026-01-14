@@ -579,3 +579,5 @@ def generate_actionable_plan_v2(
         rules.append("✅ Reduce tempo (más lento = menos estrés CNS)")
     
     return zone_display, plan, rules
+
+from .readiness_v3 import calculate_readiness_from_inputs_v3_compat

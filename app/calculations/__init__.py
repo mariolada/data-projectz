@@ -15,9 +15,16 @@ from .readiness import (
     get_lift_recommendations
 )
 
+from .readiness_v3 import (
+    calculate_readiness_from_inputs_v3,
+    calculate_readiness_from_inputs_v3_compat,
+)
+
 __all__ = [
     'calculate_readiness_from_inputs',
     'calculate_readiness_from_inputs_v2',
+    'calculate_readiness_from_inputs_v3',
+    'calculate_readiness_from_inputs_v3_compat',
     'generate_personalized_insights',
     'get_readiness_zone',
     'get_days_until_acwr',
