@@ -645,7 +645,10 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                         key="wiz_sick_level"
                     )
                     sick_labels = {1: "Leve", 2: "Leve-Moderado", 3: "Moderado", 4: "Moderado-Grave", 5: "Grave"}
-                    st.caption(f"Estado: {sick_labels[sick_level]}")
+                    if sick_level in sick_labels:
+                        st.caption(f"Estado: {sick_labels[sick_level]}")
+                    else:
+                        st.caption("Estado: Sin malestar")
                     st.markdown(
                         '<div style="color:#E05555;font-size:0.8rem;margin-top:4px;">'
                         '↳ Impacto: -20 a -40 readiness según gravedad</div>',

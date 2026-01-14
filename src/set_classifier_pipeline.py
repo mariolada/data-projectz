@@ -1,4 +1,4 @@
-from src.set_classifier import classify_sets, SetClassifierConfig, get_top_sets_summary
+from set_classifier import classify_sets, SetClassifierConfig, get_top_sets_summary
 
 import pandas as pd
 from pathlib import Path
@@ -10,6 +10,10 @@ def enrich_and_summarize_sets(training: pd.DataFrame, out_dir: str) -> tuple[pd.
     """
     # Clasificación automática de sets
     config = SetClassifierConfig()
+    # Si falta 'load', crearla a partir de 'weight'
+    if 'load' not in training.columns and 'weight' in training.columns:
+        training = training.copy()
+        training['load'] = training['weight']
     classified = classify_sets(training, config)
 
     # Añadir columnas booleanas y métricas agregadas

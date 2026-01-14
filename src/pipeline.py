@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from src.set_classifier_pipeline import enrich_and_summarize_sets
+from set_classifier_pipeline import enrich_and_summarize_sets
 
 
 # ----------------------------
