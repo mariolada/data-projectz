@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from src.set_classifier_pipeline import enrich_and_summarize_sets
 
 
 # ----------------------------
@@ -261,6 +262,9 @@ def run_pipeline(
     training = validate_intensity(training, tol=0.75)
     training = compute_row_metrics(training)
     training = add_weighted_rir_per_day(training)
+
+    # === CLASIFICACIÓN AUTOMÁTICA DE SETS ===
+    sets_processed, exercise_day_summary = enrich_and_summarize_sets(training, out_dir)
 
     # Aggregations
     daily_ex = aggregate_daily_exercise(training)
