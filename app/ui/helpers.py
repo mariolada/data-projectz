@@ -1439,3 +1439,418 @@ def render_readiness_section(readiness: int, emoji: str, baselines: dict,
             action=injury_risk.get('action'),
             factors=injury_risk.get('factors', [])
         )
+
+
+# =============================================================================
+# CUESTIONARIO REDISEÑADO - Wizard + Live Summary
+# =============================================================================
+
+def _get_recovery_status(sleep_h: float, sleep_q: int, disruptions: bool = False) -> dict:
+    """Calcula el estado de recuperación basado en sueño."""
+    score = 0
+    # Horas (0-40 pts)
+    if sleep_h >= 7.5:
+        score += 40
+    elif sleep_h >= 6.5:
+        score += 25
+    elif sleep_h >= 5.5:
+        score += 15
+    else:
+        score += 5
+    
+    # Calidad (0-40 pts)
+    score += (sleep_q - 1) * 10
+    
+    # Disruptions penalty
+    if disruptions:
+        score -= 15
+    
+    score = max(0, min(100, score))
+    
+    if score >= 65:
+        return {'label': 'Buena', 'level': 'ok', 'emoji': '✅', 'score': score}
+    elif score >= 40:
+        return {'label': 'Media', 'level': 'mid', 'emoji': '🟡', 'score': score}
+    else:
+        return {'label': 'Mala', 'level': 'low', 'emoji': '🔴', 'score': score}
+
+
+def _get_state_status(perceived: int, fatigue: int, stress: int, energy: int = None) -> dict:
+    """Calcula el estado general basado en sensaciones."""
+    # Perceived es el input dominante (40%)
+    # Fatigue/stress/energy son secundarios
+    if energy is None:
+        energy = 10 - fatigue
+    
+    # Perceived: 0-10 -> 0-40 pts
+    score = perceived * 4
+    
+    # Energy: 0-10 -> 0-20 pts
+    score += energy * 2
+    
+    # Fatigue penalty: 0-10 -> 0-20 pts penalty
+    score -= fatigue * 2
+    
+    # Stress penalty: 0-10 -> 0-20 pts penalty  
+    score -= stress * 2
+    
+    score = max(0, min(100, score + 40))  # Offset para centrar
+    
+    if score >= 65:
+        return {'label': 'Fresco', 'level': 'ok', 'emoji': '💪', 'score': score}
+    elif score >= 40:
+        return {'label': 'Normal', 'level': 'mid', 'emoji': '🟡', 'score': score}
+    else:
+        return {'label': 'Tocado', 'level': 'low', 'emoji': '⚠️', 'score': score}
+
+
+def _count_flags(alcohol: bool, caffeine: int, pain: bool, sick: bool, 
+                 disruptions: bool = False, last_hard: bool = False) -> dict:
+    """Cuenta las banderas activas."""
+    count = 0
+    active = []
+    
+    if alcohol:
+        count += 1
+        active.append('alcohol')
+    if caffeine >= 2:
+        count += 1
+        active.append('caffeine')
+    if pain:
+        count += 1
+        active.append('pain')
+    if sick:
+        count += 1
+        active.append('sick')
+    if disruptions:
+        count += 1
+        active.append('disruptions')
+    if last_hard:
+        count += 1
+        active.append('last_hard')
+    
+    if count == 0:
+        return {'label': '0', 'level': 'ok', 'emoji': '✅', 'count': count, 'active': active}
+    elif count == 1:
+        return {'label': '1', 'level': 'mid', 'emoji': '⚠️', 'count': count, 'active': active}
+    else:
+        return {'label': f'{count}+', 'level': 'low', 'emoji': '🔴', 'count': count, 'active': active}
+
+
+def render_live_summary(recovery: dict, state: dict, flags: dict, 
+                        estimated_readiness: int = None):
+    """
+    Renderiza el resumen en vivo sticky del cuestionario.
+    Muestra: Recuperación, Estado, Flags y Readiness estimado.
+    """
+    level_colors = {
+        'ok': '#50C878',
+        'mid': '#E0A040', 
+        'low': '#E05555'
+    }
+    
+    rec_color = level_colors.get(recovery['level'], '#808080')
+    state_color = level_colors.get(state['level'], '#808080')
+    flags_color = level_colors.get(flags['level'], '#808080')
+    
+    # Readiness color
+    if estimated_readiness:
+        if estimated_readiness >= 75:
+            ready_color = '#50C878'
+        elif estimated_readiness >= 55:
+            ready_color = '#E0A040'
+        else:
+            ready_color = '#E05555'
+    else:
+        ready_color = '#808080'
+    
+    ready_display = f"{estimated_readiness}" if estimated_readiness else "—"
+    
+    html = (
+        f'<div style="background:linear-gradient(135deg,rgba(20,18,24,0.98),rgba(26,24,30,0.95));'
+        f'border-radius:16px;padding:16px 20px;margin-bottom:20px;'
+        f'border:1px solid rgba(255,255,255,0.08);'
+        f'box-shadow:0 4px 20px rgba(0,0,0,0.3);">'
+        
+        f'<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1.5px;'
+        f'color:#666;margin-bottom:12px;font-weight:600;">📊 Resumen en vivo</div>'
+        
+        f'<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">'
+        
+        # Recuperación
+        f'<div style="text-align:center;flex:1;">'
+        f'<div style="font-size:0.7rem;color:#888;margin-bottom:4px;">Recuperación</div>'
+        f'<div style="display:flex;align-items:center;justify-content:center;gap:6px;">'
+        f'<span style="font-size:1.1rem;">{recovery["emoji"]}</span>'
+        f'<span style="color:{rec_color};font-weight:600;font-size:0.9rem;">{recovery["label"]}</span>'
+        f'</div>'
+        f'</div>'
+        
+        # Divider
+        f'<div style="width:1px;height:32px;background:rgba(255,255,255,0.1);"></div>'
+        
+        # Estado
+        f'<div style="text-align:center;flex:1;">'
+        f'<div style="font-size:0.7rem;color:#888;margin-bottom:4px;">Estado</div>'
+        f'<div style="display:flex;align-items:center;justify-content:center;gap:6px;">'
+        f'<span style="font-size:1.1rem;">{state["emoji"]}</span>'
+        f'<span style="color:{state_color};font-weight:600;font-size:0.9rem;">{state["label"]}</span>'
+        f'</div>'
+        f'</div>'
+        
+        # Divider
+        f'<div style="width:1px;height:32px;background:rgba(255,255,255,0.1);"></div>'
+        
+        # Flags
+        f'<div style="text-align:center;flex:1;">'
+        f'<div style="font-size:0.7rem;color:#888;margin-bottom:4px;">Flags</div>'
+        f'<div style="display:flex;align-items:center;justify-content:center;gap:6px;">'
+        f'<span style="font-size:1.1rem;">{flags["emoji"]}</span>'
+        f'<span style="color:{flags_color};font-weight:600;font-size:0.9rem;">{flags["label"]}</span>'
+        f'</div>'
+        f'</div>'
+        
+        # Divider
+        f'<div style="width:1px;height:32px;background:rgba(255,255,255,0.1);"></div>'
+        
+        # Readiness estimado
+        f'<div style="text-align:center;flex:1.2;">'
+        f'<div style="font-size:0.7rem;color:#888;margin-bottom:4px;">Readiness est.</div>'
+        f'<div style="color:{ready_color};font-weight:700;font-size:1.3rem;">{ready_display}</div>'
+        f'</div>'
+        
+        f'</div>'
+        f'</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_wizard_progress(current_step: int, total_steps: int = 3):
+    """Renderiza la barra de progreso del wizard."""
+    steps = ['Recuperación', 'Estado', 'Flags']
+    
+    html = (
+        f'<div style="display:flex;justify-content:center;align-items:center;gap:8px;margin-bottom:24px;">'
+    )
+    
+    for i, step_name in enumerate(steps):
+        step_num = i + 1
+        if step_num < current_step:
+            # Completed
+            bg = '#50C878'
+            border = '#50C878'
+            text_color = '#fff'
+            label_color = '#50C878'
+        elif step_num == current_step:
+            # Current
+            bg = 'linear-gradient(135deg,#4ECDC4,#44A08D)'
+            border = '#4ECDC4'
+            text_color = '#fff'
+            label_color = '#4ECDC4'
+        else:
+            # Pending
+            bg = 'rgba(255,255,255,0.05)'
+            border = 'rgba(255,255,255,0.2)'
+            text_color = '#666'
+            label_color = '#666'
+        
+        html += (
+            f'<div style="text-align:center;">'
+            f'<div style="width:32px;height:32px;border-radius:50%;'
+            f'background:{bg};border:2px solid {border};'
+            f'display:flex;align-items:center;justify-content:center;'
+            f'color:{text_color};font-weight:600;font-size:0.9rem;margin:0 auto 4px;">{step_num}</div>'
+            f'<div style="font-size:0.7rem;color:{label_color};white-space:nowrap;">{step_name}</div>'
+            f'</div>'
+        )
+        
+        # Connector line (except last)
+        if i < len(steps) - 1:
+            line_color = '#50C878' if step_num < current_step else 'rgba(255,255,255,0.15)'
+            html += (
+                f'<div style="flex:1;max-width:60px;height:2px;background:{line_color};'
+                f'margin:0 4px;margin-bottom:20px;"></div>'
+            )
+    
+    html += '</div>'
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_step_header(step_num: int, title: str, subtitle: str):
+    """Renderiza el header de un paso del wizard."""
+    html = (
+        f'<div style="margin-bottom:20px;">'
+        f'<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">'
+        f'<span style="background:linear-gradient(135deg,#4ECDC4,#44A08D);'
+        f'color:#fff;font-weight:700;font-size:0.85rem;padding:4px 10px;'
+        f'border-radius:6px;">PASO {step_num}</span>'
+        f'<span style="color:#e0e0e0;font-size:1.1rem;font-weight:600;">{title}</span>'
+        f'</div>'
+        f'<div style="color:#888;font-size:0.85rem;padding-left:2px;">{subtitle}</div>'
+        f'</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_input_card(label: str, badge_text: str = None, badge_level: str = None, 
+                      help_text: str = None, is_primary: bool = False):
+    """
+    Renderiza el wrapper de una tarjeta de input.
+    Retorna el estilo para usar con st.container.
+    """
+    level_colors = {
+        'ok': '#50C878',
+        'mid': '#E0A040',
+        'low': '#E05555'
+    }
+    
+    badge_html = ""
+    if badge_text and badge_level:
+        color = level_colors.get(badge_level, '#808080')
+        badge_html = (
+            f'<span style="background:{color}20;color:{color};'
+            f'font-size:0.7rem;font-weight:600;padding:2px 8px;'
+            f'border-radius:4px;margin-left:8px;">{badge_text}</span>'
+        )
+    
+    border_color = 'rgba(78,205,196,0.3)' if is_primary else 'rgba(255,255,255,0.06)'
+    bg = 'rgba(78,205,196,0.05)' if is_primary else 'rgba(26,24,30,0.6)'
+    
+    html = (
+        f'<div style="background:{bg};border-radius:12px;padding:16px;'
+        f'border:1px solid {border_color};margin-bottom:12px;">'
+        f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+        f'<span style="color:#c0c0c0;font-size:0.85rem;font-weight:500;">{label}</span>'
+        f'{badge_html}'
+        f'</div>'
+    )
+    return html
+
+
+def render_micro_badge(text: str, level: str):
+    """Renderiza un micro-badge inline alineado a la derecha."""
+    level_colors = {
+        'ok': '#50C878',
+        'mid': '#E0A040',
+        'low': '#E05555'
+    }
+    color = level_colors.get(level, '#808080')
+    
+    html = (
+        f'<div style="display:flex;justify-content:flex-end;margin-top:4px;">'
+        f'<span style="background:{color}15;color:{color};'
+        f'font-size:0.7rem;font-weight:600;padding:2px 8px;'
+        f'border-radius:4px;">{text}</span>'
+        f'</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_intuition_slider_label(value: int):
+    """Renderiza la etiqueta dinámica del slider de intuición."""
+    labels = {
+        0: ("Fatal, no debería entrenar", "#E05555"),
+        1: ("Muy mal", "#E05555"),
+        2: ("Bastante mal", "#E05555"),
+        3: ("Mal", "#E07040"),
+        4: ("Regular tirando a mal", "#E0A040"),
+        5: ("Normal, ni bien ni mal", "#C0C0C0"),
+        6: ("Bien", "#90C870"),
+        7: ("Bastante bien", "#50C878"),
+        8: ("Muy bien", "#50C878"),
+        9: ("Genial", "#40D090"),
+        10: ("Increíble, día perfecto", "#40D090")
+    }
+    
+    text, color = labels.get(value, ("Normal", "#C0C0C0"))
+    
+    html = (
+        f'<div style="display:flex;align-items:center;justify-content:space-between;'
+        f'margin-top:8px;padding:8px 12px;background:rgba(255,255,255,0.03);'
+        f'border-radius:8px;">'
+        f'<span style="color:{color};font-size:1rem;font-weight:600;">'
+        f'{value}/10 — {text}</span>'
+        f'<span style="color:#666;font-size:0.75rem;">Peso: ~25% en cálculo</span>'
+        f'</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_flag_toggle(label: str, emoji: str, impact: str = None, 
+                       is_active: bool = False):
+    """Renderiza un toggle de flag con su impacto."""
+    if is_active and impact:
+        impact_html = (
+            f'<div style="color:#E07040;font-size:0.75rem;margin-top:4px;'
+            f'padding-left:28px;">{impact}</div>'
+        )
+    else:
+        impact_html = ""
+    
+    active_style = 'border-color:#E07040;background:rgba(224,112,64,0.08);' if is_active else ''
+    
+    html = (
+        f'<div style="background:rgba(26,24,30,0.6);border-radius:10px;padding:12px;'
+        f'border:1px solid rgba(255,255,255,0.06);margin-bottom:8px;{active_style}">'
+        f'<div style="display:flex;align-items:center;gap:8px;">'
+        f'<span style="font-size:1.1rem;">{emoji}</span>'
+        f'<span style="color:#b0b0b0;font-size:0.9rem;">{label}</span>'
+        f'</div>'
+        f'{impact_html}'
+        f'</div>'
+    )
+    return html
+
+
+def render_section_divider(text: str = None):
+    """Renderiza un divisor de sección opcional."""
+    if text:
+        html = (
+            f'<div style="display:flex;align-items:center;gap:12px;margin:20px 0;">'
+            f'<div style="flex:1;height:1px;background:rgba(255,255,255,0.08);"></div>'
+            f'<span style="color:#666;font-size:0.75rem;text-transform:uppercase;'
+            f'letter-spacing:1px;">{text}</span>'
+            f'<div style="flex:1;height:1px;background:rgba(255,255,255,0.08);"></div>'
+            f'</div>'
+        )
+    else:
+        html = '<div style="height:1px;background:rgba(255,255,255,0.08);margin:20px 0;"></div>'
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_collapsible_flags_header(flag_count: int):
+    """Renderiza el header del panel colapsable de flags."""
+    if flag_count == 0:
+        color = '#50C878'
+        text = 'Sin alertas'
+        emoji = '✅'
+    elif flag_count == 1:
+        color = '#E0A040'
+        text = '1 alerta'
+        emoji = '⚠️'
+    else:
+        color = '#E05555'
+        text = f'{flag_count} alertas'
+        emoji = '🔴'
+    
+    html = (
+        f'<div style="display:flex;align-items:center;gap:8px;">'
+        f'<span style="color:#b0b0b0;">¿Algo fuera de lo normal?</span>'
+        f'<span style="background:{color}20;color:{color};'
+        f'font-size:0.75rem;font-weight:600;padding:2px 8px;'
+        f'border-radius:4px;">{emoji} {text}</span>'
+        f'</div>'
+    )
+    return html
+
+
+def render_quick_mode_section_header(title: str, emoji: str = ""):
+    """Header compacto para secciones en modo rápido."""
+    html = (
+        f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;margin-top:20px;">'
+        f'<span style="font-size:1.1rem;">{emoji}</span>'
+        f'<span style="color:#e0e0e0;font-size:0.95rem;font-weight:600;">{title}</span>'
+        f'</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+

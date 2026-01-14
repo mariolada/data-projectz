@@ -17,7 +17,13 @@ from ui.helpers import (
     render_neural_fatigue_section,
     render_consejos_section,
     render_desglose_section,
-    render_readiness_section
+    render_readiness_section,
+    # Nuevos componentes del cuestionario
+    _get_recovery_status, _get_state_status, _count_flags,
+    render_live_summary, render_wizard_progress, render_step_header,
+    render_micro_badge, render_intuition_slider_label,
+    render_section_divider, render_collapsible_flags_header,
+    render_quick_mode_section_header
 )
 from data.loaders import load_user_profile, save_mood_to_csv, load_neural_overload_flags
 from calculations.readiness import (
@@ -146,251 +152,690 @@ def render_modo_hoy(df_daily: pd.DataFrame):
     
     quick_mode = mode == "Rápido"
     
-    # === INPUTS ORGANIZADOS POR SECCIONES ===
-    st.markdown("<div style='margin-top:32px'></div>", unsafe_allow_html=True)
+    # === INICIALIZAR VALORES POR DEFECTO ===
+    # Estos se usarán para el resumen en vivo
+    sleep_h = st.session_state.get('mood_sleep_h', 7.5)
+    sleep_q = st.session_state.get('mood_sleep_q', 4)
+    sleep_disruptions = st.session_state.get('mood_sleep_disruptions', False)
+    nap_mins = st.session_state.get('mood_nap_mins', 0)
+    perceived_readiness = st.session_state.get('mood_perceived_readiness', 7)
+    fatigue = st.session_state.get('mood_fatigue', 3)
+    stress = st.session_state.get('mood_stress', 3)
+    soreness = st.session_state.get('mood_soreness', 2)
+    energy = st.session_state.get('mood_energy', 7)
+    motivation = st.session_state.get('mood_motivation', 7)
+    stiffness = st.session_state.get('mood_stiffness', 2)
+    caffeine = st.session_state.get('mood_caffeine', 0)
+    alcohol = st.session_state.get('mood_alcohol', False)
+    pain_flag = st.session_state.get('mood_pain_flag', False)
+    sick_flag = st.session_state.get('mood_sick_flag', False)
+    last_hard = st.session_state.get('mood_last_hard', False)
+    # Variables adicionales que pueden no definirse en todos los pasos
+    sick_level = st.session_state.get('mood_sick_level', 0)
+    session_goal = st.session_state.get('mood_session_goal', 'fuerza')
+    time_available = st.session_state.get('mood_time_available', 60)
+    pain_zone = st.session_state.get('mood_pain_zone', None)
+    pain_side = st.session_state.get('mood_pain_side', None)
+    pain_severity = st.session_state.get('mood_pain_severity', 0)
+    pain_type = st.session_state.get('mood_pain_type', None)
+    pain_location = st.session_state.get('mood_pain_location', '')
     
-    # SECCIÓN A: RECUPERACIÓN (siempre visible)
-    st.markdown(
-        """
-        <div class='input-section section-recovery'>
-            <div class='section-header'>A. RECUPERACIÓN</div>
-            <p style='color:rgba(255,255,255,0.6);font-size:0.95rem;margin-bottom:16px'>
-                Sueño y descanso
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    col_rec1, col_rec2, col_rec3 = st.columns(3)
+    # === WIZARD STATE (solo modo preciso) ===
+    if 'wizard_step' not in st.session_state:
+        st.session_state.wizard_step = 1
     
-    with col_rec1:
-        sleep_h = st.number_input("Horas de sueño ⏰", min_value=0.0, max_value=12.0, value=st.session_state.get('mood_sleep_h', 7.5), step=0.5,
-                                 help="Horas totales de sueño en las últimas 24h", key="input_sleep_h")
-        st.caption("Más horas = mejor recuperación")
-        txt, lvl = get_sleep_hours_level(sleep_h)
-        render_badge(txt, lvl)
-    
-    with col_rec2:
-        sleep_q = st.slider("Calidad del sueño", 1, 5, st.session_state.get('mood_sleep_q', 4), 
-                           help="1=Muy malo (despertares constantes), 5=Perfecto", key="input_sleep_q")
-        quality_labels = {1: "Horrible", 2: "Malo", 3: "Regular", 4: "Bueno", 5: "Perfecto"}
-        st.caption("Fatiga alta puede reducir tu readiness")
-        txt, lvl = get_sleep_quality_level(sleep_q)
-        render_badge(txt, lvl)
+    # =========================================================================
+    # MODO RÁPIDO: Vista compacta en 1 pantalla
+    # =========================================================================
+    if quick_mode:
+        st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
         
-    with col_rec3:
-        if not quick_mode:
-            nap_mins = st.selectbox("Siesta hoy", [0, 20, 45, 90], 
-                                   index=[0, 20, 45, 90].index(st.session_state.get('mood_nap_mins', 0)),
-                                   help="Minutos de siesta. 20=power nap, 90=ciclo completo", key="input_nap")
-            sleep_disruptions = st.checkbox("Sueño fragmentado (3+ despertares)", 
-                                           value=st.session_state.get('mood_sleep_disruptions', False), key="input_disruptions")
+        # --- RECUPERACIÓN (compacto) ---
+        render_quick_mode_section_header("Recuperación", "😴")
+        
+        col_r1, col_r2, col_r3 = st.columns([1, 1, 1])
+        
+        with col_r1:
+            sleep_h = st.number_input(
+                "Horas de sueño", 
+                min_value=0.0, max_value=12.0, 
+                value=float(st.session_state.get('mood_sleep_h', 7.5)), 
+                step=0.5,
+                key="quick_sleep_h",
+                help="Horas totales en las últimas 24h"
+            )
+            txt, lvl = get_sleep_hours_level(sleep_h)
+            render_micro_badge(txt, lvl)
+        
+        with col_r2:
+            sleep_q = st.slider(
+                "Calidad (1-5)", 1, 5, 
+                st.session_state.get('mood_sleep_q', 4),
+                key="quick_sleep_q",
+                help="1=Muy malo, 5=Perfecto"
+            )
+            txt, lvl = get_sleep_quality_level(sleep_q)
+            render_micro_badge(txt, lvl)
+        
+        with col_r3:
+            sleep_disruptions = st.checkbox(
+                "Sueño fragmentado",
+                value=st.session_state.get('mood_sleep_disruptions', False),
+                key="quick_disruptions",
+                help="3+ despertares durante la noche"
+            )
+            nap_mins = 0  # En modo rápido no se pregunta siesta
+        
+        # --- ESTADO (compacto) ---
+        render_quick_mode_section_header("Cómo estás ahora", "💪")
+        
+        # Input dominante: Intuición
+        st.markdown(
+            '<div style="background:rgba(78,205,196,0.08);border:1px solid rgba(78,205,196,0.25);'
+            'border-radius:12px;padding:16px;margin-bottom:16px;">'
+            '<div style="color:#4ECDC4;font-size:0.8rem;font-weight:600;margin-bottom:8px;">'
+            '⭐ TU INTUICIÓN HOY (input principal)</div>',
+            unsafe_allow_html=True
+        )
+        perceived_readiness = st.slider(
+            "¿Cómo te sientes de 0 a 10?", 0, 10,
+            st.session_state.get('mood_perceived_readiness', 7),
+            key="quick_perceived",
+            label_visibility="collapsed"
+        )
+        render_intuition_slider_label(perceived_readiness)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Inputs secundarios en grid 2x2
+        col_s1, col_s2 = st.columns(2)
+        
+        with col_s1:
+            fatigue = st.slider(
+                "Fatiga/Cansancio", 0, 10,
+                st.session_state.get('mood_fatigue', 3),
+                key="quick_fatigue",
+                help="0=Fresco, 10=Agotado"
+            )
+            txt, lvl = get_fatigue_level(fatigue)
+            render_micro_badge(txt, lvl)
+        
+        with col_s2:
+            stress = st.slider(
+                "Estrés mental", 0, 10,
+                st.session_state.get('mood_stress', 3),
+                key="quick_stress",
+                help="0=Relajado, 10=Muy estresado"
+            )
+            txt, lvl = get_stress_level(stress)
+            render_micro_badge(txt, lvl)
+        
+        # Energía en fila completa (agujetas solo en modo preciso)
+        energy = st.slider(
+            "Energía", 0, 10,
+            st.session_state.get('mood_energy', 7),
+            key="quick_energy",
+            help="Sensación de vitalidad"
+        )
+        txt, lvl = get_energy_level(energy)
+        render_micro_badge(txt, lvl)
+        
+        # Valores por defecto en modo rápido (optimistas para no penalizar injustamente)
+        soreness = 0  # Sin dolor muscular
+        motivation = 8  # Motivación buena por defecto
+        stiffness = 0  # Sin rigidez
+        
+        # --- FLAGS (colapsable) ---
+        flag_count = sum([alcohol, caffeine >= 2, pain_flag, sick_flag, sleep_disruptions, last_hard])
+        
+        # Label simple para el expander (no acepta HTML)
+        if flag_count == 0:
+            flags_label = "✅ ¿Algo fuera de lo normal? (Sin alertas)"
+        elif flag_count == 1:
+            flags_label = "⚠️ ¿Algo fuera de lo normal? (1 alerta)"
         else:
-            nap_mins = 0
-            sleep_disruptions = False
+            flags_label = f"🔴 ¿Algo fuera de lo normal? ({flag_count} alertas)"
         
-    # === BLOQUE B: ESTADO (SENSACIONES) ===
-    st.markdown(
-        """
-        <div class='input-section section-state'>
-            <div class='section-header'>B. ESTADO</div>
-            <p style='color:rgba(255,255,255,0.6);font-size:0.95rem;margin-bottom:16px'>
-                Cómo te sientes ahora mismo
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    
-    # PERCEPCIÓN PERSONAL (siempre visible, input clave)
-    st.markdown("**● Sensación Personal** — Tu intuición sobre readiness hoy")
-    perceived_readiness = st.slider(
-        "De 0 (fatal) a 10 (increíble)", 0, 10, 
-        st.session_state.get('mood_perceived_readiness', 7),
-        help="Tu percepción general HOY. Puede no coincidir con métricas objetivas (ej: dormiste poco pero te sientes bien). Esto tiene un peso del 25% en el cálculo.",
-        key="input_perceived_readiness"
-    )
-    txt, lvl = get_perceived_level(perceived_readiness)
-    render_badge(txt, lvl)
-    st.write("")
-    
-    col_st1, col_st2, col_st3, col_st4 = st.columns(4)
-    
-    with col_st1:
-        fatigue = st.slider("Fatiga/Cansancio", 0, 10, st.session_state.get('mood_fatigue', 3), 
-                           help="0=Fresco, 5=Normal, >=7 afecta rendimiento", key="input_fatigue")
-        txt, lvl = get_fatigue_level(fatigue)
-        render_badge(txt, lvl)
-    
-    with col_st2:
-        stress = st.slider("Estrés mental", 0, 10, st.session_state.get('mood_stress', 3), 
-                          help="0=Relajado, >=7 suele bajar rendimiento en básicos", key="input_stress")
-        txt, lvl = get_stress_level(stress)
-        render_badge(txt, lvl)
-    
-    with col_st3:
-        if not quick_mode:
-            soreness = st.slider("Agujetas/DOMS", 0, 10, st.session_state.get('mood_soreness', 2), 
-                                help="Dolor muscular general post-entreno", key="input_soreness")
-            txt, lvl = get_soreness_level(soreness)
-            render_badge(txt, lvl)
-        else:
-            soreness = 2  # Valor por defecto en modo rápido
-    
-    with col_st4:
-        if not quick_mode:
-            energy = st.slider("Energía general", 0, 10, st.session_state.get('mood_energy', 7), 
-                              help="Sensación de vitalidad (a veces 'fatiga' no captura todo)", key="input_energy")
-            txt, lvl = get_energy_level(energy)
-            render_badge(txt, lvl)
-        else:
-            energy = 10 - fatigue  # Derivar del fatigue
-        
-    # Fila 2 de Estado (solo modo completo)
-    if not quick_mode:
-        col_st5, col_st6, col_st7, col_st8 = st.columns(4)
-        
-        with col_st5:
-            motivation = st.slider("Motivación/Ganas", 0, 10, st.session_state.get('mood_motivation', 7), 
-                                  help="0=Ninguna, 10=Máxima", key="input_motivation")
-            st.caption(f" {motivation}/10")
-        
-        with col_st6:
-            stiffness = st.slider("Rigidez articular", 0, 10, st.session_state.get('mood_stiffness', 2), 
-                                 help="Movilidad limitada, calentar costará más", key="input_stiffness")
-            st.caption(f" {stiffness}/10")
-        
-        with col_st7:
-            caffeine = st.selectbox("Cafeína (últimas 6h)", [0, 1, 2, 3], 
-                                   index=st.session_state.get('mood_caffeine', 0),
-                                   help="Cafés/energéticos consumidos", key="input_caffeine")
-            st.caption(f" {caffeine} dosis")
-        
-        with col_st8:
-            alcohol = st.checkbox("Alcohol anoche", 
-                                 value=st.session_state.get('mood_alcohol', False),
-                                 help="Consumo de alcohol en las últimas 12-24h", key="input_alcohol")
-    else:
-        motivation = 7
-        stiffness = 2
-        caffeine = 0
-        alcohol = False
-        
-    # === BLOQUE C: FLAGS (BANDERAS ROJAS) ===
-    st.markdown(
-        """
-        <div class='input-section section-flags'>
-            <div class='section-header'>C. FLAGS / BANDERAS ROJAS</div>
-            <p style='color:rgba(255,255,255,0.6);font-size:0.95rem;margin-bottom:16px'>
-                ⚠️ Señales que afectan tu capacidad de entrenar
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    
-    col_flag1, col_flag2, col_flag3 = st.columns(3)
-    
-    with col_flag1:
-        if not quick_mode:
-            st.write("**🩹 Dolor localizado**")
-            pain_flag = st.checkbox("Tengo dolor localizado", value=st.session_state.get('mood_pain_flag', False), key="pain_checkbox")
+        with st.expander(flags_label, expanded=False):
+            col_f1, col_f2 = st.columns(2)
+            
+            with col_f1:
+                alcohol = st.checkbox(
+                    "🍺 Alcohol anoche",
+                    value=st.session_state.get('mood_alcohol', False),
+                    key="quick_alcohol"
+                )
+                if alcohol:
+                    st.caption("↳ Impacto: recuperación -5 a -15")
                 
-            if pain_flag:
-                zones = ["Hombro", "Codo", "Muñeca", "Espalda alta", "Espalda baja", "Cadera", "Rodilla", "Tobillo", "Otra"]
-                pain_zone = st.selectbox("Zona", zones, 
-                                        index=zones.index(st.session_state.get('mood_pain_zone', 'Hombro')) if st.session_state.get('mood_pain_zone') in zones else 0,
-                                        key="pain_zone_select")
-                sides = ["Izquierdo", "Derecho", "Ambos"]
-                pain_side = st.radio("Lado", sides, horizontal=True,
-                                    index=sides.index(st.session_state.get('mood_pain_side', 'Izquierdo')) if st.session_state.get('mood_pain_side') in sides else 0,
-                                    key="pain_side_radio")
-                pain_severity = st.slider("Severidad", 0, 10, st.session_state.get('mood_pain_severity', 5), key="pain_severity_slider",
-                                         help="0=Molestia, 5=Duele pero puedo, 10=No puedo moverlo")
-                types = ["Punzante", "Molestia", "Rigidez", "Ardor"]
-                pain_type = st.selectbox("Tipo", types,
-                                        index=types.index(st.session_state.get('mood_pain_type', 'Punzante')) if st.session_state.get('mood_pain_type') in types else 0,
-                                        key="pain_type_select")
+                caffeine = st.selectbox(
+                    "☕ Cafeína (últimas 6h)",
+                    [0, 1, 2, 3],
+                    index=st.session_state.get('mood_caffeine', 0),
+                    key="quick_caffeine"
+                )
+                if caffeine >= 2:
+                    st.caption("↳ Puede enmascarar fatiga real")
+            
+            with col_f2:
+                sick_flag = st.checkbox(
+                    "🤒 Enfermo/resfriado",
+                    value=st.session_state.get('mood_sick_flag', False),
+                    key="quick_sick"
+                )
+                if sick_flag:
+                    st.caption("↳ Impacto: -20 a -40 readiness")
                 
-                # Generar pain_location descriptivo
-                pain_location = f"{pain_zone} {pain_side.lower()} ({pain_type}, {pain_severity}/10)"
-            else:
-                pain_zone = None
-                pain_side = None
-                pain_severity = 0
-                pain_type = None
-                pain_location = ""
-        else:
-            # Modo rápido: sin dolor localizado
+                last_hard = st.checkbox(
+                    "💥 Último entreno muy duro",
+                    value=st.session_state.get('mood_last_hard', False),
+                    key="quick_lasthard"
+                )
+                if last_hard:
+                    st.caption("↳ Posible fatiga residual")
+            
+            # En modo rápido, dolor y otros son simplificados
             pain_flag = False
             pain_zone = None
             pain_side = None
             pain_severity = 0
             pain_type = None
             pain_location = ""
-        
-    with col_flag2:
-        sick_flag = st.checkbox(
-            "Estoy enfermo/resfriado",
-            value=st.session_state.get('mood_sick_flag', False),
-            key="input_sick_flag"
-        )
-        if sick_flag:
-            sick_level = st.slider(
-                "Nivel de malestar", 0, 5,
-                st.session_state.get('mood_sick_level', 0),
-                help="0=Sano, 1-2=Leve (mocos, ligera tos), 3-4=Moderado (malestar), 5=Grave (fiebre, muy mal)",
-                key="input_sick_level"
-            )
-            sick_labels = {
-                0: "Sano",
-                1: "Leve",
-                2: "Leve-Moderado",
-                3: "Moderado",
-                4: "Moderado-Grave",
-                5: "Grave"
-            }
-            st.caption(f"Estado: {sick_labels[sick_level]}")
-        else:
-            sick_level = 0
-            st.caption("Estado: Sano")
-        
-        last_hard = st.checkbox("Último entreno muy exigente", 
-                               value=st.session_state.get('mood_last_hard', False),
-                               help="Sesión de alta intensidad/volumen en últimas 48h", key="input_lasthard")
-    
-    with col_flag3:
-        if not quick_mode:
-            st.write("**Objetivo de hoy**")
-            goals = ["fuerza", "hipertrofia", "técnica", "cardio", "descanso"]
-            session_goal = st.selectbox("", goals,
-                                       index=goals.index(st.session_state.get('mood_session_goal', 'fuerza')) if st.session_state.get('mood_session_goal') in goals else 0,
-                                       key="session_goal_select")
-            time_available = st.number_input("Minutos disponibles", 
-                                            min_value=0, max_value=180, value=st.session_state.get('mood_time_available', 60), step=5,
-                                            key="time_avail_input")
-        else:
+            sick_level = 2 if sick_flag else 0
             session_goal = "fuerza"
             time_available = 60
+    
+    # =========================================================================
+    # MODO PRECISO: Wizard de 3 pasos
+    # =========================================================================
+    else:
+        st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
         
+        # Wizard progress bar
+        render_wizard_progress(st.session_state.wizard_step)
+        
+        # =====================================================================
+        # PASO 1: RECUPERACIÓN
+        # =====================================================================
+        if st.session_state.wizard_step == 1:
+            render_step_header(1, "Recuperación", "Cómo dormiste y descansaste")
+            
+            col_r1, col_r2 = st.columns(2)
+            
+            with col_r1:
+                st.markdown(
+                    '<div style="background:rgba(26,24,30,0.6);border-radius:12px;padding:16px;'
+                    'border:1px solid rgba(255,255,255,0.06);margin-bottom:12px;">'
+                    '<div style="color:#c0c0c0;font-size:0.85rem;margin-bottom:8px;">Horas de sueño</div>',
+                    unsafe_allow_html=True
+                )
+                sleep_h = st.number_input(
+                    "Horas", 
+                    min_value=0.0, max_value=12.0,
+                    value=float(st.session_state.get('mood_sleep_h', 7.5)),
+                    step=0.5,
+                    key="wiz_sleep_h",
+                    label_visibility="collapsed"
+                )
+                txt, lvl = get_sleep_hours_level(sleep_h)
+                render_micro_badge(txt, lvl)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                st.markdown(
+                    '<div style="background:rgba(26,24,30,0.6);border-radius:12px;padding:16px;'
+                    'border:1px solid rgba(255,255,255,0.06);margin-bottom:12px;">'
+                    '<div style="color:#c0c0c0;font-size:0.85rem;margin-bottom:8px;">Calidad del sueño</div>',
+                    unsafe_allow_html=True
+                )
+                sleep_q = st.slider(
+                    "Calidad", 1, 5,
+                    st.session_state.get('mood_sleep_q', 4),
+                    key="wiz_sleep_q",
+                    label_visibility="collapsed"
+                )
+                quality_map = {1: "Muy malo", 2: "Malo", 3: "Regular", 4: "Bueno", 5: "Perfecto"}
+                txt, lvl = get_sleep_quality_level(sleep_q)
+                st.caption(f"{quality_map[sleep_q]}")
+                render_micro_badge(txt, lvl)
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            with col_r2:
+                st.markdown(
+                    '<div style="background:rgba(26,24,30,0.6);border-radius:12px;padding:16px;'
+                    'border:1px solid rgba(255,255,255,0.06);margin-bottom:12px;">'
+                    '<div style="color:#c0c0c0;font-size:0.85rem;margin-bottom:8px;">Siesta hoy</div>',
+                    unsafe_allow_html=True
+                )
+                nap_options = {"Sin siesta": 0, "Power nap (20 min)": 20, "Siesta media (45 min)": 45, "Ciclo completo (90 min)": 90}
+                current_nap = st.session_state.get('mood_nap_mins', 0)
+                nap_index = list(nap_options.values()).index(current_nap) if current_nap in nap_options.values() else 0
+                nap_selection = st.selectbox(
+                    "Siesta",
+                    list(nap_options.keys()),
+                    index=nap_index,
+                    key="wiz_nap",
+                    label_visibility="collapsed"
+                )
+                nap_mins = nap_options[nap_selection]
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                st.markdown(
+                    '<div style="background:rgba(26,24,30,0.6);border-radius:12px;padding:16px;'
+                    'border:1px solid rgba(255,255,255,0.06);margin-bottom:12px;">'
+                    '<div style="color:#c0c0c0;font-size:0.85rem;margin-bottom:8px;">Calidad de sueño</div>',
+                    unsafe_allow_html=True
+                )
+                sleep_disruptions = st.checkbox(
+                    "Sueño fragmentado (3+ despertares)",
+                    value=st.session_state.get('mood_sleep_disruptions', False),
+                    key="wiz_disruptions"
+                )
+                if sleep_disruptions:
+                    st.caption("↳ Impacto: reduce calidad de recuperación")
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Feedback de paso
+            recovery_status = _get_recovery_status(sleep_h, sleep_q, sleep_disruptions)
+            st.markdown(
+                f'<div style="background:rgba(78,205,196,0.1);border-radius:10px;padding:12px 16px;'
+                f'margin-top:16px;display:flex;align-items:center;gap:12px;">'
+                f'<span style="font-size:1.3rem;">{recovery_status["emoji"]}</span>'
+                f'<span style="color:#e0e0e0;">Recuperación: <strong>{recovery_status["label"]}</strong></span>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+            
+            # Botón siguiente
+            st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
+            if st.button("Siguiente → Estado", use_container_width=True, type="primary", key="wiz_next_1"):
+                st.session_state.mood_sleep_h = sleep_h
+                st.session_state.mood_sleep_q = sleep_q
+                st.session_state.mood_nap_mins = nap_mins
+                st.session_state.mood_sleep_disruptions = sleep_disruptions
+                st.session_state.wizard_step = 2
+                st.rerun()
+        
+        # =====================================================================
+        # PASO 2: ESTADO
+        # =====================================================================
+        elif st.session_state.wizard_step == 2:
+            render_step_header(2, "Estado", "Cómo te sientes ahora mismo")
+            
+            # Input dominante: Intuición
+            st.markdown(
+                '<div style="background:rgba(78,205,196,0.08);border:1px solid rgba(78,205,196,0.25);'
+                'border-radius:12px;padding:20px;margin-bottom:20px;">'
+                '<div style="color:#4ECDC4;font-size:0.85rem;font-weight:600;margin-bottom:12px;">'
+                '⭐ TU INTUICIÓN — El input más importante</div>',
+                unsafe_allow_html=True
+            )
+            perceived_readiness = st.slider(
+                "¿Cómo te sientes hoy de 0 a 10?", 0, 10,
+                st.session_state.get('mood_perceived_readiness', 7),
+                key="wiz_perceived",
+                label_visibility="collapsed"
+            )
+            render_intuition_slider_label(perceived_readiness)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Inputs secundarios en grid
+            st.markdown(
+                '<div style="color:#888;font-size:0.8rem;margin-bottom:12px;text-transform:uppercase;'
+                'letter-spacing:1px;">Detalles adicionales</div>',
+                unsafe_allow_html=True
+            )
+            
+            col_e1, col_e2, col_e3 = st.columns(3)
+            
+            with col_e1:
+                fatigue = st.slider(
+                    "Fatiga/Cansancio", 0, 10,
+                    st.session_state.get('mood_fatigue', 3),
+                    key="wiz_fatigue",
+                    help="0=Fresco, 10=Agotado"
+                )
+                txt, lvl = get_fatigue_level(fatigue)
+                render_micro_badge(txt, lvl)
+                
+                energy = st.slider(
+                    "Energía", 0, 10,
+                    st.session_state.get('mood_energy', 7),
+                    key="wiz_energy",
+                    help="Sensación de vitalidad"
+                )
+                txt, lvl = get_energy_level(energy)
+                render_micro_badge(txt, lvl)
+            
+            with col_e2:
+                stress = st.slider(
+                    "Estrés mental", 0, 10,
+                    st.session_state.get('mood_stress', 3),
+                    key="wiz_stress",
+                    help="0=Relajado, 10=Muy estresado"
+                )
+                txt, lvl = get_stress_level(stress)
+                render_micro_badge(txt, lvl)
+                
+                motivation = st.slider(
+                    "Motivación", 0, 10,
+                    st.session_state.get('mood_motivation', 7),
+                    key="wiz_motivation",
+                    help="Ganas de entrenar"
+                )
+                render_micro_badge(f"{motivation}/10", "ok" if motivation >= 7 else "mid" if motivation >= 4 else "low")
+            
+            with col_e3:
+                soreness = st.slider(
+                    "Agujetas/DOMS", 0, 10,
+                    st.session_state.get('mood_soreness', 2),
+                    key="wiz_soreness",
+                    help="Dolor muscular post-entreno"
+                )
+                txt, lvl = get_soreness_level(soreness)
+                render_micro_badge(txt, lvl)
+                
+                stiffness = st.slider(
+                    "Rigidez articular", 0, 10,
+                    st.session_state.get('mood_stiffness', 2),
+                    key="wiz_stiffness",
+                    help="Movilidad limitada"
+                )
+                render_micro_badge(f"{stiffness}/10", "ok" if stiffness <= 3 else "mid" if stiffness <= 6 else "low")
+            
+            # Feedback de paso
+            state_status = _get_state_status(perceived_readiness, fatigue, stress, energy)
+            st.markdown(
+                f'<div style="background:rgba(78,205,196,0.1);border-radius:10px;padding:12px 16px;'
+                f'margin-top:16px;display:flex;align-items:center;gap:12px;">'
+                f'<span style="font-size:1.3rem;">{state_status["emoji"]}</span>'
+                f'<span style="color:#e0e0e0;">Estado: <strong>{state_status["label"]}</strong></span>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+            
+            # Botones navegación
+            st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
+            col_nav1, col_nav2 = st.columns(2)
+            with col_nav1:
+                if st.button("← Volver", use_container_width=True, key="wiz_back_2"):
+                    st.session_state.wizard_step = 1
+                    st.rerun()
+            with col_nav2:
+                if st.button("Siguiente → Flags", use_container_width=True, type="primary", key="wiz_next_2"):
+                    st.session_state.mood_perceived_readiness = perceived_readiness
+                    st.session_state.mood_fatigue = fatigue
+                    st.session_state.mood_stress = stress
+                    st.session_state.mood_soreness = soreness
+                    st.session_state.mood_energy = energy
+                    st.session_state.mood_motivation = motivation
+                    st.session_state.mood_stiffness = stiffness
+                    st.session_state.wizard_step = 3
+                    st.rerun()
+        
+        # =====================================================================
+        # PASO 3: FLAGS
+        # =====================================================================
+        elif st.session_state.wizard_step == 3:
+            render_step_header(3, "Flags", "Algo fuera de lo normal que debamos saber")
+            
+            st.markdown(
+                '<div style="color:#888;font-size:0.85rem;margin-bottom:16px;">'
+                'Estas señales pueden afectar tu capacidad de entrenar o aumentar riesgo de lesión.'
+                '</div>',
+                unsafe_allow_html=True
+            )
+            
+            col_fl1, col_fl2 = st.columns(2)
+            
+            with col_fl1:
+                # Alcohol
+                st.markdown(
+                    '<div style="background:rgba(26,24,30,0.6);border-radius:12px;padding:16px;'
+                    'border:1px solid rgba(255,255,255,0.06);margin-bottom:12px;">',
+                    unsafe_allow_html=True
+                )
+                alcohol = st.checkbox(
+                    "🍺 Alcohol anoche",
+                    value=st.session_state.get('mood_alcohol', False),
+                    key="wiz_alcohol"
+                )
+                if alcohol:
+                    st.markdown(
+                        '<div style="color:#E07040;font-size:0.8rem;margin-top:4px;">'
+                        '↳ Impacto: recuperación -5 a -15 pts</div>',
+                        unsafe_allow_html=True
+                    )
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                # Cafeína
+                st.markdown(
+                    '<div style="background:rgba(26,24,30,0.6);border-radius:12px;padding:16px;'
+                    'border:1px solid rgba(255,255,255,0.06);margin-bottom:12px;">',
+                    unsafe_allow_html=True
+                )
+                caffeine = st.selectbox(
+                    "☕ Cafeína (últimas 6h)",
+                    [0, 1, 2, 3],
+                    index=st.session_state.get('mood_caffeine', 0),
+                    key="wiz_caffeine",
+                    format_func=lambda x: f"{x} {'dosis' if x != 1 else 'dosis'}"
+                )
+                if caffeine >= 2:
+                    st.markdown(
+                        '<div style="color:#E0A040;font-size:0.8rem;margin-top:4px;">'
+                        '↳ Puede enmascarar fatiga real</div>',
+                        unsafe_allow_html=True
+                    )
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                # Enfermedad
+                st.markdown(
+                    '<div style="background:rgba(26,24,30,0.6);border-radius:12px;padding:16px;'
+                    'border:1px solid rgba(255,255,255,0.06);margin-bottom:12px;">',
+                    unsafe_allow_html=True
+                )
+                sick_flag = st.checkbox(
+                    "🤒 Enfermo/resfriado",
+                    value=st.session_state.get('mood_sick_flag', False),
+                    key="wiz_sick"
+                )
+                if sick_flag:
+                    sick_level = st.slider(
+                        "Nivel de malestar", 1, 5,
+                        st.session_state.get('mood_sick_level', 2),
+                        key="wiz_sick_level"
+                    )
+                    sick_labels = {1: "Leve", 2: "Leve-Moderado", 3: "Moderado", 4: "Moderado-Grave", 5: "Grave"}
+                    st.caption(f"Estado: {sick_labels[sick_level]}")
+                    st.markdown(
+                        '<div style="color:#E05555;font-size:0.8rem;margin-top:4px;">'
+                        '↳ Impacto: -20 a -40 readiness según gravedad</div>',
+                        unsafe_allow_html=True
+                    )
+                else:
+                    sick_level = 0
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            with col_fl2:
+                # Último entreno duro
+                st.markdown(
+                    '<div style="background:rgba(26,24,30,0.6);border-radius:12px;padding:16px;'
+                    'border:1px solid rgba(255,255,255,0.06);margin-bottom:12px;">',
+                    unsafe_allow_html=True
+                )
+                last_hard = st.checkbox(
+                    "💥 Último entreno muy exigente",
+                    value=st.session_state.get('mood_last_hard', False),
+                    key="wiz_lasthard",
+                    help="Alta intensidad/volumen en últimas 48h"
+                )
+                if last_hard:
+                    st.markdown(
+                        '<div style="color:#E0A040;font-size:0.8rem;margin-top:4px;">'
+                        '↳ Posible fatiga residual del SNC</div>',
+                        unsafe_allow_html=True
+                    )
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                # Dolor localizado
+                st.markdown(
+                    '<div style="background:rgba(26,24,30,0.6);border-radius:12px;padding:16px;'
+                    'border:1px solid rgba(255,255,255,0.06);margin-bottom:12px;">',
+                    unsafe_allow_html=True
+                )
+                pain_flag = st.checkbox(
+                    "🩹 Dolor localizado",
+                    value=st.session_state.get('mood_pain_flag', False),
+                    key="wiz_pain"
+                )
+                if pain_flag:
+                    zones = ["Hombro", "Codo", "Muñeca", "Espalda alta", "Espalda baja", "Cadera", "Rodilla", "Tobillo", "Otra"]
+                    pain_zone = st.selectbox("Zona", zones, key="wiz_pain_zone")
+                    sides = ["Izquierdo", "Derecho", "Ambos"]
+                    pain_side = st.radio("Lado", sides, horizontal=True, key="wiz_pain_side")
+                    pain_severity = st.slider("Severidad (0-10)", 0, 10, 5, key="wiz_pain_severity")
+                    types = ["Punzante", "Molestia", "Rigidez", "Ardor"]
+                    pain_type = st.selectbox("Tipo", types, key="wiz_pain_type")
+                    pain_location = f"{pain_zone} {pain_side.lower()} ({pain_type}, {pain_severity}/10)"
+                    st.markdown(
+                        '<div style="color:#E05555;font-size:0.8rem;margin-top:4px;">'
+                        '↳ Ajustaremos ejercicios para proteger esta zona</div>',
+                        unsafe_allow_html=True
+                    )
+                else:
+                    pain_zone = None
+                    pain_side = None
+                    pain_severity = 0
+                    pain_type = None
+                    pain_location = ""
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                # Objetivo y tiempo
+                st.markdown(
+                    '<div style="background:rgba(26,24,30,0.6);border-radius:12px;padding:16px;'
+                    'border:1px solid rgba(255,255,255,0.06);margin-bottom:12px;">',
+                    unsafe_allow_html=True
+                )
+                st.markdown('<div style="color:#888;font-size:0.75rem;margin-bottom:8px;">OBJETIVO DE HOY</div>', unsafe_allow_html=True)
+                goals = ["fuerza", "hipertrofia", "técnica", "cardio", "descanso"]
+                session_goal = st.selectbox(
+                    "Objetivo",
+                    goals,
+                    index=goals.index(st.session_state.get('mood_session_goal', 'fuerza')),
+                    key="wiz_goal",
+                    label_visibility="collapsed"
+                )
+                time_available = st.number_input(
+                    "Minutos disponibles",
+                    min_value=0, max_value=180,
+                    value=st.session_state.get('mood_time_available', 60),
+                    step=5,
+                    key="wiz_time"
+                )
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Feedback de flags
+            flags_status = _count_flags(alcohol, caffeine, pain_flag, sick_flag, sleep_disruptions, last_hard)
+            st.markdown(
+                f'<div style="background:rgba(78,205,196,0.1);border-radius:10px;padding:12px 16px;'
+                f'margin-top:16px;display:flex;align-items:center;gap:12px;">'
+                f'<span style="font-size:1.3rem;">{flags_status["emoji"]}</span>'
+                f'<span style="color:#e0e0e0;">Flags activos: <strong>{flags_status["label"]}</strong></span>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+            
+            # Botones navegación
+            st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
+            col_nav1, col_nav2 = st.columns(2)
+            with col_nav1:
+                if st.button("← Volver", use_container_width=True, key="wiz_back_3"):
+                    st.session_state.wizard_step = 2
+                    st.rerun()
+    
+    # =========================================================================
+    # RESUMEN EN VIVO (siempre visible arriba del botón)
+    # =========================================================================
+    st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
+    
+    # Calcular estados para resumen
+    recovery_status = _get_recovery_status(sleep_h, sleep_q, sleep_disruptions)
+    state_status = _get_state_status(perceived_readiness, fatigue, stress, energy)
+    flags_status = _count_flags(alcohol, caffeine, pain_flag, sick_flag, sleep_disruptions, last_hard)
+    
+    # Estimación de readiness más precisa (similar al cálculo real)
+    # Fórmula simplificada de calculate_readiness_from_inputs_v2
+    
+    # Estimación de readiness más precisa (alineada con cálculo real v2)
+    # 1. Percepción personal (18% directo)
+    perceived_component = (perceived_readiness / 10) * 18
+    base_multiplier = 0.85
+    
+    # 2. Sueño (38% del 85% = ~32% total)
+    # Más generoso: 5h=0, 7.5h=1
+    sleep_hours_score = max(0, min(1, (sleep_h - 5.0) / 2.5))
+    sleep_quality_score = (sleep_q - 1) / 4
+    sleep_base = (sleep_hours_score * 0.6 + sleep_quality_score * 0.4)
+    sleep_component = base_multiplier * 38 * sleep_base
+    
+    # Penalizaciones sueño (reducidas)
+    if sleep_disruptions:
+        sleep_component -= 5
+    if alcohol:
+        sleep_component -= 12
+    
+    # 3. Estado (42% del 85% = ~35% total)
+    fatigue_score = (10 - fatigue) / 10
+    stress_score = (10 - stress) / 10
+    energy_score = energy / 10
+    soreness_score = (10 - soreness) / 10
+    state_component = base_multiplier * 42 * (
+        energy_score * 0.40 +
+        fatigue_score * 0.35 +
+        stress_score * 0.20 +
+        soreness_score * 0.05
+    )
+    # Stiffness solo penaliza si >3
+    if stiffness > 3:
+        state_component -= (stiffness - 3) * 0.3
+    
+    # 4. Motivación (18% del 85% = ~15% total)
+    motivation_component = base_multiplier * 18 * (motivation / 10)
+    
+    # 5. Penalizaciones flags (reducidas)
+    pain_penalty = 15 if pain_flag else 0
+    sick_penalty = {0: 0, 1: 5, 2: 8, 3: 15, 4: 25, 5: 35}.get(sick_level, 0)
+    caffeine_mask = 5 if (caffeine >= 3 and fatigue >= 7) else 0
+    
+    # Total estimado
+    estimated_readiness = int(
+        perceived_component + sleep_component + state_component + motivation_component
+        - pain_penalty - sick_penalty - caffeine_mask
+    )
+    estimated_readiness = max(20, min(95, estimated_readiness))
+    
+    render_live_summary(recovery_status, state_status, flags_status, estimated_readiness)
+    
     # === ACTION BUTTON ===
-    st.markdown("<div style='margin:40px 0 20px'></div>", unsafe_allow_html=True)
     st.markdown(
-        """
-        <div style='text-align:center'>
-            <p style='color:rgba(255,255,255,0.5);font-size:0.9rem;margin-bottom:12px'>
-                Obtén tu puntuación y plan personalizado
-            </p>
-        </div>
-        """,
+        '<div style="text-align:center;color:rgba(255,255,255,0.5);font-size:0.85rem;margin-bottom:12px;">'
+        'Obtén tu puntuación exacta y plan personalizado'
+        '</div>',
         unsafe_allow_html=True
     )
-    submitted = st.button(
-        " CALCULAR READINESS & PLAN",
-        use_container_width=True,
-        key="submit_readiness",
-        type="primary",
-    )
+    
+    # En modo preciso, solo mostrar botón en paso 3
+    show_submit = quick_mode or st.session_state.wizard_step == 3
+    
+    if show_submit:
+        submitted = st.button(
+            "🎯 CALCULAR READINESS & PLAN",
+            use_container_width=True,
+            key="submit_readiness",
+            type="primary",
+        )
+    else:
+        submitted = False
+
 
     # Cheat sheet de métricas clave (ayuda rápida)
     with st.expander("📘 ¿Qué significa cada métrica?"):
@@ -533,6 +978,21 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                 adjustment_factors=adjustment_factors
             )
             
+            # DEBUG: Mostrar breakdown detallado
+            with st.expander("🔍 DEBUG: Breakdown detallado del cálculo", expanded=False):
+                st.write("**Readiness final:**", readiness_instant)
+                st.write("**Percepción component:**", f"{readiness_breakdown.get('perceived_component', 0):.1f} pts")
+                st.write("**Components:**")
+                for key, val in readiness_breakdown.get('components', {}).items():
+                    st.write(f"  - {key}: {val:.1f} pts")
+                st.write("**Adjustments:**")
+                for key, val in readiness_breakdown.get('context_adjustments', {}).items():
+                    st.write(f"  - {key}: {val:.1f} pts")
+                if readiness_breakdown.get('notes'):
+                    st.write("**Notas:**")
+                    for note in readiness_breakdown['notes']:
+                        st.write(f"  - {note}")
+            
             # Get zone
             zone, emoji, _ = get_readiness_zone(readiness_instant)
             
@@ -641,14 +1101,14 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                 st.write("**Guardar este día en el histórico** para que el motor lo aprenda y recalcule tendencias.")
             with col_save2:
                 if st.button("💾 Guardar", use_container_width='stretch'):
-                    today = datetime.date.today()
+                    today_save = datetime.date.today()
                     save_mood_to_csv(
-                        today, sleep_h, sleep_q, fatigue, soreness, stress, motivation,
+                        today_save, sleep_h, sleep_q, fatigue, soreness, stress, motivation,
                         pain_flag, pain_location, readiness_instant
-                )
-                st.success(f"✅ Guardado para {today}")
-                st.info("💡 **Próximo paso:** ejecuta el pipeline para que se regenere el histórico con estos datos.")
-                st.session_state.mood_calculated = False  # Reset after save
+                    )
+                    st.success(f"✅ Guardado para {today_save}")
+                    st.info("💡 **Próximo paso:** ejecuta el pipeline para que se regenere el histórico con estos datos.")
+                    st.session_state.mood_calculated = False  # Reset after save
         
         # Charts - Last 7 days + TODAY
         st.markdown("---")

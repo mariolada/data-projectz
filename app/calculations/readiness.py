@@ -138,10 +138,11 @@ def calculate_readiness_from_inputs_v2(
         }
     
     # === 1. PERCEPCIÓN PERSONAL (anclaje inicial) ===
+    # La percepción es importante pero no debe dominar el score
     if perceived_readiness is not None:
         perceived_score = perceived_readiness / 10
-        perceived_component = 0.25 * perceived_score
-        base_weight_multiplier = 0.75
+        perceived_component = 0.18 * perceived_score  # Reducido para dar más peso a métricas objetivas
+        base_weight_multiplier = 0.85  # El 85% restante se reparte entre otros componentes
     else:
         perceived_component = 0
         base_weight_multiplier = 1.0
@@ -153,89 +154,98 @@ def calculate_readiness_from_inputs_v2(
         'notes': []
     }
     
-    # === 2. RECUPERACIÓN (SÍ/NO ERES SENSIBLE AL SUEÑO) ===
-    sleep_hours_score = np.clip((sleep_hours - 6.0) / (7.5 - 6.0), 0, 1)
-    sleep_quality_score = (sleep_quality - 1) / 4
+    # === 2. RECUPERACIÓN (SUEÑO) ===
+    # Sleep hours: 6h = 0.5, 7h = 0.83, 7.5h+ = 1.0 (más generoso)
+    sleep_hours_score = np.clip((sleep_hours - 5.0) / (7.5 - 5.0), 0, 1)
+    sleep_quality_score = (sleep_quality - 1) / 4  # 1=0, 5=1
     
-    # PERSONALIZACIÓN: Comparar contra tu baseline
+    # Combinar horas y calidad
+    sleep_base = (sleep_hours_score * 0.6 + sleep_quality_score * 0.4)
+    
+    # PERSONALIZACIÓN: Comparar contra tu baseline (impacto reducido)
     sleep_context_bonus = 0
     if baselines.get('sleep', {}).get('p50'):
         your_baseline = baselines['sleep']['p50']
         delta_sleep = sleep_hours - your_baseline
         
-        if delta_sleep < 0:
-            sleep_deficit = abs(delta_sleep)
+        if delta_sleep < -1.5:  # Solo penalizar si déficit > 1.5h
+            sleep_deficit = abs(delta_sleep) - 1.5
             if adjustment_factors.get('sleep_responsive', True):
-                sleep_context_bonus = -0.05 * sleep_deficit
-                breakdown['notes'].append(f"⚠️ Déficit de sueño: {sleep_deficit:.1f}h bajo tu media ({your_baseline:.1f}h). Eres sensible → impacto alto")
+                sleep_context_bonus = -0.03 * sleep_deficit  # Reducido de 0.05
+                breakdown['notes'].append(f"⚠️ Déficit de sueño notable: {abs(delta_sleep):.1f}h bajo tu media")
             else:
-                sleep_context_bonus = -0.02 * sleep_deficit
-                breakdown['notes'].append(f"ℹ️ Sueño bajo tu media pero NO eres muy sensible → impacto moderado")
-        else:
-            sleep_bonus = delta_sleep * 0.03
-            sleep_context_bonus = min(sleep_bonus, 0.10)
-            breakdown['notes'].append(f"✅ Extra sueño: {delta_sleep:.1f}h sobre tu media → pequeño bonus")
+                sleep_context_bonus = -0.015 * sleep_deficit
+        elif delta_sleep > 0.5:
+            sleep_context_bonus = min(delta_sleep * 0.02, 0.05)  # Pequeño bonus
     
     # Bonus siesta
     nap_bonus = 0
     if nap_mins == 20:
-        nap_bonus = 0.05
+        nap_bonus = 0.03
     elif nap_mins == 45:
-        nap_bonus = 0.08
+        nap_bonus = 0.05
     elif nap_mins == 90:
-        nap_bonus = 0.10
+        nap_bonus = 0.07
     
-    # Penalizaciones
-    disruption_penalty = 0.15 if sleep_disruptions else 0
-    alcohol_penalty = 0.20 if alcohol else 0
+    # Penalizaciones (reducidas)
+    disruption_penalty = 0.05 if sleep_disruptions else 0  # Reducido de 0.08
+    alcohol_penalty = 0.12 if alcohol else 0  # Reducido de 0.20
     
-    sleep_weight = adjustment_factors.get('sleep_weight', 0.30)
-    sleep_component = base_weight_multiplier * (
-        sleep_weight * (sleep_hours_score + sleep_quality_score * 0.5 + nap_bonus + sleep_context_bonus)
-        - disruption_penalty - alcohol_penalty
-    )
+    # Componente final de sueño (38% del restante = ~32 pts max)
+    sleep_component = base_weight_multiplier * 0.38 * (
+        sleep_base + nap_bonus + sleep_context_bonus
+    ) - disruption_penalty - alcohol_penalty
+    
+    sleep_component = max(0, sleep_component)  # No puede ser negativo
     breakdown['components']['sleep'] = sleep_component * 100
     
-    # === 3. ESTADO (FATIGA, ESTRÉS, SORENESS CON SENSIBILIDADES PERSONALES) ===
+    # === 3. ESTADO (FATIGA, ESTRÉS, ENERGÍA) ===
     fatigue_score = 1 - (fatigue / 10)
-    fatigue_sensitivity = adjustment_factors.get('fatigue_sensitivity', 1.0)
-    
-    fatigue_context = 0
-    if baselines.get('readiness', {}).get('mean') and baselines.get('readiness', {}).get('std'):
-        if fatigue > 6 and fatigue_sensitivity > 1.0:
-            fatigue_context = -0.08
-            breakdown['notes'].append(f"⚠️ Fatiga alta + eres sensible → penalización extra")
-    
     stress_score = 1 - (stress / 10)
-    stress_sensitivity = adjustment_factors.get('stress_sensitivity', 1.0)
-    
     energy_score = energy / 10
     soreness_score = 1 - (soreness / 10)
-    stiffness_penalty = (stiffness / 10) * 0.10
     
-    state_component = base_weight_multiplier * (
-        0.12 * fatigue_score * fatigue_sensitivity +
-        0.08 * stress_score * stress_sensitivity +
-        0.10 * energy_score +
+    # Sensibilidades personalizadas (impacto moderado)
+    fatigue_sensitivity = adjustment_factors.get('fatigue_sensitivity', 1.0)
+    stress_sensitivity = adjustment_factors.get('stress_sensitivity', 1.0)
+    
+    # Solo penalizar extra si fatiga es MUY alta (>7)
+    fatigue_context = 0
+    if fatigue > 7 and fatigue_sensitivity > 1.1:
+        fatigue_context = -0.03  # Reducido de 0.08
+        breakdown['notes'].append(f"⚠️ Fatiga muy alta detectada")
+    
+    # Stiffness muy tolerante (solo impacta si es muy alto)
+    stiffness_penalty = (max(0, stiffness - 3) / 10) * 0.03  # Solo penaliza si >3
+    
+    # Componente estado (42% del restante = ~35 pts max)
+    # Con inputs perfectos debe aportar ~35 pts
+    state_component = base_weight_multiplier * 0.42 * (
+        0.40 * energy_score +
+        0.35 * fatigue_score * min(fatigue_sensitivity, 1.15) +
+        0.20 * stress_score * min(stress_sensitivity, 1.15) +
         0.05 * soreness_score
-        - stiffness_penalty + fatigue_context
-    )
+    ) - stiffness_penalty + fatigue_context
+    
+    state_component = max(0, state_component)
     breakdown['components']['state'] = state_component * 100
     
-    # === 4. MOTIVACIÓN ===
+    # === 4. MOTIVACIÓN (18% del restante = ~15 pts max)
     motivation_score = motivation / 10
-    motivation_component = base_weight_multiplier * 0.15 * motivation_score
+    motivation_component = base_weight_multiplier * 0.18 * motivation_score
     breakdown['components']['motivation'] = motivation_component * 100
     
-    # === 5. PENALIZACIONES FLAGS ===
-    pain_penalty = 0.25 if pain_flag else 0
+    # === 5. PENALIZACIONES FLAGS (más tolerantes) ===
+    pain_penalty = 0.15 if pain_flag else 0  # Reducido de 0.25
     
-    sick_penalty_map = {0: 0.0, 1: 0.10, 2: 0.15, 3: 0.25, 4: 0.35, 5: 0.50}
+    # Sick penalty más gradual
+    sick_penalty_map = {0: 0.0, 1: 0.05, 2: 0.08, 3: 0.15, 4: 0.25, 5: 0.35}
     sick_penalty = sick_penalty_map.get(sick_level, 0.0)
     
+    # Cafeína: solo penalizar si fatiga es ALTA
     caffeine_mask = 0
-    if caffeine >= 2 and fatigue >= 6:
-        caffeine_mask = 0.08
+    if caffeine >= 3 and fatigue >= 7:  # Más restrictivo
+        caffeine_mask = 0.05  # Reducido de 0.08
         breakdown['notes'].append(f"☕ Cafeína alta + fatiga → posible enmascaramiento")
     
     breakdown['context_adjustments'] = {
