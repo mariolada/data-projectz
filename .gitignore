@@ -10,5 +10,10 @@ __pycache__/
 /data/
 outputs/
 
+# Entorno virtual
+.venv/
+venv/
+env/
+
 # No ignorar el módulo app/data
 !app/data/

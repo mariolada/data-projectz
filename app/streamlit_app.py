@@ -31,11 +31,20 @@ from charts.daily_charts import (
 from ui.components import render_section_title
 from ui.styles import inject_main_css, inject_hero
 from ui.loader import loading, inject_loader_css
-from views import render_modo_hoy, render_semana, render_perfil, render_entrenamiento
+from views import render_modo_hoy, render_semana, render_perfil, render_entrenamiento, render_login
 
 
 def main():
     st.set_page_config(page_title="Trainer Readiness Dashboard", layout="wide")
+    
+    # Inicializar session_state para autenticación
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+    
+    # Login gate: si no hay usuario autenticado, mostrar pantalla minimalista y detener
+    if not st.session_state.authenticated:
+        render_login(providers=("google", "github"))
+        st.stop()
     
     # Inyectar CSS principal, Hero y Loader
     inject_main_css(st)

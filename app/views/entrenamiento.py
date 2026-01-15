@@ -188,7 +188,7 @@ def _recent_sessions_summary(df_hist: pd.DataFrame, limit: int = 10) -> pd.DataF
                  * pd.to_numeric(g["weight"], errors="coerce").fillna(0)).sum()
             ) if {"sets", "reps", "weight"}.issubset(g.columns) else 0.0,
             "rpe_mean": float(pd.to_numeric(g["rpe"], errors="coerce").mean()) if "rpe" in g.columns else float("nan"),
-        }))
+        }), include_groups=False)
         .reset_index()
         .sort_values("date", ascending=False)
         .head(limit)
@@ -252,143 +252,236 @@ def render_entrenamiento() -> None:
     st.markdown(
         """
         <style>
-        :root{
-          --bg:#0b0f14;
-          --surface:#0f1620;
-          --surface2:#0c131c;
-          --border:rgba(255,255,255,.10);
-          --border2:rgba(255,255,255,.07);
-          --text:#e8fff3;
-          --muted:rgba(232,255,243,.66);
-          --accent:#00ffb0;
-          --danger:#ff4b4b;
-          --radius:14px;
-          --shadow: 0 10px 30px rgba(0,0,0,.33);
+        :root {
+            --bg: #0B0F14;
+            --surface: rgba(15,22,32,0.95);
+            --surface-alt: rgba(20,28,40,0.85);
+            --border: rgba(255,255,255,0.06);
+            --border-light: rgba(255,255,255,0.08);
+            --text: rgba(235,235,235,0.95);
+            --text-secondary: rgba(200,200,200,0.8);
+            --muted: rgba(150,150,150,0.65);
+            --good: #00FFB0;
+            --good-soft: rgba(0,255,176,0.2);
+            --warn: #FFB81C;
+            --warn-soft: rgba(255,184,28,0.15);
+            --risk: #FF6B5E;
+            --risk-soft: rgba(255,107,94,0.15);
         }
 
         body, .stApp { background: var(--bg) !important; }
 
-        .n-card{
-          background: linear-gradient(180deg, rgba(15,22,32,.92), rgba(12,19,28,.92));
-          border:1px solid var(--border);
-          border-radius: var(--radius);
-          box-shadow: var(--shadow);
-          padding: 14px 14px;
-        }
-        .n-title{
-          font-size: 2.05rem;
-          font-weight: 850;
-          letter-spacing: .02em;
-          color: var(--text);
-          margin: .15rem 0 .15rem 0;
-          text-shadow: 0 0 14px rgba(0,255,176,.14);
-        }
-        .n-sub{
-          color: var(--muted);
-          font-size: 1.02rem;
-          margin: 0 0 .9rem 0;
-        }
-        .n-sep{
-          height: 1px;
-          background: linear-gradient(90deg, transparent, rgba(0,255,176,.34), transparent);
-          opacity: .35;
-          margin: 12px 0;
+        /* HEADER */
+        .training-header {
+            margin-bottom: 28px;
         }
 
-        /* Chips */
-        .n-chip{
-          display:inline-flex;
-          align-items:center;
-          gap:8px;
-          padding: 6px 10px;
-          border: 1px solid rgba(0,255,176,.26);
-          border-radius: 999px;
-          color: var(--text);
-          background: rgba(0,0,0,.25);
-          font-weight: 780;
-          font-size: .92rem;
-          margin: 4px 6px 4px 0;
-          white-space: nowrap;
-        }
-        .n-chip-muted{
-          border-color: var(--border2);
-          color: var(--muted);
-          font-weight: 650;
+        .training-title {
+            color: var(--text);
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+            margin-bottom: 6px;
         }
 
-        /* Grid header */
-        .n-grid-header{
-          position: sticky;
-          top: 0;
-          z-index: 10;
-          background: rgba(15,22,32,.98);
-          border: 1px solid var(--border);
-          border-radius: 12px;
-          padding: 7px 10px;
-          margin-top: 10px;
-        }
-        .n-hcell{
-          color: rgba(232,255,243,.78);
-          font-weight: 900;
-          letter-spacing: .08em;
-          font-size: .74rem;
-          text-transform: uppercase;
+        .training-subtitle {
+            color: var(--muted);
+            font-size: 0.95rem;
+            line-height: 1.5;
         }
 
-        /* Rows */
-        .n-row{
-          border: 1px solid var(--border2);
-          background: rgba(0,0,0,.13);
-          border-radius: 12px;
-          padding: 7px 10px;
-          margin: 7px 0;
-          transition: border-color .12s ease, background .12s ease, transform .08s ease;
-        }
-        .n-row.zebra{ background: rgba(255,255,255,.03); }
-        .n-row:hover{
-          border-color: rgba(0,255,176,.28);
-          background: rgba(0,255,176,.055);
-          transform: translateY(-1px);
+        /* CARDS */
+        .training-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
         }
 
-        /* Make widgets feel like cells */
+        .training-card.card-primary {
+            border-top: 3px solid var(--good);
+        }
+
+        .training-card.card-sticky {
+            position: sticky;
+            top: 1.2rem;
+        }
+
+        .card-label {
+            color: var(--muted);
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            margin-bottom: 16px;
+            display: block;
+        }
+
+        /* CHIPS */
+        .training-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 1px solid var(--border-light);
+            color: var(--text-secondary);
+            background: rgba(255,255,255,0.02);
+            margin-bottom: 8px;
+            margin-right: 8px;
+        }
+
+        .training-chip.good {
+            border-color: rgba(0,255,176,0.4);
+            color: var(--good);
+            background: var(--good-soft);
+        }
+
+        .training-chip.warn {
+            border-color: rgba(255,184,28,0.4);
+            color: var(--warn);
+            background: var(--warn-soft);
+        }
+
+        .training-chip.muted {
+            border-color: var(--border);
+            color: var(--muted);
+            background: rgba(255,255,255,0.01);
+        }
+
+        /* GRID HEADER */
+        .training-grid-header {
+            display: grid;
+            grid-template-columns: 0.35fr 3.2fr 1fr 1fr 1.25fr 0.95fr 0.95fr 0.52fr;
+            gap: 8px;
+            padding: 12px 14px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            margin-top: 16px;
+            margin-bottom: 8px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--muted);
+        }
+
+        /* ROWS */
+        .training-row {
+            display: grid;
+            grid-template-columns: 0.35fr 3.2fr 1fr 1fr 1.25fr 0.95fr 0.95fr 0.52fr;
+            gap: 8px;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            background: rgba(0,0,0,0.13);
+            border-radius: 12px;
+            margin-bottom: 8px;
+            align-items: center;
+            transition: all 0.12s ease;
+        }
+
+        .training-row:nth-child(even) {
+            background: rgba(255,255,255,0.03);
+        }
+
+        .training-row:hover {
+            border-color: rgba(0,255,176,0.28);
+            background: rgba(0,255,176,0.055);
+            transform: translateY(-1px);
+        }
+
+        /* SUMMARY STATS */
+        .summary-stat {
+            margin-bottom: 12px;
+        }
+
+        .summary-stat-label {
+            color: var(--muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        .summary-stat-value {
+            color: var(--text);
+            font-size: 1.4rem;
+            font-weight: 800;
+        }
+
+        .summary-stat-hint {
+            color: var(--muted);
+            font-size: 0.75rem;
+            margin-top: 2px;
+        }
+
+        /* BUTTONS */
+        .stButton > button[kind="primary"] {
+            background: linear-gradient(90deg, rgba(0,255,176,1), rgba(0,201,167,1)) !important;
+            color: #061018 !important;
+            border-radius: 12px !important;
+            font-weight: 800 !important;
+            letter-spacing: 0.02em;
+            box-shadow: 0 10px 26px rgba(0,255,176,0.14) !important;
+        }
+
+        .stButton > button[kind="primary"]:hover {
+            filter: brightness(1.03);
+            box-shadow: 0 12px 30px rgba(0,255,176,0.18) !important;
+        }
+
+        /* INPUT STYLING */
         div[data-testid="stSelectbox"] > div,
         div[data-testid="stNumberInput"] > div,
-        div[data-testid="stTextInput"] > div{
-          background: rgba(0,0,0,.18) !important;
-          border: 1px solid var(--border2) !important;
-          border-radius: 10px !important;
+        div[data-testid="stTextInput"] > div {
+            background: rgba(0,0,0,0.18) !important;
+            border: 1px solid var(--border) !important;
+            border-radius: 10px !important;
         }
+
         div[data-testid="stSelectbox"] > div:hover,
         div[data-testid="stNumberInput"] > div:hover,
-        div[data-testid="stTextInput"] > div:hover{
-          border-color: rgba(0,255,176,.22) !important;
+        div[data-testid="stTextInput"] > div:hover {
+            border-color: rgba(0,255,176,0.22) !important;
         }
+
         div[data-testid="stSelectbox"] > div:focus-within,
         div[data-testid="stNumberInput"] > div:focus-within,
-        div[data-testid="stTextInput"] > div:focus-within{
-          border-color: rgba(0,255,176,.55) !important;
-          box-shadow: 0 0 0 2px rgba(0,255,176,.16) !important;
+        div[data-testid="stTextInput"] > div:focus-within {
+            border-color: rgba(0,255,176,0.55) !important;
+            box-shadow: 0 0 0 2px rgba(0,255,176,0.16) !important;
         }
 
-        /* Reduce vertical gaps */
-        .stNumberInput, .stSelectbox, .stTextInput { margin-top: -3px; }
-        .stButton { margin-top: -2px; }
-
-        /* Primary button */
-        .stButton > button[kind="primary"]{
-          border-radius: 12px !important;
-          font-weight: 900 !important;
-          letter-spacing: .02em;
-          padding: 0.78rem 1rem !important;
-          border: none !important;
-          background: linear-gradient(90deg, rgba(0,255,176,1), rgba(0,201,167,1)) !important;
-          color: #061018 !important;
-          box-shadow: 0 10px 26px rgba(0,255,176,.14) !important;
+        /* SEPARATOR */
+        .training-sep {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(0,255,176,0.2), transparent);
+            margin: 16px 0;
         }
-        .stButton > button[kind="primary"]:hover{
-          filter: brightness(1.03);
-          box-shadow: 0 12px 30px rgba(0,255,176,.18) !important;
+
+        /* TABS */
+        .stTabs [data-baseweb="tab-list"] {
+            background: rgba(0,0,0,0.1);
+            border-bottom: 1px solid var(--border);
+            border-radius: 12px 12px 0 0;
+            padding: 0.25rem;
+            gap: 4px;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            border-radius: 10px;
+            color: var(--muted);
+        }
+
+        .stTabs [aria-selected="true"] {
+            background: rgba(0,255,176,0.15) !important;
+            color: var(--good) !important;
         }
         </style>
         """,
@@ -396,14 +489,19 @@ def render_entrenamiento() -> None:
     )
 
     # ---------- Header ----------
-    st.markdown('<div class="n-title">Entrenamiento</div>', unsafe_allow_html=True)
-    st.markdown('<div class="n-sub">Registra tu sesión estilo Excel: rápido, claro y coherente con el resto de la app.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="training-header">', unsafe_allow_html=True)
+    st.markdown('<div class="training-title">Entrenamiento</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="training-subtitle">Registra tu sesión estilo Excel: rápido, claro y coherente con el resto de la app.</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
 
     col_main, col_side = st.columns([7, 3], gap="large")
 
     # ---------- Main ----------
     with col_main:
-        st.markdown('<div class="n-card">', unsafe_allow_html=True)
+        st.markdown('<div class="training-card card-primary">', unsafe_allow_html=True)
 
         # Fecha + nombre sesión
         c1, c2 = st.columns([1.15, 2.45], gap="medium")
@@ -450,16 +548,10 @@ def render_entrenamiento() -> None:
                     "- **3**: 3 reps"
                 )
 
-        st.markdown('<div class="n-sep"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="training-sep"></div>', unsafe_allow_html=True)
 
-        # Header “Excel”
-        st.markdown('<div class="n-grid-header">', unsafe_allow_html=True)
-        hcols = st.columns([0.35, 3.2, 1.0, 1.0, 1.25, 0.95, 0.95, 0.52], gap="small")
-        labels = ["#", "Ejercicio", "Series", "Reps", "Peso (kg)", "RPE", "RIR", ""]
-        for col, lab in zip(hcols, labels):
-            with col:
-                st.markdown(f'<div class="n-hcell">{lab}</div>', unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+        # Header "Excel"
+        st.markdown('<div class="training-grid-header"># | Ejercicio | Series | Reps | Peso (kg) | RPE | RIR | </div>', unsafe_allow_html=True)
 
         # Render rows
         rows_data: list[dict] = []
@@ -472,13 +564,12 @@ def render_entrenamiento() -> None:
             else:
                 row = get_empty_row(selected_date)
 
-            zebra = "zebra" if i % 2 == 1 else ""
-            st.markdown(f'<div class="n-row {zebra}">', unsafe_allow_html=True)
+            st.markdown(f'<div class="training-row">', unsafe_allow_html=True)
 
             cols = st.columns([0.35, 3.2, 1.0, 1.0, 1.25, 0.95, 0.95, 0.52], gap="small")
 
             with cols[0]:
-                st.markdown(f"**{i+1}**")
+                st.markdown(f"<div style='color:var(--muted);text-align:center;font-weight:700'>{i+1}</div>", unsafe_allow_html=True)
 
             with cols[1]:
                 opciones = [""] + all_ex + ["➕ Nuevo ejercicio..."]
@@ -579,16 +670,16 @@ def render_entrenamiento() -> None:
                 st.rerun()
         with add_cols[1]:
             st.markdown(
-                '<span class="n-chip n-chip-muted">Tip: usa Tab para moverte rápido por las celdas</span>',
+                '<span class="training-chip muted">Tip: usa Tab para moverte rápido por las celdas</span>',
                 unsafe_allow_html=True
             )
 
-        st.markdown("</div>", unsafe_allow_html=True)  # end card
+        st.markdown("</div>", unsafe_allow_html=True)
 
     # ---------- Sidebar ----------
     with col_side:
-        st.markdown('<div class="n-card" style="position:sticky;top:1.2rem;">', unsafe_allow_html=True)
-        st.markdown("### Resumen de sesión")
+        st.markdown('<div class="training-card card-sticky">', unsafe_allow_html=True)
+        st.markdown('<span class="card-label">Resumen de Sesión</span>', unsafe_allow_html=True)
 
         df_to_save = st.session_state.training_data.copy()
         df_to_save["date"] = selected_date
@@ -602,36 +693,33 @@ def render_entrenamiento() -> None:
 
         if not df_to_save.empty:
             vol = float((df_to_save["sets"] * df_to_save["reps"] * df_to_save["weight"]).sum())
-            st.markdown(
-                f'<span class="n-chip">Ejercicios: {len(df_to_save)}</span>'
-                f'<span class="n-chip">Series: {int(df_to_save["sets"].sum())}</span>'
-                f'<span class="n-chip">Volumen: {vol:,.0f} kg</span>',
-                unsafe_allow_html=True
-            )
+            st.markdown(f'<span class="training-chip good">Ejercicios: {len(df_to_save)}</span>', unsafe_allow_html=True)
+            st.markdown(f'<span class="training-chip good">Series: {int(df_to_save["sets"].sum())}</span>', unsafe_allow_html=True)
+            st.markdown(f'<span class="training-chip good">Volumen: {vol:,.0f} kg</span>', unsafe_allow_html=True)
             try:
                 e1rm_top = float((df_to_save["weight"] * (1 + df_to_save["reps"] / 30.0)).max())
-                st.markdown(f'<span class="n-chip">e1RM top: {e1rm_top:.1f} kg</span>', unsafe_allow_html=True)
+                st.markdown(f'<span class="training-chip good">e1RM: {e1rm_top:.1f} kg</span>', unsafe_allow_html=True)
             except Exception:
                 pass
 
             if "rpe" in df_to_save.columns and df_to_save["rpe"].notna().any():
                 st.markdown(
-                    f'<span class="n-chip n-chip-muted">RPE medio: {df_to_save["rpe"].mean():.2f}</span>',
+                    f'<span class="training-chip muted">RPE: {df_to_save["rpe"].mean():.1f}/10</span>',
                     unsafe_allow_html=True
                 )
             if "rir" in df_to_save.columns and df_to_save["rir"].notna().any():
                 st.markdown(
-                    f'<span class="n-chip n-chip-muted">RIR medio: {df_to_save["rir"].mean():.2f}</span>',
+                    f'<span class="training-chip muted">RIR: {df_to_save["rir"].mean():.1f}</span>',
                     unsafe_allow_html=True
                 )
         else:
             st.info("Añade al menos un ejercicio para ver el resumen.")
 
-        st.markdown('<div class="n-sep"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="training-sep"></div>', unsafe_allow_html=True)
 
-        # Guardar (siempre visible)
+        # Guardar
         save_clicked = st.button(
-            "💾 Guardar entrenamiento",
+            "💾 GUARDAR ENTRENAMIENTO",
             type="primary",
             width="stretch",
             key="save_training_primary"
@@ -662,49 +750,44 @@ def render_entrenamiento() -> None:
                         st.success(f"✅ Guardado: {name_to_save}")
                         st.balloons()
 
-        st.markdown('<div class="n-sep"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="training-sep"></div>', unsafe_allow_html=True)
 
-        # Recientes / Plantillas (siempre visibles)
-        tabs = st.tabs(["Recientes", "Plantillas"])
+        # Sesiones recientes
+        st.markdown('<span class="card-label">Sesiones Recientes</span>', unsafe_allow_html=True)
+        df_hist = load_existing_training()
+        recent = _recent_sessions_summary(df_hist, limit=10)
 
-        with tabs[0]:
-            df_hist = load_existing_training()
-            recent = _recent_sessions_summary(df_hist, limit=10)
+        if recent.empty:
+            st.markdown(f"<div style='color:var(--muted);text-align:center;padding:12px;font-size:0.9rem;'>Sin sesiones recientes.</div>", unsafe_allow_html=True)
+        else:
+            for idx, r in recent.iterrows():
+                d = r["date"]
+                name = str(r.get("session_name", "")).strip()
+                title = name if name else f"Sesión {d.strftime('%d/%m/%Y')}"
+                vol = r.get("vol", 0.0)
+                rpe_mean = r.get("rpe_mean", float("nan"))
 
-            if recent.empty:
-                st.caption("Sin sesiones recientes.")
-            else:
-                for idx, r in recent.iterrows():
-                    d = r["date"]
-                    name = str(r.get("session_name", "")).strip()
-                    title = name if name else f"Sesión {d.strftime('%d/%m/%Y')}"
-                    vol = r.get("vol", 0.0)
-                    rpe_mean = r.get("rpe_mean", float("nan"))
+                row = st.columns([3.2, 1.2], gap="small")
+                with row[0]:
+                    st.markdown(
+                        f"**{d.strftime('%d/%m/%Y')} — {title}**  \n"
+                        f"<span style='color:rgba(232,255,243,.66)'>Vol: {vol:,.0f} kg"
+                        + (f" | RPE: {rpe_mean:.1f}" if pd.notna(rpe_mean) else "")
+                        + "</span>",
+                        unsafe_allow_html=True
+                    )
+                with row[1]:
+                    if st.button("Cargar", width="stretch", key=f"load_{idx}_{d}"):
+                        # Solo actualiza la variable lógica, no la del widget
+                        st.session_state.training_date = d
+                        st.session_state.training_data = _session_rows(df_hist, d)
+                        st.session_state.num_rows = max(1, len(st.session_state.training_data))
 
-                    row = st.columns([3.2, 1.2], gap="small")
-                    with row[0]:
-                        st.markdown(
-                            f"**{d.strftime('%d/%m/%Y')} — {title}**  \n"
-                            f"<span style='color:rgba(232,255,243,.66)'>Vol: {vol:,.0f} kg"
-                            + (f" | RPE: {rpe_mean:.1f}" if pd.notna(rpe_mean) else "")
-                            + "</span>",
-                            unsafe_allow_html=True
-                        )
-                    with row[1]:
-                        if st.button("Cargar", width="stretch", key=f"load_{idx}_{d}"):
-                            # Solo actualiza la variable lógica, no la del widget
-                            st.session_state.training_date = d
-                            st.session_state.training_data = _session_rows(df_hist, d)
-                            st.session_state.num_rows = max(1, len(st.session_state.training_data))
+                        # Sync banco ejercicios con esa sesión
+                        for ex in st.session_state.training_data["exercise"].dropna().astype(str).tolist():
+                            add_exercise_to_bank(ex)
 
-                            # Sync banco ejercicios con esa sesión
-                            for ex in st.session_state.training_data["exercise"].dropna().astype(str).tolist():
-                                add_exercise_to_bank(ex)
+                        st.rerun()
 
-                            st.rerun()
-
-        with tabs[1]:
-            st.caption("Plantillas (próximo paso): guardar una sesión como plantilla reutilizable.")
-            st.markdown('<span class="n-chip n-chip-muted">Idea: “Upper A”, “Lower B”, “Full Body”</span>', unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
