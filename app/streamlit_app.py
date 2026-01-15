@@ -282,7 +282,7 @@ def main():
             # Recreate styled with formatted values
             styled = display_df.style.map(color_readiness, subset=['readiness_score'])
         
-        st.dataframe(styled, use_container_width=True)
+        st.dataframe(styled, width="stretch")
         
         # ============== CHARTS ==============
         render_section_title("Gráficas", accent="#FF6B6B")
@@ -292,7 +292,7 @@ def main():
             if 'readiness_score' in df_filtered.columns:
                 rts = df_filtered.set_index('date')['readiness_score'].sort_index()
                 fig = create_readiness_chart(rts, "Readiness")
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig)
                 
                 with st.expander("❓ ¿Qué significa Readiness?"):
                     st.write("""
@@ -322,7 +322,7 @@ def main():
                 
                 if not pi.empty:
                     fig = create_performance_chart(pi, "Performance Index")
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig)
                 else:
                     # Si no hay datos en el rango filtrado, intentar mostrar TODO el histórico disponible
                     pi_all = (df_daily
@@ -334,7 +334,7 @@ def main():
                     if not pi_all.empty:
                         st.info("💡 Sin datos en el rango seleccionado. Mostrando histórico completo:")
                         fig = create_performance_chart(pi_all, "Performance Index (Histórico Completo)")
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig)
                     else:
                         st.warning(" Performance Index sin datos disponibles. Verifica que daily.csv tenga la columna 'performance_index' con valores numéricos o ejecuta el pipeline que lo calcule.")
             else:
@@ -359,7 +359,7 @@ def main():
         if 'volume' in df_filtered.columns:
             vol = df_filtered.set_index('date')['volume'].sort_index()
             fig = create_volume_chart(vol, "Volumen")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig)
             
             with st.expander("❓ ¿Qué significa Volumen?"):
                 st.write("""

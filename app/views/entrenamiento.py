@@ -572,7 +572,7 @@ def render_entrenamiento() -> None:
         # Add row
         add_cols = st.columns([1.5, 6.5], gap="small")
         with add_cols[0]:
-            if st.button("＋ Añadir fila", key="add_row", use_container_width=True):
+            if st.button("＋ Añadir fila", key="add_row", width="stretch"):
                 st.session_state.num_rows += 1
                 new_row = pd.DataFrame([get_empty_row(selected_date)])
                 st.session_state.training_data = pd.concat([st.session_state.training_data, new_row], ignore_index=True)
@@ -633,7 +633,7 @@ def render_entrenamiento() -> None:
         save_clicked = st.button(
             "💾 Guardar entrenamiento",
             type="primary",
-            use_container_width=True,
+            width="stretch",
             key="save_training_primary"
         )
         st.caption("Se guardará con fecha y nombre de sesión (opcional).")
@@ -691,7 +691,7 @@ def render_entrenamiento() -> None:
                             unsafe_allow_html=True
                         )
                     with row[1]:
-                        if st.button("Cargar", use_container_width=True, key=f"load_{idx}_{d}"):
+                        if st.button("Cargar", width="stretch", key=f"load_{idx}_{d}"):
                             # Solo actualiza la variable lógica, no la del widget
                             st.session_state.training_date = d
                             st.session_state.training_data = _session_rows(df_hist, d)

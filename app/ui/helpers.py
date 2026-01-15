@@ -1628,9 +1628,10 @@ def render_live_summary(recovery: dict, state: dict, flags: dict,
 def render_wizard_progress(current_step: int, total_steps: int = 3):
     """Renderiza la barra de progreso del wizard."""
     steps = ['Recuperación', 'Estado', 'Flags']
-    
+
     html = (
-        f'<div style="display:flex;justify-content:center;align-items:center;gap:8px;margin-bottom:24px;">'
+        f'<div class="mh-card mh-card-left mh-aqua" style="margin-bottom:18px;">'
+        f'<div style="display:flex;justify-content:center;align-items:center;gap:10px;">'
     )
     
     for i, step_name in enumerate(steps):
@@ -1671,22 +1672,23 @@ def render_wizard_progress(current_step: int, total_steps: int = 3):
                 f'<div style="flex:1;max-width:60px;height:2px;background:{line_color};'
                 f'margin:0 4px;margin-bottom:20px;"></div>'
             )
-    
-    html += '</div>'
+
+    html += '</div></div>'
     st.markdown(html, unsafe_allow_html=True)
 
 
 def render_step_header(step_num: int, title: str, subtitle: str):
     """Renderiza el header de un paso del wizard."""
+    accent = '#4ECDC4' if step_num == 1 else '#B266FF' if step_num == 2 else '#E05555'
     html = (
-        f'<div style="margin-bottom:20px;">'
-        f'<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">'
-        f'<span style="background:linear-gradient(135deg,#4ECDC4,#44A08D);'
-        f'color:#fff;font-weight:700;font-size:0.85rem;padding:4px 10px;'
-        f'border-radius:6px;">PASO {step_num}</span>'
-        f'<span style="color:#e0e0e0;font-size:1.1rem;font-weight:600;">{title}</span>'
+        f'<div class="mh-card mh-card-left" style="border-left-color:{accent};margin-bottom:16px;">'
+        f'<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'
+        f'<span style="padding:4px 10px;border-radius:6px;'
+        f'background:rgba(255,255,255,0.02);border:1px solid {accent}40;color:{accent};'
+        f'font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;">PASO {step_num}</span>'
+        f'<span style="color:#f0f0f0;font-size:1.05rem;font-weight:700;">{title}</span>'
         f'</div>'
-        f'<div style="color:#888;font-size:0.85rem;padding-left:2px;">{subtitle}</div>'
+        f'<div class="mh-muted" style="font-size:0.85rem;">{subtitle}</div>'
         f'</div>'
     )
     st.markdown(html, unsafe_allow_html=True)
@@ -1742,6 +1744,38 @@ def render_micro_badge(text: str, level: str):
         f'font-size:0.7rem;font-weight:600;padding:2px 8px;'
         f'border-radius:4px;">{text}</span>'
         f'</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_status_badge(prefix: str, status: dict):
+    """Badge discreto tipo chip: "Recuperación: Buena" / "Estado: Fresco"."""
+    level = status.get('level', 'mid')
+    emoji = status.get('emoji', '')
+    label = status.get('label', '')
+
+    tone_cls = {
+        'ok': 'mh-chip-green',
+        'mid': 'mh-chip-amber',
+        'low': 'mh-chip-red',
+    }.get(level, 'mh-chip-amber')
+
+    html = (
+        f'<div style="display:flex;justify-content:flex-end;margin-top:10px;">'
+        f'<span class="mh-chip {tone_cls}">{emoji} {prefix}: <strong>{label}</strong></span>'
+        f'</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_slider_scale(left: str, mid: str, right: str):
+    """Fila de significado bajo sliders (Bajo / OK / Alto)."""
+    html = (
+        '<div class="mh-scale">'
+        f'<span>{left}</span>'
+        f'<span>{mid}</span>'
+        f'<span>{right}</span>'
+        '</div>'
     )
     st.markdown(html, unsafe_allow_html=True)
 
@@ -1847,9 +1881,11 @@ def render_collapsible_flags_header(flag_count: int):
 def render_quick_mode_section_header(title: str, emoji: str = ""):
     """Header compacto para secciones en modo rápido."""
     html = (
-        f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;margin-top:20px;">'
+        f'<div style="display:flex;align-items:center;gap:10px;margin:18px 0 12px 0;">'
         f'<span style="font-size:1.1rem;">{emoji}</span>'
-        f'<span style="color:#e0e0e0;font-size:0.95rem;font-weight:600;">{title}</span>'
+        f'<span style="font-family:Orbitron, system-ui;letter-spacing:0.06em;text-transform:uppercase;'
+        f'color:#e0e0e0;font-size:0.95rem;font-weight:800;">{title}</span>'
+        f'<span style="flex:1;height:1px;background:rgba(255,255,255,0.08);"></span>'
         f'</div>'
     )
     st.markdown(html, unsafe_allow_html=True)

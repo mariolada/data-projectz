@@ -513,9 +513,203 @@ MAIN_CSS = """
 # CSS adicional para el Modo Hoy
 MODE_TODAY_CSS = """
 <style>
-/* Gaming-dark theme */
-.stApp {
-    background: linear-gradient(135deg, #0a0e27 0%, #1a1a2e 100%);
+/* =====================================================
+   MODO HOY — Base negra minimalista
+   (sobrescribe el MAIN_CSS para esta vista)
+   ===================================================== */
+
+:root {
+    --mh-bg0: #07090f;
+    --mh-bg1: #0b0e14;
+    --mh-panel: rgba(22, 22, 28, 0.92);
+    --mh-panel2: rgba(28, 26, 32, 0.88);
+    --mh-border: rgba(255, 255, 255, 0.06);
+    --mh-text: #e6e6e6;
+    --mh-muted: #9ca3af;
+    --mh-aqua: #4ECDC4;
+    --mh-green: #00D084;
+    --mh-amber: #E0A040;
+    --mh-red: #E05555;
+    --primary-color: #4ECDC4;
+}
+
+html, body {
+    background: var(--mh-bg0) !important;
+    color: var(--mh-text) !important;
+}
+
+/* Streamlit containers (force the black base everywhere) */
+.stApp,
+[data-testid="stAppViewContainer"],
+[data-testid="stAppViewContainer"] > .main,
+.main {
+    background:
+        radial-gradient(circle at 12% 10%, rgba(78, 205, 196, 0.06), transparent 28%),
+        radial-gradient(circle at 85% 0%, rgba(178, 102, 255, 0.05), transparent 30%),
+        linear-gradient(180deg, var(--mh-bg1) 0%, var(--mh-bg0) 78%)
+        !important;
+    color: var(--mh-text) !important;
+}
+
+/* Reduce default top padding feel */
+[data-testid="stAppViewContainer"] .main .block-container {
+    padding-top: 1.25rem;
+}
+
+/* =====================================================
+   Contenedores con borde (st.container(border=True))
+   ===================================================== */
+
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    background: linear-gradient(135deg, var(--mh-panel), var(--mh-panel2)) !important;
+    border: 1px solid var(--mh-border) !important;
+    border-radius: 14px !important;
+    padding: 14px 16px !important;
+    box-shadow: 0 2px 14px rgba(0,0,0,0.32) !important;
+}
+
+/* =====================================================
+   Questionnaire wrapper styles are injected inline
+   in modo_hoy.py for precise targeting.
+   ===================================================== */
+
+/* Make inner border (if present) subtle */
+div[data-testid="stVerticalBlockBorderWrapper"] > div {
+    border-radius: 12px !important;
+}
+
+/* =====================================================
+   Tipografía/contraste (labels/captions)
+   ===================================================== */
+
+/* Widget labels */
+div[data-testid="stWidgetLabel"] > label,
+div[data-testid="stWidgetLabel"] p,
+div[data-testid="stWidgetLabel"] span {
+    color: rgba(230,230,230,0.92) !important;
+    font-weight: 600 !important;
+}
+
+/* Captions */
+div[data-testid="stCaptionContainer"],
+.stCaption {
+    color: rgba(190,190,190,0.75) !important;
+}
+
+/* Markdown inside blocks */
+div[data-testid="stMarkdownContainer"] p,
+div[data-testid="stMarkdownContainer"] span,
+div[data-testid="stMarkdownContainer"] div {
+    color: var(--mh-text);
+}
+
+/* =====================================================
+   MODO HOY — CUESTIONARIO (estética "Consejos")
+   Negro limpio + acentos, sin brillos agresivos
+   ===================================================== */
+
+/* Chips (badges discretos) */
+.mh-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 650;
+    letter-spacing: 0.01em;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.03);
+    color: rgba(230,230,230,0.92);
+}
+.mh-chip strong { font-weight: 800; }
+.mh-chip-green { border-color: rgba(0,208,132,0.30); color: #00D084; background: rgba(0,208,132,0.08); }
+.mh-chip-amber { border-color: rgba(224,160,64,0.30); color: #E0A040; background: rgba(224,160,64,0.08); }
+.mh-chip-red   { border-color: rgba(224,85,85,0.30); color: #E05555; background: rgba(224,85,85,0.08); }
+
+/* Slider scale labels (meaning row) */
+.mh-scale {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 0.72rem;
+    color: rgba(156,163,175,0.85);
+    margin-top: -6px;
+    padding: 0 2px 6px 2px;
+    user-select: none;
+}
+.mh-scale span:nth-child(2) { opacity: 0.85; }
+.mh-scale span:last-child { text-align: right; }
+
+/* Cards base (para wrappers HTML del cuestionario) */
+.mh-card {
+    background: linear-gradient(135deg, rgba(22,22,28,0.95), rgba(28,26,32,0.90));
+    border-radius: 12px;
+    padding: 16px 20px;
+    border: 1px solid rgba(255,255,255,0.05);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.30);
+}
+.mh-card-left {
+    border-left: 3px solid rgba(255,255,255,0.12);
+}
+.mh-card-left.mh-green { border-left-color: #50C878; }
+.mh-card-left.mh-aqua  { border-left-color: #4ECDC4; }
+.mh-card-left.mh-amber { border-left-color: #E0A040; }
+.mh-card-left.mh-red   { border-left-color: #E05555; }
+.mh-muted { color: #A0A0A0; }
+
+/* Widgets: inputs/selector/textarea */
+div[data-testid="stNumberInput"] input,
+div[data-testid="stTextInput"] input,
+div[data-testid="stTextArea"] textarea,
+div[data-testid="stDateInput"] input {
+    background: rgba(255,255,255,0.035) !important;
+    border: 1px solid rgba(255,255,255,0.09) !important;
+    border-radius: 10px !important;
+    color: var(--mh-text) !important;
+}
+
+/* NumberInput +/- buttons */
+div[data-testid="stNumberInput"] button {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    color: var(--mh-text) !important;
+    border-radius: 10px !important;
+}
+
+/* BaseWeb selectbox surface */
+div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+    background: rgba(255,255,255,0.035) !important;
+    border: 1px solid rgba(255,255,255,0.09) !important;
+    border-radius: 10px !important;
+}
+div[data-testid="stSelectbox"] * { color: var(--mh-text) !important; }
+
+/* Checkbox / radio subtle */
+div[data-testid="stCheckbox"] label,
+div[data-testid="stRadio"] label {
+    color: rgba(230,230,230,0.9) !important;
+}
+
+/* Slider surface + handle */
+div[data-testid="stSlider"] div[data-baseweb="slider"] {
+    padding: 8px 2px !important;
+}
+div[data-testid="stSlider"] div[data-baseweb="slider"] div[role="slider"] {
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.15) !important;
+}
+
+/* Slider track (remove the aggressive magenta look; keep subtle aqua) */
+div[data-testid="stSlider"] div[data-baseweb="slider"] div[role="presentation"] {
+    background: rgba(255,255,255,0.12) !important;
+}
+div[data-testid="stSlider"] div[data-baseweb="slider"] div[role="presentation"] > div {
+    background: linear-gradient(90deg, rgba(78,205,196,0.95), rgba(0,208,132,0.90)) !important;
+}
+
+/* Make widget labels less shouty (more premium) */
+label, .stMarkdown, p {
+    letter-spacing: 0.01em;
 }
 
 /* Mode Toggle */
@@ -610,10 +804,17 @@ MODE_TODAY_CSS = """
     box-shadow: 0 8px 30px rgba(0, 208, 132, 0.6);
 }
 
-/* Slider dynamic colors */
-.stSlider > div > div > div[data-baseweb="slider"] > div:first-child {
-    background: linear-gradient(90deg, #FF6B6B 0%, #FFB81C 50%, #00D084 100%) !important;
+/* Expander surface (flags, etc.) */
+div[data-testid="stExpander"] {
+    background: rgba(255,255,255,0.02) !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    border-radius: 12px !important;
 }
+div[data-testid="stExpander"] summary {
+    color: rgba(230,230,230,0.92) !important;
+}
+
+/* Remove the old rainbow slider rule (kept intentionally empty) */
 
 /* Compact output card */
 .compact-card {

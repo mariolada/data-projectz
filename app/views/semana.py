@@ -525,20 +525,20 @@ def _render_performance(df_week_days: pd.DataFrame, ctx: WeekContext) -> None:
     with cols[0]:
         readiness = _series_for_week(df_week_days, ctx, "readiness_score", fill_missing=None)
         if readiness is not None and readiness.notna().any():
-            st.plotly_chart(create_readiness_chart(readiness.dropna(), title="Readiness diario"), use_container_width=True)
+            st.plotly_chart(create_readiness_chart(readiness.dropna(), title="Readiness diario"))
 
         volume = _series_for_week(df_week_days, ctx, "volume", fill_missing=0.0)
         if volume is not None and volume.notna().any():
-            st.plotly_chart(create_volume_chart(volume, title="Volumen por día"), use_container_width=True)
+            st.plotly_chart(create_volume_chart(volume, title="Volumen por día"))
 
     with cols[1]:
         strain = _series_for_week(df_week_days, ctx, "strain", fill_missing=0.0)
         if strain is not None and strain.notna().any():
-            st.plotly_chart(create_strain_chart(strain, title="Strain por día"), use_container_width=True)
+            st.plotly_chart(create_strain_chart(strain, title="Strain por día"))
 
         monotony = _series_for_week(df_week_days, ctx, "monotony", fill_missing=None)
         if monotony is not None and monotony.notna().any():
-            st.plotly_chart(_create_monotony_chart(monotony.dropna(), title="Monotonía diaria"), use_container_width=True)
+            st.plotly_chart(_create_monotony_chart(monotony.dropna(), title="Monotonía diaria"))
 
 
 def _render_daily_table(df_week_days: pd.DataFrame) -> None:
@@ -657,23 +657,23 @@ def _render_multiweek_trends(df_weekly: pd.DataFrame) -> None:
         if "volume_week" in df.columns:
             s = pd.to_numeric(df.set_index("week_start")["volume_week"], errors="coerce").dropna()
             if not s.empty:
-                st.plotly_chart(create_volume_chart(s, title="Volumen semanal"), use_container_width=True)
+                st.plotly_chart(create_volume_chart(s, title="Volumen semanal"))
 
         if "readiness_avg" in df.columns:
             s = pd.to_numeric(df.set_index("week_start")["readiness_avg"], errors="coerce").dropna()
             if not s.empty:
-                st.plotly_chart(create_readiness_chart(s, title="Readiness promedio"), use_container_width=True)
+                st.plotly_chart(create_readiness_chart(s, title="Readiness promedio"))
 
     with cols[1]:
         if "strain" in df.columns:
             s = pd.to_numeric(df.set_index("week_start")["strain"], errors="coerce").dropna()
             if not s.empty:
-                st.plotly_chart(create_strain_chart(s, title="Strain semanal"), use_container_width=True)
+                st.plotly_chart(create_strain_chart(s, title="Strain semanal"))
 
         if "monotony" in df.columns:
             s = pd.to_numeric(df.set_index("week_start")["monotony"], errors="coerce").dropna()
             if not s.empty:
-                st.plotly_chart(_create_monotony_chart(s, title="Monotonía semanal"), use_container_width=True)
+                st.plotly_chart(_create_monotony_chart(s, title="Monotonía semanal"))
 
 
 def _render_suggested_sequence(df_week_days: pd.DataFrame, kpis: Dict[str, Any], df_weekly: pd.DataFrame) -> None:
