@@ -207,8 +207,10 @@ def create_strain_chart(data, title="Strain"):
     fig = go.Figure()
     max_val = data.max() if len(data) > 0 else 0
     y_max = max(max_val * 1.2, 1.0)
+
+    x_vals = pd.to_datetime(data.index)
     fig.add_trace(go.Scatter(
-        x=data.index,
+        x=x_vals,
         y=data.values,
         mode='lines+markers',
         name='Strain',
@@ -216,14 +218,14 @@ def create_strain_chart(data, title="Strain"):
         marker=dict(size=8, color='#FF6B6B', line=dict(color='#FFFFFF', width=2)),
         fill='tozeroy',
         fillcolor='rgba(255, 107, 107, 0.18)',
-        hovertemplate='<b>%{x}</b><br>Strain: %{y:,.0f}<extra></extra>'
+        hovertemplate='<b>%{x|%d/%m/%Y}</b><br>Strain: %{y:,.0f}<extra></extra>'
     ))
     fig.update_layout(
         title=dict(text=title, font=dict(size=16, color='#FF6B6B', family='Orbitron')),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         font=dict(color='#E0E0E0'),
-        xaxis=dict(showgrid=True, gridcolor='rgba(255, 107, 107, 0.12)', zeroline=False),
+        xaxis=dict(showgrid=True, gridcolor='rgba(255, 107, 107, 0.12)', zeroline=False, tickformat='%d/%m/%Y'),
         yaxis=dict(showgrid=True, gridcolor='rgba(255, 107, 107, 0.12)', zeroline=False, range=[0, y_max]),
         hovermode='x unified',
         margin=dict(l=40, r=40, t=40, b=40),
