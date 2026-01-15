@@ -15,5 +15,14 @@ outputs/
 venv/
 env/
 
+# Configuración local de Streamlit
+.streamlit/config.toml
+.streamlit/secrets.toml
+
+# Entorno virtual
+.venv/
+venv/
+env/
+
 # No ignorar el módulo app/data
 !app/data/
