@@ -2,7 +2,7 @@
 Vista Entrenamiento - Entrada de ejercicios estilo Excel (modo A: filas con st.columns)
 - UI coherente (negro + acento verde)
 - Tabla tipo Excel: header sticky, zebra, hover suave, inputs compactos
-- Añadir ejercicio "on the fly" (persistente en exercises.csv)
+- Añadir ejercicio "on the fly" (persistente en base de datos)
 - Guardado con nombre de sesión + reemplazo por fecha
 - Panel lateral: resumen + guardar + recientes (cargar una sesión)
 """
@@ -10,15 +10,16 @@ Vista Entrenamiento - Entrada de ejercicios estilo Excel (modo A: filas con st.c
 from __future__ import annotations
 
 import datetime
-from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
 from ui.loader import loading
+from database.connection import get_db, init_db
+from database.repositories import TrainingRepository, ExerciseRepository
 
-TRAINING_CSV_PATH = Path("data/raw/training.csv")
-EXERCISES_CSV_PATH = Path("data/raw/exercises.csv")
+# Inicializar base de datos al importar el módulo
+init_db()
 
 EJERCICIOS_BASE = [
     "Press Banca", "Press Inclinado", "Press Militar",
@@ -64,15 +65,12 @@ def validate_exercises(df: pd.DataFrame) -> tuple[bool, list[str]]:
 
 
 def load_existing_training() -> pd.DataFrame:
-    if TRAINING_CSV_PATH.exists():
-        try:
-            df = pd.read_csv(TRAINING_CSV_PATH)
-            if "date" in df.columns:
-                df["date"] = pd.to_datetime(df["date"]).dt.date
-            return df
-        except Exception:
-            return pd.DataFrame()
-    return pd.DataFrame(columns=["date", "session_name", "exercise", "sets", "reps", "weight", "rpe", "rir"])
+    """Carga entrenamientos desde la base de datos"""
+    db = next(get_db())
+    try:
+        return TrainingRepository.get_all(db)
+    finally:
+        db.close()
 
 
 def _normalize_ex_name(name: str) -> str:
@@ -81,22 +79,23 @@ def _normalize_ex_name(name: str) -> str:
 
 
 def load_exercises_bank() -> list[str]:
-    """Lee ejercicios persistidos (exercises.csv)."""
-    if EXERCISES_CSV_PATH.exists():
-        try:
-            df = pd.read_csv(EXERCISES_CSV_PATH)
-            if "exercise" in df.columns:
-                return sorted({_normalize_ex_name(x) for x in df["exercise"].dropna().astype(str).tolist() if str(x).strip()})
-        except Exception:
-            pass
-    return []
+    """Lee ejercicios desde la base de datos"""
+    db = next(get_db())
+    try:
+        return ExerciseRepository.get_all(db)
+    finally:
+        db.close()
 
 
 def save_exercises_bank(exercises: set[str]) -> None:
-    """Guarda ejercicios persistidos (exercises.csv) de forma idempotente."""
-    EXERCISES_CSV_PATH.parent.mkdir(parents=True, exist_ok=True)
-    clean = sorted({_normalize_ex_name(x) for x in exercises if str(x).strip()})
-    pd.DataFrame({"exercise": clean}).to_csv(EXERCISES_CSV_PATH, index=False)
+    """Guarda ejercicios en la base de datos"""
+    db = next(get_db())
+    try:
+        clean = sorted({_normalize_ex_name(x) for x in exercises if str(x).strip()})
+        for exercise_name in clean:
+            ExerciseRepository.add(db, exercise_name)
+    finally:
+        db.close()
 
 
 def add_exercise_to_bank(name: str) -> None:
@@ -135,24 +134,32 @@ def get_all_exercises() -> list[str]:
 
 
 def save_training(df: pd.DataFrame, date: datetime.date) -> bool:
+    """Guarda entrenamientos en la base de datos"""
+    db = next(get_db())
     try:
-        TRAINING_CSV_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-        if TRAINING_CSV_PATH.exists():
-            df_existing = pd.read_csv(TRAINING_CSV_PATH)
-            if "date" in df_existing.columns:
-                df_existing["date"] = pd.to_datetime(df_existing["date"]).dt.date
-            df_existing = df_existing[df_existing["date"] != date]
-            df_final = pd.concat([df_existing, df], ignore_index=True)
-        else:
-            df_final = df
-
-        df_final = df_final.sort_values("date", ascending=False)
-        df_final.to_csv(TRAINING_CSV_PATH, index=False)
+        # Eliminar entrenamientos existentes de esa fecha
+        TrainingRepository.delete_by_date(db, date)
+        
+        # Guardar nuevos
+        for _, row in df.iterrows():
+            training_data = {
+                'date': date,
+                'exercise': row.get('exercise', ''),
+                'sets': int(row.get('sets', 3)),
+                'reps': int(row.get('reps', 8)),
+                'weight': float(row.get('weight', 0.0)),
+                'rpe': float(row.get('rpe', 7.0)) if pd.notna(row.get('rpe')) else 7.0,
+                'rir': float(row.get('rir', 2.0)) if pd.notna(row.get('rir')) else 2.0,
+                'session_name': str(row.get('session_name', ''))
+            }
+            TrainingRepository.create(db, training_data)
+        
         return True
     except Exception as e:
         st.error(f"Error guardando: {e}")
         return False
+    finally:
+        db.close()
 
 
 def _session_rows(df_hist: pd.DataFrame, date: datetime.date) -> pd.DataFrame:
