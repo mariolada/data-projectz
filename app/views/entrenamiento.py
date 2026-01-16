@@ -18,6 +18,14 @@ from ui.loader import loading
 from database.connection import get_db, init_db
 from database.repositories import TrainingRepository, ExerciseRepository
 
+
+def _current_user_id() -> str:
+    return (
+        st.session_state.get("user_sub")
+        or st.session_state.get("user_email")
+        or "default_user"
+    )
+
 # Inicializar base de datos al importar el módulo
 init_db()
 
@@ -68,7 +76,7 @@ def load_existing_training() -> pd.DataFrame:
     """Carga entrenamientos desde la base de datos"""
     db = next(get_db())
     try:
-        return TrainingRepository.get_all(db)
+        return TrainingRepository.get_all(db, user_id=_current_user_id())
     finally:
         db.close()
 
@@ -82,7 +90,7 @@ def load_exercises_bank() -> list[str]:
     """Lee ejercicios desde la base de datos"""
     db = next(get_db())
     try:
-        return ExerciseRepository.get_all(db)
+        return ExerciseRepository.get_all(db, user_id=_current_user_id())
     finally:
         db.close()
 
@@ -93,7 +101,7 @@ def save_exercises_bank(exercises: set[str]) -> None:
     try:
         clean = sorted({_normalize_ex_name(x) for x in exercises if str(x).strip()})
         for exercise_name in clean:
-            ExerciseRepository.add(db, exercise_name)
+            ExerciseRepository.add(db, exercise_name, user_id=_current_user_id())
     finally:
         db.close()
 
@@ -138,7 +146,7 @@ def save_training(df: pd.DataFrame, date: datetime.date) -> bool:
     db = next(get_db())
     try:
         # Eliminar entrenamientos existentes de esa fecha
-        TrainingRepository.delete_by_date(db, date)
+        TrainingRepository.delete_by_date(db, date, user_id=_current_user_id())
         
         # Guardar nuevos
         for _, row in df.iterrows():
@@ -152,7 +160,7 @@ def save_training(df: pd.DataFrame, date: datetime.date) -> bool:
                 'rir': float(row.get('rir', 2.0)) if pd.notna(row.get('rir')) else 2.0,
                 'session_name': str(row.get('session_name', ''))
             }
-            TrainingRepository.create(db, training_data)
+            TrainingRepository.create(db, training_data, user_id=_current_user_id())
         
         return True
     except Exception as e:

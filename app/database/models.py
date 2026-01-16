@@ -62,3 +62,31 @@ class UserProfile(Base):
     user_id = Column(String, default='default_user', nullable=False, unique=True)
     data = Column(Text, nullable=False)  # JSON serializado del perfil
     last_updated = Column(DateTime, default=datetime.utcnow)
+
+
+class AuthSession(Base):
+    """Sesiones OAuth persistidas para no perder login en F5/ctrl+F5."""
+    __tablename__ = 'auth_sessions'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String, nullable=False)          # sub (google) o email
+    provider = Column(String, nullable=False)         # google, github, etc.
+    email = Column(String, nullable=True)
+    display_name = Column(String, nullable=True)
+    session_token_hash = Column(String, nullable=False, unique=True)
+    refresh_token = Column(Text, nullable=True)
+    access_token = Column(Text, nullable=True)
+    id_token = Column(Text, nullable=True)
+    expires_at = Column(DateTime, nullable=True)      # expiración del access token
+    session_expires_at = Column(DateTime, nullable=True)  # expiración del session cookie
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class PKCEState(Base):
+    """Almacena state/code_verifier pares para PKCE flow."""
+    __tablename__ = 'pkce_states'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    state = Column(String, nullable=False, unique=True)
+    code_verifier = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

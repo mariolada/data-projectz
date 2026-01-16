@@ -4,6 +4,7 @@ import numpy as np
 from pathlib import Path
 import datetime
 import sys
+import secrets
 
 # Añadir paths para imports
 APP_DIR = Path(__file__).parent
@@ -31,7 +32,115 @@ from charts.daily_charts import (
 from ui.components import render_section_title
 from ui.styles import inject_main_css, inject_hero
 from ui.loader import loading, inject_loader_css
+from ui.sidebar_premium import inject_sidebar_premium_css, render_sidebar_header
 from views import render_modo_hoy, render_semana, render_perfil, render_entrenamiento, render_login
+from auth.google_oauth import build_authorization_url, exchange_code_for_token, fetch_userinfo
+from auth.session_manager import (
+    generate_state_and_verifier,
+    create_persistent_session,
+    restore_session,
+    drop_session,
+    save_pkce_pair,
+    get_code_verifier,
+    delete_pkce_state,
+)
+
+
+def _current_user_id() -> str:
+    return (
+        st.session_state.get("user_sub")
+        or st.session_state.get("user_email")
+        or "default_user"
+    )
+
+
+def _restore_session_from_query():
+    """Restaura la sesión desde el query param 'session' si existe y es válido."""
+    params = dict(st.query_params)
+    session_token = params.get("session")
+    
+    if session_token and not st.session_state.get("authenticated"):
+        rec = restore_session(session_token)
+        if rec:
+            st.session_state.authenticated = True
+            st.session_state.user_email = rec.email or rec.user_id
+            st.session_state.user_sub = rec.user_id
+            st.session_state.auth_provider = rec.provider
+            st.session_state.session_token = session_token
+            return True
+        else:
+            # Limpiar query params si la sesión es inválida
+            st.query_params.clear()
+            return False
+    
+    return False
+
+
+def _handle_oauth_callback(params):
+    code = params.get("code")
+    state = params.get("state")
+    
+    if not code:
+        return False
+    
+    st.write("🔄 Procesando autenticación con Google...")
+
+    # Recuperar el code_verifier desde la BD usando el state
+    code_verifier = get_code_verifier(state) if state else None
+    
+    if not code_verifier:
+        st.error("❌ Code verifier no encontrado. Reinicia el login.")
+        st.session_state.authenticated = False
+        return False
+
+    try:
+        st.write("📡 Intercambiando código por token...")
+        token = exchange_code_for_token(code, code_verifier)
+        st.write("👤 Obteniendo información del usuario...")
+        userinfo = fetch_userinfo(token.get("access_token"))
+    except Exception as e:
+        st.error(f"❌ Error intercambiando el código: {str(e)}")
+        import traceback
+        st.write(traceback.format_exc())
+        st.session_state.authenticated = False
+        return False
+
+    user_email = userinfo.get("email") or "usuario@google.com"
+    user_sub = userinfo.get("sub") or user_email
+    display_name = userinfo.get("name", "Usuario")
+
+    try:
+        st.write("💾 Guardando sesión...")
+        session_token = create_persistent_session(
+            provider="google",
+            user_id=user_sub,
+            email=user_email,
+            display_name=display_name,
+            access_token=token.get("access_token"),
+            refresh_token=token.get("refresh_token"),
+            id_token=token.get("id_token"),
+            expires_at=None,
+        )
+    except Exception as e:
+        st.error(f"❌ Error guardando sesión: {str(e)}")
+        import traceback
+        st.write(traceback.format_exc())
+        return False
+
+    st.session_state.authenticated = True
+    st.session_state.user_email = user_email
+    st.session_state.user_sub = user_sub
+    st.session_state.auth_provider = "google"
+    st.session_state.session_token = session_token
+    st.session_state.display_name = display_name
+
+    # SOLO eliminar el PKCE state después de éxito completo
+    if state:
+        delete_pkce_state(state)
+
+    st.write(f"✅ Autenticación exitosa para {display_name}")
+    
+    return True
 
 
 def main():
@@ -41,15 +150,66 @@ def main():
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
     
+    # Obtener query params (puede tener code/state del callback OAuth o session del restore)
+    current_params = dict(st.query_params)
+    
+    # DEBUG: mostrar query params
+    if current_params:
+        st.warning(f"DEBUG - Query params detectados: {list(current_params.keys())}")
+    
+    # Si tenemos un session token válido, restaurarlo PRIMERO (antes de procesar callback)
+    if "session" in current_params and not st.session_state.authenticated:
+        st.warning("✅ Session token detectado en URL, restaurando...")
+        if _restore_session_from_query():
+            st.warning("✅ Sesión restaurada desde query params")
+    
+    # Procesar callback OAuth SOLO si NO tenemos sesión válida y SÍ tenemos código
+    if not st.session_state.authenticated and "code" in current_params:
+        st.warning("⚠️ Detectado callback OAuth con código")
+        if _handle_oauth_callback(current_params):
+            st.warning("✅ OAuth callback exitoso, guardando session...")
+            # Si el callback fue exitoso, guardar session en query params
+            session_token = st.session_state.get("session_token")
+            if session_token:
+                st.warning(f"✅ Token guardado: {session_token[:20]}...")
+                # Usar st.query_params para actualizar la URL con el token persistido
+                st.query_params["session"] = session_token
+                # HACER RERUN para que en la siguiente ejecución restaure desde el token
+                st.rerun()
+        else:
+            # Si falló, mostrar login de nuevo
+            st.stop()
+    
+    # Rehidratar sesión desde query params si aún no está autenticada (segunda pasada)
+    if not st.session_state.authenticated:
+        restored = _restore_session_from_query()
+        if restored:
+            st.warning("✅ Sesión restaurada desde query params")
+    
     # Login gate: si no hay usuario autenticado, mostrar pantalla minimalista y detener
     if not st.session_state.authenticated:
-        render_login(providers=("google", "github"))
+        st.warning("⚠️ Usuario no autenticado, mostrando login")
+        # Preparar estado PKCE/State para Google
+        # Estos se guardan en session_state Y también se guardan en la BD
+        if "oauth_state" not in st.session_state or "oauth_code_verifier" not in st.session_state:
+            state, verifier = generate_state_and_verifier()
+            st.session_state.oauth_state = state
+            st.session_state.oauth_code_verifier = verifier
+            # Guardar en la BD para recuperarlos después del callback
+            save_pkce_pair(state, verifier)
+        
+        auth_url = build_authorization_url(
+            st.session_state.oauth_state,
+            st.session_state.oauth_code_verifier,
+        )
+        render_login(providers=("google",), auth_url=auth_url)
         st.stop()
     
     # Inyectar CSS principal, Hero y Loader
     inject_main_css(st)
     inject_loader_css()
     inject_hero(st)
+    inject_sidebar_premium_css()  # Nuevo: estilos premium del sidebar
 
     daily_path = Path("data/processed/daily.csv")
     reco_path = Path("data/processed/recommendations_daily.csv")
@@ -117,9 +277,35 @@ def main():
         st.warning(f"❌ No pude cargar weekly.csv: {e}")
         df_weekly = None
 
+    # Sidebar: header premium
+    with st.sidebar:
+        render_sidebar_header("Readiness Tracker", "Dashboard")
+    
     # Sidebar: view selector (day/week/today)
-    st.sidebar.markdown("<div class='sidebar-title'>Configuración</div>", unsafe_allow_html=True)
-    view_mode = st.sidebar.radio("Vista", ["Día", "Modo Hoy", "Semana", "Entrenamiento", "Perfil Personal"], key="view_mode")
+    st.sidebar.markdown("<div class='sidebar-title'>Navegación</div>", unsafe_allow_html=True)
+    
+    # Usar select_slider o radio con labels mejorados + help text
+    view_mode = st.sidebar.radio(
+        "Vista",
+        ["Día", "Modo Hoy", "Semana", "Entrenamiento", "Perfil Personal"],
+        key="view_mode",
+        help="Selecciona la vista que deseas ver"
+    )
+    
+    # Mostrar descripción discreta de la sección activa
+    descriptions = {
+        "Día": "Vista detallada de un día concreto",
+        "Modo Hoy": "Cálculo de readiness y estado actual",
+        "Semana": "Resumen y análisis semanal",
+        "Entrenamiento": "Registro de entrenamientos",
+        "Perfil Personal": "Datos y preferencias personales"
+    }
+    
+    if view_mode in descriptions:
+        st.sidebar.markdown(
+            f"<div class='sidebar-item-description'>{descriptions[view_mode]}</div>",
+            unsafe_allow_html=True
+        )
 
     # Sidebar: date range filter - Solo mostrar en modo Día
     dates = sorted(df_daily['date'].unique())
@@ -131,6 +317,7 @@ def main():
         min_date = max_date - datetime.timedelta(days=6)
 
     if view_mode == "Día":
+        st.sidebar.markdown("<div class='sidebar-separator'></div>", unsafe_allow_html=True)
         st.sidebar.markdown("### Filtro de fechas")
         col1, col2 = st.sidebar.columns(2)
         with col1:

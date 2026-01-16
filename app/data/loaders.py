@@ -10,6 +10,14 @@ from database.connection import get_db
 from database.repositories import MoodRepository, UserProfileRepository
 
 
+def _current_user_id() -> str:
+    return (
+        st.session_state.get("user_sub")
+        or st.session_state.get("user_email")
+        or "default_user"
+    )
+
+
 @st.cache_data
 def load_csv(path: str):
     p = Path(path)
@@ -27,8 +35,9 @@ def load_user_profile(profile_path: str = "data/processed/user_profile.json"):
     """Carga el perfil del usuario. Preferir DB; fallback a JSON si existe y DB vacío."""
     # Primero intentar cargar desde DB
     db = next(get_db())
+    user_id = _current_user_id()
     try:
-        profile_db = UserProfileRepository.get(db)
+        profile_db = UserProfileRepository.get(db, user_id=user_id)
         # Si el perfil en DB parece vacío y existe JSON, usar JSON (migración implícita)
         # Heurística: si archetype es 'unknown' y existe el archivo JSON, leerlo
         p = Path(profile_path)
@@ -37,7 +46,7 @@ def load_user_profile(profile_path: str = "data/processed/user_profile.json"):
                 with p.open('r', encoding='utf-8') as f:
                     data_file = json.load(f)
                 # Guardar en DB para futuras lecturas
-                UserProfileRepository.create_or_update(db, data_file)
+                UserProfileRepository.create_or_update(db, data_file, user_id=user_id)
                 return data_file
             except Exception:
                 return profile_db
@@ -60,6 +69,7 @@ def save_mood_to_csv(date, sleep_hours, sleep_quality, fatigue, soreness, stress
     """Guarda los datos del "Modo Hoy" en la base de datos."""
     db = next(get_db())
     try:
+        user_id = _current_user_id()
         mood_data = {
             'date': date,
             'sleep_hours': float(sleep_hours) if sleep_hours is not None else None,
@@ -73,7 +83,7 @@ def save_mood_to_csv(date, sleep_hours, sleep_quality, fatigue, soreness, stress
             'readiness': float(readiness) if readiness is not None else None
         }
         
-        MoodRepository.create_or_update(db, mood_data)
+        MoodRepository.create_or_update(db, mood_data, user_id=user_id)
         return True
     except Exception as e:
         print(f"Error guardando mood: {e}")
@@ -86,7 +96,7 @@ def load_mood_by_date(date):
     """Carga el mood de una fecha específica desde la base de datos."""
     db = next(get_db())
     try:
-        return MoodRepository.get_by_date(db, date)
+        return MoodRepository.get_by_date(db, date, user_id=_current_user_id())
     finally:
         db.close()
 
@@ -95,7 +105,7 @@ def load_all_mood():
     """Carga todos los registros de mood desde la base de datos."""
     db = next(get_db())
     try:
-        return MoodRepository.get_all(db)
+        return MoodRepository.get_all(db, user_id=_current_user_id())
     finally:
         db.close()
 

@@ -67,6 +67,29 @@ def _inject_login_css():
             transform: translateY(1px);
         }}
 
+        .login-google-btn {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 46px;
+            border-radius: 10px;
+            border: 1px solid rgba(0,255,176,0.5);
+            background: linear-gradient(135deg, rgba(0,255,176,0.12), rgba(0,0,0,0.35));
+            color: {TEXT_MAIN};
+            font-weight: 700;
+            letter-spacing: 0.2px;
+            text-decoration: none;
+            transition: all 150ms ease;
+        }}
+        .login-google-btn:hover {{
+            border-color: {PRIMARY};
+            background: rgba(0,255,176,0.18);
+        }}
+        .login-google-btn:active {{
+            transform: translateY(1px);
+        }}
+
         .login-icon {{
             width: 42px;
             height: 42px;
@@ -131,8 +154,8 @@ def _provider_label(provider: str) -> str:
     return provider.title()
 
 
-def render_login(providers=("google",)):
-    """Renderiza la pantalla de login minimalista."""
+def render_login(providers=("google",), auth_url: str = None):
+    """Renderiza la pantalla de login minimalista con OAuth real."""
     _inject_login_css()
 
     # Inicializar variables de sesión
@@ -153,25 +176,17 @@ def render_login(providers=("google",)):
         if st.session_state.authenticated:
             identity = st.session_state.user_email or "Usuario autenticado"
             st.markdown(f"<div class='login-chip'>✅ Conectado como: {identity}</div>", unsafe_allow_html=True)
-
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Entrar", type="primary", key="btn_enter"):
-                    st.rerun()
-            with col2:
-                if st.button("Cerrar sesión", key="btn_logout"):
-                    st.session_state.authenticated = False
-                    st.session_state.user_email = None
-                    st.rerun()
+            if st.button("Entrar", type="primary", key="btn_enter"):
+                st.rerun()
         else:
-            for provider in providers:
-                label = _provider_label(provider)
-                if st.button(f"Continuar con {label}", key=f"login_{provider}"):
-                    # Simulación de login exitoso
-                    st.session_state.authenticated = True
-                    st.session_state.user_email = f"usuario@{provider}.com"
-                    st.rerun()
-            
+            if not auth_url:
+                st.markdown("<div class='login-error'>Falta configurar Google OAuth.</div>", unsafe_allow_html=True)
+            else:
+                st.markdown(
+                    f"<a class='login-google-btn' href='{auth_url}'>Continuar con Google</a>",
+                    unsafe_allow_html=True,
+                )
+        
             if st.session_state.get("login_error"):
                 st.markdown(f"<div class='login-error'>{st.session_state['login_error']}</div>", unsafe_allow_html=True)
 

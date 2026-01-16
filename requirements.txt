@@ -4,3 +4,5 @@ scipy
 plotly
 sqlalchemy
 streamlit
+authlib>=1.3
+cryptography>=42.0

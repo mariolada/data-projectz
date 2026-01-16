@@ -2,11 +2,12 @@
 Repositorios - Operaciones CRUD para cada tabla
 """
 from sqlalchemy.orm import Session
-from .models import Training, Mood, Exercise, UserProfile
-from datetime import date, datetime
+from .models import Training, Mood, Exercise, UserProfile, AuthSession, PKCEState
+from datetime import date, datetime, timedelta
 import pandas as pd
 from typing import List, Optional
 import json
+import hashlib
 
 
 class TrainingRepository:
@@ -249,3 +250,105 @@ class UserProfileRepository:
         db.commit()
         db.refresh(rec)
         return rec
+
+
+class AuthSessionRepository:
+    """Repositorio para sesiones OAuth persistidas."""
+
+    SESSION_TTL_DAYS = 7  # tiempo que mantenemos la sesión viva sin volver a loguear
+
+    @staticmethod
+    def _hash_token(raw_token: str) -> str:
+        return hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
+
+    @staticmethod
+    def create(
+        db: Session,
+        *,
+        raw_session_token: str,
+        user_id: str,
+        provider: str,
+        email: str = None,
+        display_name: str = None,
+        refresh_token: str = None,
+        access_token: str = None,
+        id_token: str = None,
+        access_expires_at: datetime = None,
+    ) -> AuthSession:
+        session_hash = AuthSessionRepository._hash_token(raw_session_token)
+        session_expires_at = datetime.utcnow() + timedelta(days=AuthSessionRepository.SESSION_TTL_DAYS)
+
+        rec = AuthSession(
+            user_id=user_id,
+            provider=provider,
+            email=email,
+            display_name=display_name,
+            session_token_hash=session_hash,
+            refresh_token=refresh_token,
+            access_token=access_token,
+            id_token=id_token,
+            expires_at=access_expires_at,
+            session_expires_at=session_expires_at,
+        )
+        db.add(rec)
+        db.commit()
+        db.refresh(rec)
+        return rec
+
+    @staticmethod
+    def get_by_session_token(db: Session, raw_session_token: str) -> Optional[AuthSession]:
+        session_hash = AuthSessionRepository._hash_token(raw_session_token)
+        rec = db.query(AuthSession).filter(AuthSession.session_token_hash == session_hash).first()
+        if not rec:
+            return None
+        # validar expiración de la sesión persistida
+        if rec.session_expires_at and rec.session_expires_at < datetime.utcnow():
+            db.delete(rec)
+            db.commit()
+            return None
+        return rec
+
+    @staticmethod
+    def delete(db: Session, raw_session_token: str):
+        session_hash = AuthSessionRepository._hash_token(raw_session_token)
+        rec = db.query(AuthSession).filter(AuthSession.session_token_hash == session_hash).first()
+        if rec:
+            db.delete(rec)
+            db.commit()
+
+
+class PKCEStateRepository:
+    """Almacena y recupera pares state/code_verifier para PKCE flow."""
+
+    @staticmethod
+    def save(db: Session, state: str, code_verifier: str) -> PKCEState:
+        """Guarda un par state/code_verifier."""
+        pkce = PKCEState(
+            state=state,
+            code_verifier=code_verifier,
+        )
+        db.add(pkce)
+        db.commit()
+        db.refresh(pkce)
+        return pkce
+
+    @staticmethod
+    def get_by_state(db: Session, state: str) -> Optional[PKCEState]:
+        """Recupera el code_verifier usando el state."""
+        rec = db.query(PKCEState).filter(PKCEState.state == state).first()
+        return rec
+
+    @staticmethod
+    def delete(db: Session, state: str):
+        """Elimina el registro después de usar."""
+        rec = db.query(PKCEState).filter(PKCEState.state == state).first()
+        if rec:
+            db.delete(rec)
+            db.commit()
+
+    @staticmethod
+    def cleanup_old(db: Session, hours: int = 1):
+        """Limpia registros viejos (más de X horas)."""
+        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        db.query(PKCEState).filter(PKCEState.created_at < cutoff).delete()
+        db.commit()
