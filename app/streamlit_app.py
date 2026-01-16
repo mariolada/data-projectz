@@ -100,8 +100,6 @@ def _handle_oauth_callback(params):
         userinfo = fetch_userinfo(token.get("access_token"))
     except Exception as e:
         st.error(f"❌ Error intercambiando el código: {str(e)}")
-        import traceback
-        st.write(traceback.format_exc())
         st.session_state.authenticated = False
         return False
 
@@ -123,8 +121,6 @@ def _handle_oauth_callback(params):
         )
     except Exception as e:
         st.error(f"❌ Error guardando sesión: {str(e)}")
-        import traceback
-        st.write(traceback.format_exc())
         return False
 
     st.session_state.authenticated = True
@@ -153,49 +149,33 @@ def main():
     # Obtener query params (puede tener code/state del callback OAuth o session del restore)
     current_params = dict(st.query_params)
     
-    # DEBUG: mostrar query params
-    if current_params:
-        st.warning(f"DEBUG - Query params detectados: {list(current_params.keys())}")
-    
     # Si tenemos un session token válido, restaurarlo PRIMERO (antes de procesar callback)
     if "session" in current_params and not st.session_state.authenticated:
-        st.warning("✅ Session token detectado en URL, restaurando...")
         if _restore_session_from_query():
-            st.warning("✅ Sesión restaurada desde query params")
+            st.success("✅ Sesión restaurada")
     
     # Procesar callback OAuth SOLO si NO tenemos sesión válida y SÍ tenemos código
     if not st.session_state.authenticated and "code" in current_params:
-        st.warning("⚠️ Detectado callback OAuth con código")
         if _handle_oauth_callback(current_params):
-            st.warning("✅ OAuth callback exitoso, guardando session...")
             # Si el callback fue exitoso, guardar session en query params
             session_token = st.session_state.get("session_token")
             if session_token:
-                st.warning(f"✅ Token guardado: {session_token[:20]}...")
-                # Usar st.query_params para actualizar la URL con el token persistido
                 st.query_params["session"] = session_token
-                # HACER RERUN para que en la siguiente ejecución restaure desde el token
                 st.rerun()
         else:
             # Si falló, mostrar login de nuevo
             st.stop()
     
-    # Rehidratar sesión desde query params si aún no está autenticada (segunda pasada)
+    # Rehidratar sesión desde query params si aún no está autenticada
     if not st.session_state.authenticated:
-        restored = _restore_session_from_query()
-        if restored:
-            st.warning("✅ Sesión restaurada desde query params")
+        _restore_session_from_query()
     
-    # Login gate: si no hay usuario autenticado, mostrar pantalla minimalista y detener
+    # Login gate: si no hay usuario autenticado, mostrar pantalla de login y detener
     if not st.session_state.authenticated:
-        st.warning("⚠️ Usuario no autenticado, mostrando login")
-        # Preparar estado PKCE/State para Google
-        # Estos se guardan en session_state Y también se guardan en la BD
         if "oauth_state" not in st.session_state or "oauth_code_verifier" not in st.session_state:
             state, verifier = generate_state_and_verifier()
             st.session_state.oauth_state = state
             st.session_state.oauth_code_verifier = verifier
-            # Guardar en la BD para recuperarlos después del callback
             save_pkce_pair(state, verifier)
         
         auth_url = build_authorization_url(
@@ -222,60 +202,36 @@ def main():
     
     with loading("Cargando datos..."):
         try:
-            df_metrics = load_csv(daily_path)  # daily.csv solo tiene métricas base
+            df_metrics = load_csv(daily_path)
         except FileNotFoundError:
             st.warning("❌ Falta daily.csv. Ejecuta el `pipeline` primero.")
             st.stop()
         
         try:
-            df_recommendations = load_csv(reco_path)  # recommendations_daily.csv contiene TODO: métricas + readiness + recomendaciones
+            df_recommendations = load_csv(reco_path)
         except FileNotFoundError:
             st.warning("❌ Falta recommendations_daily.csv. Ejecuta `decision_engine` primero.")
             st.stop()
 
-    # Combinar métricas base (daily.csv) con readiness/recomendaciones (recommendations_daily.csv)
+    # Preparar fechas
     df_metrics['date'] = pd.to_datetime(df_metrics['date']).dt.date
     df_recommendations['date'] = pd.to_datetime(df_recommendations['date']).dt.date
 
-    # Eliminar columnas de df_metrics que están en recommendations (para evitar duplicados)
-    # Columnas que queremos usar de recommendations en lugar de daily
-    cols_to_drop_from_metrics = []
-    for col in ['readiness_score', 'recommendation', 'reason', 'action_intensity', 'reason_codes']:
-        if col in df_recommendations.columns and col in df_metrics.columns:
-            cols_to_drop_from_metrics.append(col)
+    # Eliminar columnas duplicadas
+    cols_to_drop = [c for c in ['readiness_score', 'recommendation', 'reason', 'action_intensity', 'reason_codes']
+                    if c in df_recommendations.columns and c in df_metrics.columns]
+    if cols_to_drop:
+        df_metrics = df_metrics.drop(columns=cols_to_drop)
     
-    if cols_to_drop_from_metrics:
-        df_metrics = df_metrics.drop(columns=cols_to_drop_from_metrics)
+    # Merge
+    merge_cols = ['date'] + [c for c in ['readiness_score', 'recommendation', 'reason', 'action_intensity', 'reason_codes']
+                             if c in df_recommendations.columns]
+    df_daily = df_metrics.merge(df_recommendations[merge_cols], on='date', how='left')
     
-    # Ahora hacer el merge sin conflictos
-    merge_cols = ['date']
-    for col in ['readiness_score', 'recommendation', 'reason', 'action_intensity', 'reason_codes']:
-        if col in df_recommendations.columns:
-            merge_cols.append(col)
-    
-    df_daily = df_metrics.merge(
-        df_recommendations[merge_cols], on='date', how='left'
-    )
-    
-    # Agregar columnas faltantes si no existen (para compatibilidad)
-    if 'action_intensity' not in df_daily.columns:
-        df_daily['action_intensity'] = 'Normal'
-    if 'reason_codes' not in df_daily.columns:
-        df_daily['reason_codes'] = ''
-
-    # Load optional files
-    df_exercises = None
-    try:
-        df_exercises = load_csv(daily_ex_path)
-    except:
-        pass
-
-    df_weekly = None
-    try:
-        df_weekly = load_csv(weekly_path)
-    except Exception as e:
-        st.warning(f"❌ No pude cargar weekly.csv: {e}")
-        df_weekly = None
+    # Asegurar columnas necesarias
+    for col in ['action_intensity', 'reason_codes']:
+        if col not in df_daily.columns:
+            df_daily[col] = '' if col == 'reason_codes' else 'Normal'
 
     # Sidebar: header premium
     with st.sidebar:

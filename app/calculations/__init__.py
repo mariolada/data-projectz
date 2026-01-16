@@ -1,6 +1,5 @@
 # Calculations module
 from .readiness import (
-    calculate_readiness_from_inputs,
     calculate_readiness_from_inputs_v2,
     generate_personalized_insights,
     get_readiness_zone,
@@ -21,7 +20,6 @@ from .readiness_v3 import (
 )
 
 __all__ = [
-    'calculate_readiness_from_inputs',
     'calculate_readiness_from_inputs_v2',
     'calculate_readiness_from_inputs_v3',
     'calculate_readiness_from_inputs_v3_compat',

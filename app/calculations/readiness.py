@@ -83,34 +83,6 @@ def get_lift_recommendations(df_exercises, readiness_score, readiness_zone):
     return recs
 
 
-def calculate_readiness_from_inputs(sleep_hours, sleep_quality, fatigue, soreness, stress, motivation, pain_flag):
-    """Calcula readiness instantáneamente desde inputs del usuario (versión legacy)."""
-    
-    sleep_hours_score = np.clip((sleep_hours - 6.0) / (7.5 - 6.0), 0, 1)
-    sleep_quality_score = (sleep_quality - 1) / 4
-    
-    fatigue_score = 1 - (fatigue / 10)
-    soreness_score = 1 - (soreness / 10)
-    stress_score = 1 - (stress / 10)
-    motivation_score = motivation / 10
-    
-    pain_penalty = 0.3 if pain_flag else 0
-    
-    readiness_0_1 = (
-        0.25 * sleep_hours_score +
-        0.15 * sleep_quality_score +
-        0.15 * fatigue_score +
-        0.15 * soreness_score +
-        0.15 * stress_score +
-        0.15 * motivation_score
-    ) - pain_penalty
-    
-    readiness_0_1 = np.clip(readiness_0_1, 0, 1)
-    readiness_score = int(round(readiness_0_1 * 100))
-    
-    return readiness_score
-
-
 def calculate_readiness_from_inputs_v2(
     sleep_hours, sleep_quality, fatigue, soreness, stress, motivation, pain_flag,
     nap_mins=0, sleep_disruptions=False, energy=7, stiffness=2, 
@@ -118,13 +90,9 @@ def calculate_readiness_from_inputs_v2(
     baselines=None, adjustment_factors=None
 ):
     """
-    Versión CONTEXTUAL AVANZADA: 
-    - Inputs subjetivos (cómo te sientes)
-    - Baselines históricas (cómo acostumbras estar)
-    - Factores personalizados (cómo te afecta cada cosa)
-    - Sleep responsiveness (eres sensible al sueño?)
+    Cálculo contextualizado de readiness v2 (legacy, usado por compatibilidad).
     
-    Retorna: (readiness_score, breakdown_dict) para visibilidad
+    Retorna: (readiness_score, breakdown_dict)
     """
     
     if baselines is None:

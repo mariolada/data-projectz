@@ -5,71 +5,78 @@ Funciones para badges dinámicos y clasificación de niveles.
 import streamlit as st
 
 
+# Level classification thresholds (value, text_ok, text_mid, text_low)
+_LEVEL_THRESHOLDS = {
+    'sleep_hours': [(7.5, "Excelente", "Moderado", "Crítico"), (6.5, None, None, None)],
+    'sleep_quality': {1: ("Muy malo", "low"), 2: ("Malo", "mid"), 3: ("Regular", "mid"), 4: ("Bueno", "ok"), 5: ("Perfecto", "ok")},
+    'fatigue': [(3, "Baja", "Media", "Alta"), (6, None, None, None)],
+    'stress': [(3, "Bajo", "Medio", "Alto"), (6, None, None, None)],
+    'soreness': [(2, "Ligera", "Moderada", "Alta"), (5, None, None, None)],
+    'energy': [(7, "Alta", "Media", "Baja"), (4, None, None, None)],  # Invertido (inversely proportional)
+    'perceived': [(8, "Me siento genial", "Me siento bien", "Regular"), (6, None, "Regular", None), (4, None, None, "Me siento mal")],
+}
+
+
 def render_badge(text: str, level: str):
     """Renderiza un badge con color según nivel (ok, mid, low)."""
     cls = {"ok": "badge-green", "mid": "badge-yellow", "low": "badge-red"}.get(level, "badge-yellow")
     st.markdown(f"<span class='badge-dynamic {cls}'>{text}</span>", unsafe_allow_html=True)
 
 
+def _classify_value(value: float, thresholds: list, inverse: bool = False) -> tuple:
+    """
+    Clasifica un valor según thresholds. Retorna (texto, nivel).
+    
+    Args:
+        value: Valor a clasificar
+        thresholds: Lista de tuplas (threshold, text_ok, text_mid, text_low) o dict
+        inverse: Si True, interpreta como "más alto = peor"
+    """
+    if isinstance(thresholds, dict):
+        return thresholds.get(int(value), ("Regular", "mid"))
+    
+    for threshold, ok, mid, low in thresholds:
+        if not inverse:
+            if value >= threshold:
+                return (ok or mid or low, "ok" if ok else ("mid" if mid else "low"))
+        else:
+            if value >= threshold:
+                return (low or mid or ok, "low" if low else ("mid" if mid else "ok"))
+    return ("Desconocido", "mid")
+
+
 def get_sleep_hours_level(hours: float) -> tuple:
     """Clasifica las horas de sueño y retorna (texto, nivel)."""
     if hours >= 7.5:
         return ("Excelente", "ok")
-    if hours >= 6.5:
-        return ("Moderado", "mid")
-    return ("Crítico", "low")
+    return ("Moderado", "mid") if hours >= 6.5 else ("Crítico", "low")
 
 
 def get_sleep_quality_level(quality: int) -> tuple:
     """Clasifica la calidad de sueño (1-5) y retorna (texto, nivel)."""
-    mapping = {
-        1: ("Muy malo", "low"),
-        2: ("Malo", "mid"),
-        3: ("Regular", "mid"),
-        4: ("Bueno", "ok"),
-        5: ("Perfecto", "ok")
-    }
-    return mapping.get(quality, ("Regular", "mid"))
+    return {
+        1: ("Muy malo", "low"), 2: ("Malo", "mid"), 3: ("Regular", "mid"),
+        4: ("Bueno", "ok"), 5: ("Perfecto", "ok")
+    }.get(quality, ("Regular", "mid"))
 
 
 def get_fatigue_level(fatigue: int) -> tuple:
-    """Clasifica el nivel de fatiga (0-10) y retorna (texto, nivel)."""
-    if fatigue <= 3:
-        return ("Baja", "ok")
-    if fatigue <= 6:
-        return ("Media", "mid")
-    return ("Alta", "low")
+    return ("Baja", "ok") if fatigue <= 3 else ("Media", "mid") if fatigue <= 6 else ("Alta", "low")
 
 
 def get_stress_level(stress: int) -> tuple:
-    """Clasifica el nivel de estrés (0-10) y retorna (texto, nivel)."""
-    if stress <= 3:
-        return ("Bajo", "ok")
-    if stress <= 6:
-        return ("Medio", "mid")
-    return ("Alto", "low")
+    return ("Bajo", "ok") if stress <= 3 else ("Medio", "mid") if stress <= 6 else ("Alto", "low")
 
 
 def get_soreness_level(soreness: int) -> tuple:
-    """Clasifica el nivel de agujetas (0-10) y retorna (texto, nivel)."""
-    if soreness <= 2:
-        return ("Ligera", "ok")
-    if soreness <= 5:
-        return ("Moderada", "mid")
-    return ("Alta", "low")
+    return ("Ligera", "ok") if soreness <= 2 else ("Moderada", "mid") if soreness <= 5 else ("Alta", "low")
 
 
 def get_energy_level(energy: int) -> tuple:
-    """Clasifica el nivel de energía (0-10) y retorna (texto, nivel)."""
-    if energy >= 7:
-        return ("Alta", "ok")
-    if energy >= 4:
-        return ("Media", "mid")
-    return ("Baja", "low")
+    return ("Alta", "ok") if energy >= 7 else ("Media", "mid") if energy >= 4 else ("Baja", "low")
 
 
 def get_perceived_level(perceived: int) -> tuple:
-    """Clasifica la percepción personal (0-10) y retorna (texto, nivel)."""
     if perceived >= 8:
         return ("Me siento genial", "ok")
     elif perceived >= 6:
