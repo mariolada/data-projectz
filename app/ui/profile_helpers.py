@@ -1,41 +1,56 @@
 """
 UI helpers para perfil de usuario y cuestionario de ciclo menstrual.
+Estilo minimalista coherente con el tema de la aplicación.
 """
 import streamlit as st
 from typing import Dict, Any
 
+# Paleta de colores consistente
+COLORS = {
+    'primary': '#B266FF',      # Purple
+    'success': '#00D084',      # Green
+    'warning': '#FFB81C',      # Amber
+    'danger': '#FF6B6B',       # Coral
+    'info': '#4ECDC4',         # Aqua
+    'cycle': '#D947EF',        # Magenta para ciclo menstrual
+    'text': '#E0E0E0',
+    'text_muted': '#9CA3AF',
+}
+
 
 def render_user_profile_header(display_name: str, email: str, profile_picture: str = None):
     """Renderiza header del perfil con foto y nombre desde Google."""
-    col1, col2 = st.columns([1, 3])
+    st.markdown(f"<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([1, 3], gap="medium")
     
     with col1:
         if profile_picture:
-            st.image(profile_picture, width=120, use_column_width=False)
+            st.image(profile_picture, width=100, use_column_width=False)
         else:
             st.markdown(
-                '<div style="width:120px; height:120px; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); '
-                'border-radius:50%; display:flex; align-items:center; justify-content:center; ">'
-                '<span style="font-size:48px; color:white;">👤</span></div>',
+                f'<div style="width:100px; height:100px; background:linear-gradient(135deg, {COLORS["primary"]} 0%, {COLORS["cycle"]} 100%); '
+                'border-radius:50%; display:flex; align-items:center; justify-content:center; border: 2px solid rgba(217,71,239,0.3);">'
+                '<span style="font-size:48px;">👤</span></div>',
                 unsafe_allow_html=True
             )
     
     with col2:
-        st.markdown(f"### {display_name}")
-        st.markdown(f"**Email:** {email}")
-        st.divider()
+        st.markdown(f"# {display_name}")
+        st.markdown(f"📧 {email}")
 
 
 def render_gender_selection() -> str:
     """Renderiza selector de género con UI amigable."""
-    st.subheader("👥 Información Personal")
-    st.write("Esta información nos ayuda a personalizar tus métricas de readiness.")
+    st.markdown(f"### 👥 Información Personal")
+    st.markdown("Esta información personaliza tus métricas de readiness.")
+    st.markdown("")
     
     gender = st.radio(
         "¿Cuál es tu género?",
         ["Hombre", "Mujer", "Otro", "Prefiero no decir"],
         horizontal=True,
-        help="Esto afecta cómo interpretamos algunos factores de recuperación."
+        help="Esto afecta cómo interpretamos factores de recuperación y performance."
     )
     
     return gender.lower() if gender else None
@@ -43,43 +58,41 @@ def render_gender_selection() -> str:
 
 def render_menstrual_cycle_questionnaire() -> Dict[str, Any]:
     """Renderiza el cuestionario de ciclo menstrual para atletas mujeres."""
-    st.subheader("🔄 Ciclo Menstrual")
-    st.write("""
-    Entender tu ciclo menstrual nos permite ajustar mejor tus métricas de readiness.
-    Los cambios hormonales afectan energía, fatiga y recuperación.
-    **Toda esta información es privada y confidencial.**
+    st.markdown(f"### 🔄 Ciclo Menstrual")
+    st.markdown("""
+    Entender tu ciclo nos permite ajustar mejor tus métricas. Los cambios hormonales 
+    afectan energía, fatiga y recuperación. **Toda esta información es privada.**
     """)
     
     st.info(
-        "📌 **¿Por qué es importante?** El ciclo menstrual puede aumentar o disminuir tu "
-        "readiness real en hasta 15 puntos. Queremos que veas datos más precisos según tu ciclo.",
+        "📌 El ciclo menstrual puede cambiar tu readiness real hasta **±15 puntos**. "
+        "Queremos que veas datos más precisos según tu fase del ciclo.",
         icon="ℹ️"
     )
-    
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns(2, gap="medium")
     
     with col1:
         day_of_cycle = st.number_input(
-            "¿Qué día de tu ciclo estás? (1-28)",
+            "¿Qué día de tu ciclo? (1-28)",
             min_value=1, max_value=28, value=14,
-            help="Día 1 = primer día de sangrado menstrual. Si no lo sabes, estima."
+            help="Día 1 = sangrado | Si no lo sabes, estima aproximadamente"
         )
         
         cramping = st.slider(
-            "Intensidad de cólicos",
+            "Intensidad de cólicos (0-5)",
             min_value=0, max_value=5, value=0,
-            help="0 = nada | 5 = muy fuertes"
+            help="0 = ninguno | 5 = muy fuertes"
         )
     
     with col2:
         bloating = st.slider(
-            "Hinchazón abdominal",
+            "Hinchazón abdominal (0-5)",
             min_value=0, max_value=5, value=0,
-            help="0 = nada | 5 = mucha"
+            help="0 = ninguna | 5 = mucha"
         )
         
         mood = st.slider(
-            "¿Cómo está tu humor?",
+            "Humor general (0-10)",
             min_value=0, max_value=10, value=5,
             help="0 = muy bajo | 10 = excelente"
         )
@@ -93,16 +106,16 @@ def render_menstrual_cycle_questionnaire() -> Dict[str, Any]:
 
 
 def render_gender_note(gender: str):
-    """Muestra nota basada en el género seleccionado."""
+    """Muestra nota personalizada según el género seleccionado."""
     if gender == "mujer":
         st.success(
-            "✅ El algoritmo de readiness ahora incluye factor de ciclo menstrual. "
-            "Tus puntuaciones de readiness se ajustarán según tu fase del ciclo.",
+            "✅ El algoritmo de readiness incluye **factor de ciclo menstrual**. "
+            "Tus puntuaciones se ajustarán según tu fase.",
             icon="💜"
         )
     elif gender in ["hombre", "otro", "prefiero no decir"]:
         st.info(
-            "ℹ️ Tus métricas de readiness se calculan sin ajustes de ciclo menstrual. "
+            "ℹ️ Tus métricas se calculan sin ajustes de ciclo menstrual. "
             "Puedes cambiar esto en cualquier momento.",
             icon="ℹ️"
         )
