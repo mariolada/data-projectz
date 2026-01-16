@@ -274,6 +274,8 @@ class AuthSessionRepository:
         access_token: str = None,
         id_token: str = None,
         access_expires_at: datetime = None,
+        profile_picture_url: str = None,
+        gender: str = None,
     ) -> AuthSession:
         session_hash = AuthSessionRepository._hash_token(raw_session_token)
         session_expires_at = datetime.utcnow() + timedelta(days=AuthSessionRepository.SESSION_TTL_DAYS)
@@ -289,6 +291,8 @@ class AuthSessionRepository:
             id_token=id_token,
             expires_at=access_expires_at,
             session_expires_at=session_expires_at,
+            profile_picture_url=profile_picture_url,
+            gender=gender,
         )
         db.add(rec)
         db.commit()

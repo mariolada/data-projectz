@@ -48,6 +48,7 @@ from personalization_engine import (
     detect_fatigue_type,
     calculate_injury_risk_score
 )
+from menstrual_cycle_readiness import adjust_readiness_for_menstrual_cycle
 
 
 def render_modo_hoy(df_daily: pd.DataFrame):
@@ -926,6 +927,24 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                     for note in readiness_breakdown['notes']:
                         st.write(f"  - {note}")
             
+            # === AJUSTE POR CICLO MENSTRUAL (si es mujer) ===
+            menstrual_adjustment = None
+            user_gender = st.session_state.get('user_gender', 'hombre')
+            if user_gender == 'mujer':
+                cycle_data = st.session_state.get('menstrual_cycle_data', {})
+                if cycle_data:
+                    menstrual_adjustment = adjust_readiness_for_menstrual_cycle(
+                        readiness_instant,
+                        cycle_data.get('day_of_cycle', 14),
+                        {
+                            'cramping': cycle_data.get('cramping', 0),
+                            'bloating': cycle_data.get('bloating', 0),
+                            'mood': cycle_data.get('mood', 5)
+                        }
+                    )
+                    # Usar readiness ajustado
+                    readiness_instant = menstrual_adjustment['adjusted_score']
+            
             # Get zone
             zone, emoji, _ = get_readiness_zone(readiness_instant)
             
@@ -1005,6 +1024,28 @@ def render_modo_hoy(df_daily: pd.DataFrame):
         
         # Advice Cards (nuevo diseño premium)
         st.markdown("---")
+        
+        # === SECCIÓN DE CICLO MENSTRUAL (si es mujer) ===
+        if menstrual_adjustment:
+            render_section_title("🔄 Ajuste por Ciclo Menstrual", accent="#D947EF")
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Fase", menstrual_adjustment['phase'], delta=None)
+            with col2:
+                st.metric("Energía", f"{menstrual_adjustment['energy_factor']:.0%}", delta=None)
+            with col3:
+                st.metric("Ajuste", f"{menstrual_adjustment['menstrual_adjustment']:+.0f} pts", delta=None)
+            
+            with st.expander("📊 Detalles del Ciclo", expanded=False):
+                st.write(menstrual_adjustment['explanation'])
+                if menstrual_adjustment['recommendations']:
+                    st.write("**Recomendaciones:**")
+                    for rec in menstrual_adjustment['recommendations']:
+                        st.write(f"• {rec}")
+            
+            st.markdown("---")
+        
         render_section_title("Consejos de hoy", accent="#FFB81C")
 
         # Nueva sección unificada con Summary Strip + Cards + Checklist

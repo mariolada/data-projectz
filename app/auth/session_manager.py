@@ -45,7 +45,8 @@ def delete_pkce_state(state: str) -> None:
 
 def create_persistent_session(*, provider: str, user_id: str, email: str, display_name: str,
                               access_token: str, refresh_token: str = None, id_token: str = None,
-                              expires_at: Optional[datetime] = None) -> str:
+                              expires_at: Optional[datetime] = None, profile_picture_url: str = None,
+                              gender: str = None) -> str:
     """Crea una sesión persistida y retorna el token sin hash para el query param."""
     session_token = secrets.token_urlsafe(32)
     db = next(get_db())
@@ -61,6 +62,8 @@ def create_persistent_session(*, provider: str, user_id: str, email: str, displa
             access_token=access_token,
             id_token=id_token,
             access_expires_at=expires_at,
+            profile_picture_url=profile_picture_url,
+            gender=gender,
         )
         return session_token
     finally:

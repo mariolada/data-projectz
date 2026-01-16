@@ -73,6 +73,8 @@ class AuthSession(Base):
     provider = Column(String, nullable=False)         # google, github, etc.
     email = Column(String, nullable=True)
     display_name = Column(String, nullable=True)
+    profile_picture_url = Column(String, nullable=True)  # URL de foto de Google
+    gender = Column(String, nullable=True)             # 'male', 'female', 'other'
     session_token_hash = Column(String, nullable=False, unique=True)
     refresh_token = Column(Text, nullable=True)
     access_token = Column(Text, nullable=True)

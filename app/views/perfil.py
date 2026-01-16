@@ -9,6 +9,7 @@ from ui.components import render_section_title
 from ui.loader import loading
 from data.loaders import load_user_profile
 from calculations.readiness import generate_personalized_insights
+from ui.profile_helpers import render_user_profile_header, render_gender_selection, render_menstrual_cycle_questionnaire, render_gender_note
 
 # Import desde src (estos se añaden al path en streamlit_app.py)
 from personalization_engine import calculate_personal_baselines
@@ -386,6 +387,29 @@ def render_perfil(df_daily: pd.DataFrame):
     )
     st.markdown("<div class='profile-accent-line'></div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
+    
+    # ============ PROFILE INFO + GENDER CONFIG ============
+    with st.expander("👤 Configuración de Perfil", expanded=False):
+        col_profile = st.columns(1)[0]
+        with col_profile:
+            # Obtener info del usuario actual
+            display_name = st.session_state.get('display_name', 'Usuario')
+            user_email = st.session_state.get('user_email', 'no-email@example.com')
+            profile_picture = st.session_state.get('profile_picture_url', None)
+            
+            render_user_profile_header(display_name, user_email, profile_picture)
+            
+            # Selector de género
+            gender = render_gender_selection()
+            st.session_state['user_gender'] = gender
+            
+            # Si es mujer, mostrar cuestionario de ciclo menstrual
+            if gender == "mujer":
+                st.divider()
+                cycle_data = render_menstrual_cycle_questionnaire()
+                st.session_state['menstrual_cycle_data'] = cycle_data
+            
+            render_gender_note(gender)
     
     # Cargar datos
     with loading("Cargando perfil..."):

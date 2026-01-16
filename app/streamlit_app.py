@@ -67,6 +67,9 @@ def _restore_session_from_query():
             st.session_state.user_sub = rec.user_id
             st.session_state.auth_provider = rec.provider
             st.session_state.session_token = session_token
+            st.session_state.display_name = rec.display_name
+            st.session_state.profile_picture_url = rec.profile_picture_url  # Restaurar foto
+            st.session_state.user_gender = rec.gender  # Restaurar género
             return True
         else:
             # Limpiar query params si la sesión es inválida
@@ -106,6 +109,7 @@ def _handle_oauth_callback(params):
     user_email = userinfo.get("email") or "usuario@google.com"
     user_sub = userinfo.get("sub") or user_email
     display_name = userinfo.get("name", "Usuario")
+    profile_picture = userinfo.get("picture", None)  # URL de foto de perfil de Google
 
     try:
         st.write("💾 Guardando sesión...")
@@ -118,6 +122,8 @@ def _handle_oauth_callback(params):
             refresh_token=token.get("refresh_token"),
             id_token=token.get("id_token"),
             expires_at=None,
+            profile_picture_url=profile_picture,
+
         )
     except Exception as e:
         st.error(f"❌ Error guardando sesión: {str(e)}")
@@ -129,6 +135,7 @@ def _handle_oauth_callback(params):
     st.session_state.auth_provider = "google"
     st.session_state.session_token = session_token
     st.session_state.display_name = display_name
+    st.session_state.profile_picture_url = profile_picture  # Guardar foto de perfil
 
     # SOLO eliminar el PKCE state después de éxito completo
     if state:
