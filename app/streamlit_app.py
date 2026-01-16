@@ -44,6 +44,7 @@ from auth.session_manager import (
     get_code_verifier,
     delete_pkce_state,
 )
+from database.connection import init_db  # Inicializar BD
 
 
 def _current_user_id() -> str:
@@ -148,6 +149,9 @@ def _handle_oauth_callback(params):
 
 def main():
     st.set_page_config(page_title="Trainer Readiness Dashboard", layout="wide")
+    
+    # Inicializar base de datos (crea tablas si no existen)
+    init_db()
     
     # Inicializar session_state para autenticación
     if "authenticated" not in st.session_state:
