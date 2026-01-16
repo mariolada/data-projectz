@@ -231,15 +231,11 @@ def render_entrenamiento() -> None:
     if "training_date" not in st.session_state:
         st.session_state.training_date = datetime.date.today()
 
-    # OJO: el widget NO debe usar la misma key que modificamos a mano.
-    if "training_date_widget" not in st.session_state:
-        st.session_state.training_date_widget = st.session_state.training_date
-
     if "training_data" not in st.session_state:
-        st.session_state.training_data = pd.DataFrame([get_empty_row(st.session_state.training_date)])
+        st.session_state.training_data = pd.DataFrame(columns=["date", "exercise", "sets", "reps", "weight", "rpe", "rir"])
 
     if "num_rows" not in st.session_state:
-        st.session_state.num_rows = max(1, len(st.session_state.training_data))
+        st.session_state.num_rows = max(0, len(st.session_state.training_data))
 
     if "custom_exercises" not in st.session_state:
         st.session_state.custom_exercises = set()
@@ -271,37 +267,53 @@ def render_entrenamiento() -> None:
 
         body, .stApp { background: var(--bg) !important; }
 
-        /* HEADER */
-        .training-header {
-            margin-bottom: 28px;
+        /* FORZAR COLORES OSCUROS GLOBALMENTE */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(60,60,65,0.5) transparent;
+        }
+        
+        /* Eliminar TODOS los fondos morados/azules de Streamlit */
+        [data-baseweb="select"],
+        [data-baseweb="input"],
+        [data-baseweb="base-input"],
+        .stSelectbox,
+        .stNumberInput,
+        .stTextInput,
+        .stDateInput {
+            background-color: transparent !important;
         }
 
+        /* HEADER */
         .training-title {
             color: var(--text);
-            font-size: 2rem;
+            font-size: 2.2rem;
             font-weight: 800;
-            letter-spacing: -0.01em;
-            margin-bottom: 6px;
+            letter-spacing: -0.02em;
+            margin-bottom: 8px;
         }
 
         .training-subtitle {
             color: var(--muted);
             font-size: 0.95rem;
             line-height: 1.5;
+            margin-bottom: 20px;
         }
 
         /* CARDS */
         .training-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
+            background: rgba(11,14,17,0.65);
+            border: 1px solid rgba(255,255,255,0.04);
             border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            padding: 28px;
+            margin-bottom: 28px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
         }
 
         .training-card.card-primary {
-            border-top: 3px solid var(--good);
+            border-top: 2px solid rgba(0,255,176,0.5);
+            border-left: 1px solid rgba(0,255,176,0.1);
+            border-right: 1px solid rgba(0,255,176,0.1);
         }
 
         .training-card.card-sticky {
@@ -357,112 +369,176 @@ def render_entrenamiento() -> None:
         .training-grid-header {
             display: grid;
             grid-template-columns: 0.35fr 3.2fr 1fr 1fr 1.25fr 0.95fr 0.95fr 0.52fr;
-            gap: 8px;
-            padding: 12px 14px;
-            background: rgba(0,0,0,0.3);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            margin-top: 16px;
-            margin-bottom: 8px;
-            font-size: 0.72rem;
-            font-weight: 700;
+            gap: 10px;
+            padding: 14px 16px;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid rgba(60,60,65,0.4);
+            border-radius: 0;
+            margin-top: 24px;
+            margin-bottom: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--muted);
+            letter-spacing: 0.12em;
+            color: rgba(120,120,125,0.75);
+        }
+
+        .training-grid-header > div {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
         }
 
         /* ROWS */
         .training-row {
             display: grid;
             grid-template-columns: 0.35fr 3.2fr 1fr 1fr 1.25fr 0.95fr 0.95fr 0.52fr;
-            gap: 8px;
-            padding: 12px 14px;
-            border: 1px solid var(--border);
-            background: rgba(0,0,0,0.13);
-            border-radius: 12px;
-            margin-bottom: 8px;
+            gap: 10px;
+            padding: 14px 16px;
+            border: 1px solid transparent;
+            background: transparent;
+            border-radius: 10px;
+            margin-bottom: 6px;
             align-items: center;
-            transition: all 0.12s ease;
+            transition: all 0.15s ease;
         }
 
         .training-row:nth-child(even) {
-            background: rgba(255,255,255,0.03);
+            background: rgba(255,255,255,0.015);
         }
 
         .training-row:hover {
-            border-color: rgba(0,255,176,0.28);
-            background: rgba(0,255,176,0.055);
-            transform: translateY(-1px);
+            border-color: rgba(0,255,176,0.18);
+            background: rgba(0,255,176,0.035);
+            box-shadow: 0 2px 8px rgba(0,255,176,0.08);
         }
 
         /* SUMMARY STATS */
         .summary-stat {
+            background: rgba(15,20,25,0.75);
+            border: 1px solid rgba(0,255,176,0.08);
+            border-left: 2px solid rgba(0,255,176,0.25);
+            border-radius: 10px;
+            padding: 16px;
             margin-bottom: 12px;
         }
 
         .summary-stat-label {
             color: var(--muted);
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
             display: block;
         }
 
         .summary-stat-value {
             color: var(--text);
-            font-size: 1.4rem;
+            font-size: 1.5rem;
             font-weight: 800;
+            line-height: 1.1;
         }
 
         .summary-stat-hint {
             color: var(--muted);
-            font-size: 0.75rem;
-            margin-top: 2px;
+            font-size: 0.7rem;
+            margin-top: 3px;
+            opacity: 0.75;
         }
 
         /* BUTTONS */
         .stButton > button[kind="primary"] {
-            background: linear-gradient(90deg, rgba(0,255,176,1), rgba(0,201,167,1)) !important;
-            color: #061018 !important;
-            border-radius: 12px !important;
-            font-weight: 800 !important;
+            background: linear-gradient(135deg, rgba(0,200,140,0.85), rgba(0,160,120,0.85)) !important;
+            color: rgba(10,15,20,0.95) !important;
+            border: 1px solid rgba(0,255,176,0.25) !important;
+            border-radius: 10px !important;
+            font-weight: 700 !important;
             letter-spacing: 0.02em;
-            box-shadow: 0 10px 26px rgba(0,255,176,0.14) !important;
+            box-shadow: 0 4px 12px rgba(0,255,176,0.08) !important;
         }
 
         .stButton > button[kind="primary"]:hover {
-            filter: brightness(1.03);
-            box-shadow: 0 12px 30px rgba(0,255,176,0.18) !important;
+            background: linear-gradient(135deg, rgba(0,220,155,0.9), rgba(0,180,135,0.9)) !important;
+            box-shadow: 0 6px 16px rgba(0,255,176,0.12) !important;
         }
 
-        /* INPUT STYLING */
+        .stButton > button:not([kind="primary"] ) {
+            background: rgba(30,30,35,0.5) !important;
+            color: rgba(200,200,200,0.85) !important;
+            border: 1px solid rgba(60,60,65,0.5) !important;
+            border-radius: 8px !important;
+        }
+
+        .stButton > button:not([kind="primary"]):hover {
+            background: rgba(40,40,45,0.7) !important;
+            border-color: rgba(80,80,85,0.7) !important;
+        }
+
+        /* INPUT STYLING - Forzar negro/gris, eliminar morados */
+        div[data-testid="stSelectbox"] > div > div,
+        div[data-testid="stNumberInput"] > div > div > input,
+        div[data-testid="stTextInput"] > div > div > input,
+        div[data-testid="stDateInput"] > div > div > input,
+        input[type="number"],
+        input[type="text"],
+        input[type="date"] {
+            background-color: rgba(15,15,18,0.95) !important;
+            background: rgba(15,15,18,0.95) !important;
+            color: rgba(220,220,220,0.95) !important;
+            border: 1px solid rgba(60,60,65,0.5) !important;
+            border-radius: 6px !important;
+        }
+
         div[data-testid="stSelectbox"] > div,
         div[data-testid="stNumberInput"] > div,
-        div[data-testid="stTextInput"] > div {
-            background: rgba(0,0,0,0.18) !important;
-            border: 1px solid var(--border) !important;
-            border-radius: 10px !important;
+        div[data-testid="stTextInput"] > div,
+        div[data-testid="stDateInput"] > div {
+            background: transparent !important;
         }
 
-        div[data-testid="stSelectbox"] > div:hover,
-        div[data-testid="stNumberInput"] > div:hover,
-        div[data-testid="stTextInput"] > div:hover {
-            border-color: rgba(0,255,176,0.22) !important;
+        div[data-testid="stSelectbox"] > div > div:hover,
+        div[data-testid="stNumberInput"] > div > div:hover,
+        div[data-testid="stTextInput"] > div > div:hover,
+        input:hover {
+            border-color: rgba(80,80,85,0.7) !important;
+            background: rgba(20,20,23,0.95) !important;
         }
 
-        div[data-testid="stSelectbox"] > div:focus-within,
-        div[data-testid="stNumberInput"] > div:focus-within,
-        div[data-testid="stTextInput"] > div:focus-within {
-            border-color: rgba(0,255,176,0.55) !important;
-            box-shadow: 0 0 0 2px rgba(0,255,176,0.16) !important;
+        div[data-testid="stSelectbox"] > div > div:focus-within,
+        div[data-testid="stNumberInput"] > div > div:focus-within,
+        div[data-testid="stTextInput"] > div > div:focus-within,
+        input:focus {
+            border-color: rgba(0,255,176,0.3) !important;
+            background: rgba(20,20,23,0.98) !important;
+            box-shadow: 0 0 0 1px rgba(0,255,176,0.12) !important;
+            outline: none !important;
+        }
+
+        /* Eliminar fondos morados de los selectbox */
+        [role="listbox"],
+        [role="option"] {
+            background: rgba(15,15,18,0.98) !important;
+            color: rgba(220,220,220,0.95) !important;
+        }
+
+        [role="option"]:hover {
+            background: rgba(30,30,35,0.98) !important;
+        }
+
+        /* Eliminar warnings llamativos de Streamlit */
+        .element-container:has(.stAlert) .stAlert,
+        div[data-testid="stNotification"] {
+            background: rgba(30,30,35,0.5) !important;
+            border: 1px solid rgba(60,60,65,0.5) !important;
+            color: rgba(180,180,185,0.85) !important;
         }
 
         /* SEPARATOR */
         .training-sep {
             height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(0,255,176,0.2), transparent);
-            margin: 16px 0;
+            background: linear-gradient(90deg, transparent, rgba(60,60,65,0.25), transparent);
+            margin: 20px 0;
         }
 
         /* TABS */
@@ -489,35 +565,32 @@ def render_entrenamiento() -> None:
     )
 
     # ---------- Header ----------
-    st.markdown('<div class="training-header">', unsafe_allow_html=True)
     st.markdown('<div class="training-title">Entrenamiento</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="training-subtitle">Registra tu sesión estilo Excel: rápido, claro y coherente con el resto de la app.</div>',
+        '<div class="training-subtitle">Registro limpio de tu sesión — mantén el foco, sin ruido visual.</div>',
         unsafe_allow_html=True
     )
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div style="height:18px"></div>', unsafe_allow_html=True)
 
     col_main, col_side = st.columns([7, 3], gap="large")
 
     # ---------- Main ----------
     with col_main:
-        st.markdown('<div class="training-card card-primary">', unsafe_allow_html=True)
-
-        # Fecha + nombre sesión
+        # Fecha + nombre sesión (fuera de la card)
         c1, c2 = st.columns([1.15, 2.45], gap="medium")
         with c1:
+            def _on_date_change():
+                """Callback para sincronizar fecha cuando el usuario la cambia."""
+                st.session_state.training_date = st.session_state.training_date_widget
+            
             selected_date = st.date_input(
                 "Fecha",
-                key="training_date_widget",  # <- clave del widget separada
-                value=st.session_state.training_date_widget,
+                key="training_date_widget",
+                value=st.session_state.training_date,
                 max_value=datetime.date.today(),
-                format="DD/MM/YYYY"
+                format="DD/MM/YYYY",
+                on_change=_on_date_change
             )
-
-        # Sync: si el usuario cambió la fecha en el widget
-        if selected_date != st.session_state.training_date:
-            st.session_state.training_date = selected_date
-            st.session_state.training_date_widget = selected_date
 
         with c2:
             session_name = st.text_input(
@@ -527,6 +600,11 @@ def render_entrenamiento() -> None:
                 placeholder="Ej: Upper fuerza / Pierna volumen / Push A",
                 help="Si lo dejas vacío, se autogenerará al guardar."
             )
+
+        st.markdown('<div style="height:16px"></div>', unsafe_allow_html=True)
+
+        # ABRE LA CARD PRINCIPAL - abarcar el contenido del entrenamiento
+        st.markdown('<div class="training-card card-primary">', unsafe_allow_html=True)
 
         with st.expander("📖 Guía RPE y RIR", expanded=False):
             a, b = st.columns(2)
@@ -543,137 +621,155 @@ def render_entrenamiento() -> None:
                 st.markdown(
                     "**RIR (Reps en recámara)**\n"
                     "- **0**: Fallo\n"
-                    "- **1**: 1 rep\n"
-                    "- **2**: 2 reps\n"
-                    "- **3**: 3 reps"
+                    "- **1**: 1 rep más\n"
+                    "- **2**: 2 reps más\n"
+                    "- **3**: 3+ reps más"
                 )
 
         st.markdown('<div class="training-sep"></div>', unsafe_allow_html=True)
 
-        # Header "Excel"
-        st.markdown('<div class="training-grid-header"># | Ejercicio | Series | Reps | Peso (kg) | RPE | RIR | </div>', unsafe_allow_html=True)
+        # Inicializar rows_data desde training_data
+        if st.session_state.training_data.empty:
+            rows_data: list[dict] = []
+            rows_to_delete: list[int] = []
+        else:
+            rows_data: list[dict] = st.session_state.training_data.to_dict('records')
+            rows_to_delete: list[int] = []
+            all_ex = get_all_exercises()
 
-        # Render rows
-        rows_data: list[dict] = []
-        rows_to_delete: list[int] = []
-        all_ex = get_all_exercises()
+            # Header "Excel" - Grid horizontal
+            header_html = '''
+            <div class="training-grid-header">
+                <div>#</div>
+                <div>Ejercicio</div>
+                <div>Series</div>
+                <div>Reps</div>
+                <div>Peso (kg)</div>
+                <div>RPE</div>
+                <div>RIR</div>
+                <div></div>
+            </div>
+            '''
+            st.markdown(header_html, unsafe_allow_html=True)
 
-        for i in range(st.session_state.num_rows):
-            if i < len(st.session_state.training_data):
-                row = st.session_state.training_data.iloc[i].to_dict()
-            else:
-                row = get_empty_row(selected_date)
+            # Render rows
+            for i in range(len(rows_data)):
+                row = rows_data[i]
 
-            st.markdown(f'<div class="training-row">', unsafe_allow_html=True)
+                st.markdown(f'<div class="training-row">', unsafe_allow_html=True)
 
-            cols = st.columns([0.35, 3.2, 1.0, 1.0, 1.25, 0.95, 0.95, 0.52], gap="small")
+                cols = st.columns([0.35, 3.2, 1.0, 1.0, 1.25, 0.95, 0.95, 0.52], gap="small")
 
-            with cols[0]:
-                st.markdown(f"<div style='color:var(--muted);text-align:center;font-weight:700'>{i+1}</div>", unsafe_allow_html=True)
+                with cols[0]:
+                    st.markdown(f"<div style='color:var(--muted);text-align:center;font-weight:700'>{i+1}</div>", unsafe_allow_html=True)
 
-            with cols[1]:
-                opciones = [""] + all_ex + ["➕ Nuevo ejercicio..."]
-                current_ex = _normalize_ex_name(row.get("exercise", ""))
-                if current_ex and current_ex not in all_ex:
-                    opciones = ["", current_ex] + all_ex + ["➕ Nuevo ejercicio..."]
-                    default_idx = 1
-                else:
-                    default_idx = opciones.index(current_ex) if current_ex in opciones else 0
+                with cols[1]:
+                    opciones = [""] + all_ex + ["➕ Nuevo ejercicio..."]
+                    current_ex = _normalize_ex_name(row.get("exercise", ""))
+                    if current_ex and current_ex not in all_ex:
+                        opciones = ["", current_ex] + all_ex + ["➕ Nuevo ejercicio..."]
+                        default_idx = 1
+                    else:
+                        default_idx = opciones.index(current_ex) if current_ex in opciones else 0
 
-                selected = st.selectbox(
-                    "Ejercicio",
-                    options=opciones,
-                    index=default_idx,
-                    key=f"ex_select_{i}",
-                    label_visibility="collapsed",
-                )
-
-                if selected == "➕ Nuevo ejercicio...":
-                    st.text_input(
-                        "Nombre ejercicio",
-                        key=f"ex_new_{i}",
+                    selected = st.selectbox(
+                        "Ejercicio",
+                        options=opciones,
+                        index=default_idx,
+                        key=f"ex_select_{i}",
                         label_visibility="collapsed",
-                        placeholder="Escribe el nombre y Enter…",
-                        on_change=lambda idx=i: _save_new_exercise_from_row(idx),
                     )
-                    # Mientras escribe, no ensuciamos df
-                    exercise = ""
-                else:
-                    exercise = _normalize_ex_name(selected)
 
-            with cols[2]:
-                sets = st.number_input(
-                    "Series", min_value=1, max_value=30,
-                    value=int(row.get("sets", 3)), step=1,
-                    key=f"sets_{i}", label_visibility="collapsed"
-                )
-            with cols[3]:
-                reps = st.number_input(
-                    "Reps", min_value=1, max_value=80,
-                    value=int(row.get("reps", 8)), step=1,
-                    key=f"reps_{i}", label_visibility="collapsed"
-                )
-            with cols[4]:
-                weight = st.number_input(
-                    "Peso", min_value=0.0, max_value=600.0,
-                    value=float(row.get("weight", 0.0)),
-                    step=2.5, format="%.1f",
-                    key=f"weight_{i}", label_visibility="collapsed"
-                )
-            with cols[5]:
-                rpe = st.number_input(
-                    "RPE", min_value=1, max_value=10,
-                    value=int(row.get("rpe", 7)), step=1,
-                    key=f"rpe_{i}", label_visibility="collapsed"
-                )
-            with cols[6]:
-                rir = st.number_input(
-                    "RIR", min_value=0, max_value=6,
-                    value=int(row.get("rir", 2)), step=1,
-                    key=f"rir_{i}", label_visibility="collapsed"
-                )
+                    if selected == "➕ Nuevo ejercicio...":
+                        st.text_input(
+                            "Nombre ejercicio",
+                            key=f"ex_new_{i}",
+                            label_visibility="collapsed",
+                            placeholder="Escribe el nombre y Enter…",
+                            on_change=lambda idx=i: _save_new_exercise_from_row(idx),
+                        )
+                        exercise = ""
+                    else:
+                        exercise = _normalize_ex_name(selected)
+                        rows_data[i]["exercise"] = exercise
 
-            with cols[7]:
-                if st.button("🗑️", key=f"del_{i}", help="Eliminar fila"):
-                    rows_to_delete.append(i)
+                with cols[2]:
+                    sets = st.number_input(
+                        "Series", min_value=1, max_value=30,
+                        value=int(row.get("sets", 3)), step=1,
+                        key=f"sets_{i}", label_visibility="collapsed"
+                    )
+                    rows_data[i]["sets"] = int(sets)
 
-            st.markdown("</div>", unsafe_allow_html=True)
+                with cols[3]:
+                    reps = st.number_input(
+                        "Reps", min_value=1, max_value=80,
+                        value=int(row.get("reps", 8)), step=1,
+                        key=f"reps_{i}", label_visibility="collapsed"
+                    )
+                    rows_data[i]["reps"] = int(reps)
 
-            rows_data.append({
-                "date": selected_date,
-                "exercise": exercise,
-                "sets": int(sets),
-                "reps": int(reps),
-                "weight": float(weight),
-                "rpe": int(rpe),
-                "rir": int(rir),
-            })
+                with cols[4]:
+                    weight = st.number_input(
+                        "Peso", min_value=0.0, max_value=600.0,
+                        value=float(row.get("weight", 0.0)),
+                        step=2.5, format="%.1f",
+                        key=f"weight_{i}", label_visibility="collapsed"
+                    )
+                    rows_data[i]["weight"] = float(weight)
 
-        # delete handling
-        if rows_to_delete:
-            rows_data = [r for idx, r in enumerate(rows_data) if idx not in rows_to_delete]
-            if not rows_data:
-                rows_data = [get_empty_row(selected_date)]
-            st.session_state.training_data = pd.DataFrame(rows_data)
-            st.session_state.num_rows = len(st.session_state.training_data)
-            st.rerun()
+                with cols[5]:
+                    rpe = st.number_input(
+                        "RPE", min_value=1, max_value=10,
+                        value=int(row.get("rpe", 7)), step=1,
+                        key=f"rpe_{i}", label_visibility="collapsed"
+                    )
+                    rows_data[i]["rpe"] = int(rpe)
 
+                with cols[6]:
+                    rir = st.number_input(
+                        "RIR", min_value=0, max_value=6,
+                        value=int(row.get("rir", 2)), step=1,
+                        key=f"rir_{i}", label_visibility="collapsed"
+                    )
+                    rows_data[i]["rir"] = int(rir)
+
+                with cols[7]:
+                    if st.button("🗑️", key=f"del_{i}", help="Eliminar fila"):
+                        rows_to_delete.append(i)
+
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            # delete handling
+            if rows_to_delete:
+                rows_data = [r for idx, r in enumerate(rows_data) if idx not in rows_to_delete]
+
+        # Sync con session_state
         st.session_state.training_data = pd.DataFrame(rows_data)
+        st.session_state.num_rows = len(rows_data)
 
-        # Add row
-        add_cols = st.columns([1.5, 6.5], gap="small")
+        # Add row button (siempre visible)
+        st.markdown('<div style="height:12px"></div>', unsafe_allow_html=True)
+        add_cols = st.columns([1.8, 6.2], gap="small")
         with add_cols[0]:
             if st.button("＋ Añadir fila", key="add_row", width="stretch"):
-                st.session_state.num_rows += 1
-                new_row = pd.DataFrame([get_empty_row(selected_date)])
-                st.session_state.training_data = pd.concat([st.session_state.training_data, new_row], ignore_index=True)
+                new_row = {
+                    "date": selected_date,
+                    "exercise": "",
+                    "sets": 3,
+                    "reps": 8,
+                    "weight": 0.0,
+                    "rpe": 7,
+                    "rir": 2
+                }
+                rows_data.append(new_row)
+                st.session_state.training_data = pd.DataFrame(rows_data)
+                st.session_state.num_rows = len(rows_data)
                 st.rerun()
         with add_cols[1]:
-            st.markdown(
-                '<span class="training-chip muted">Tip: usa Tab para moverte rápido por las celdas</span>',
-                unsafe_allow_html=True
-            )
+            st.caption("💡 Tip: usa Tab para moverte entre celdas")
 
+        # CIERRA LA CARD PRINCIPAL
         st.markdown("</div>", unsafe_allow_html=True)
 
     # ---------- Sidebar ----------
@@ -682,41 +778,46 @@ def render_entrenamiento() -> None:
         st.markdown('<span class="card-label">Resumen de Sesión</span>', unsafe_allow_html=True)
 
         df_to_save = st.session_state.training_data.copy()
-        df_to_save["date"] = selected_date
+        
+        # Verificar que el DataFrame no esté vacío y tenga la columna 'exercise'
+        if not df_to_save.empty and "exercise" in df_to_save.columns:
+            df_to_save["date"] = selected_date
 
-        # Filtrar filas “válidas”
-        df_to_save = df_to_save[
-            df_to_save["exercise"].notna()
-            & (df_to_save["exercise"].astype(str).str.strip() != "")
-            & (df_to_save["exercise"].astype(str).str.strip() != "➕ Nuevo ejercicio...")
-        ].copy()
+            # Filtrar filas "válidas"
+            df_to_save = df_to_save[
+                df_to_save["exercise"].notna()
+                & (df_to_save["exercise"].astype(str).str.strip() != "")
+                & (df_to_save["exercise"].astype(str).str.strip() != "➕ Nuevo ejercicio...")
+            ].copy()
+        else:
+            df_to_save = pd.DataFrame(columns=["date", "exercise", "sets", "reps", "weight", "rpe", "rir"])
 
-        if not df_to_save.empty:
+        if not df_to_save.empty and "sets" in df_to_save.columns:
             vol = float((df_to_save["sets"] * df_to_save["reps"] * df_to_save["weight"]).sum())
-            st.markdown(f'<span class="training-chip good">Ejercicios: {len(df_to_save)}</span>', unsafe_allow_html=True)
-            st.markdown(f'<span class="training-chip good">Series: {int(df_to_save["sets"].sum())}</span>', unsafe_allow_html=True)
-            st.markdown(f'<span class="training-chip good">Volumen: {vol:,.0f} kg</span>', unsafe_allow_html=True)
+            st.markdown(f'<div class="summary-stat"><span class="summary-stat-label">Ejercicios</span><div class="summary-stat-value">{len(df_to_save)}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="summary-stat"><span class="summary-stat-label">Series Totales</span><div class="summary-stat-value">{int(df_to_save["sets"].sum())}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="summary-stat"><span class="summary-stat-label">Volumen</span><div class="summary-stat-value">{vol:,.0f}</div><div class="summary-stat-hint">kg</div></div>', unsafe_allow_html=True)
             try:
                 e1rm_top = float((df_to_save["weight"] * (1 + df_to_save["reps"] / 30.0)).max())
-                st.markdown(f'<span class="training-chip good">e1RM: {e1rm_top:.1f} kg</span>', unsafe_allow_html=True)
+                st.markdown(f'<div class="summary-stat"><span class="summary-stat-label">e1RM Máx</span><div class="summary-stat-value">{e1rm_top:.1f}</div><div class="summary-stat-hint">kg</div></div>', unsafe_allow_html=True)
             except Exception:
                 pass
 
             if "rpe" in df_to_save.columns and df_to_save["rpe"].notna().any():
                 st.markdown(
-                    f'<span class="training-chip muted">RPE: {df_to_save["rpe"].mean():.1f}/10</span>',
+                    f'<div class="summary-stat"><span class="summary-stat-label">RPE Promedio</span><div class="summary-stat-value">{df_to_save["rpe"].mean():.1f}</div><div class="summary-stat-hint">/10</div></div>',
                     unsafe_allow_html=True
                 )
             if "rir" in df_to_save.columns and df_to_save["rir"].notna().any():
                 st.markdown(
-                    f'<span class="training-chip muted">RIR: {df_to_save["rir"].mean():.1f}</span>',
+                    f'<div class="summary-stat"><span class="summary-stat-label">RIR Promedio</span><div class="summary-stat-value">{df_to_save["rir"].mean():.1f}</div><div class="summary-stat-hint">reps</div></div>',
                     unsafe_allow_html=True
                 )
         else:
             st.info("Añade al menos un ejercicio para ver el resumen.")
-
+        
         st.markdown('<div class="training-sep"></div>', unsafe_allow_html=True)
-
+        
         # Guardar
         save_clicked = st.button(
             "💾 GUARDAR ENTRENAMIENTO",
@@ -727,17 +828,27 @@ def render_entrenamiento() -> None:
         st.caption("Se guardará con fecha y nombre de sesión (opcional).")
 
         if save_clicked:
-            if df_to_save.empty:
+            # Filtrar filas con ejercicio
+            df_valid = st.session_state.training_data.copy()
+            if "exercise" in df_valid.columns:
+                df_valid = df_valid[
+                    df_valid["exercise"].notna()
+                    & (df_valid["exercise"].astype(str).str.strip() != "")
+                    & (df_valid["exercise"].astype(str).str.strip() != "➕ Nuevo ejercicio...")
+                ].copy()
+            
+            if df_valid.empty:
                 st.warning("Añade al menos un ejercicio.")
             else:
-                is_valid, errors = validate_exercises(df_to_save)
+                is_valid, errors = validate_exercises(df_valid)
                 if not is_valid:
                     for e in errors:
                         st.error(e)
                 else:
                     name_to_save = str(session_name).strip() or f"Entrenamiento - {selected_date.strftime('%d/%m/%Y')}"
                     with loading("Guardando..."):
-                        df_out = df_to_save.copy()
+                        df_out = df_valid.copy()
+                        df_out["date"] = selected_date
                         df_out["session_name"] = name_to_save
 
                         # Persistimos ejercicios por si acaso

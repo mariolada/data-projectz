@@ -18,6 +18,7 @@ env/
 # Configuración local de Streamlit
 .streamlit/config.toml
 .streamlit/secrets.toml
+.streamlit/secret.toml
 
 # Entorno virtual
 .venv/

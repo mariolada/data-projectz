@@ -6,5 +6,12 @@ from views.modo_hoy import render_modo_hoy
 from views.semana import render_semana
 from views.perfil import render_perfil
 from views.entrenamiento import render_entrenamiento
+from views.login import render_login
 
-__all__ = ['render_modo_hoy', 'render_semana', 'render_perfil', 'render_entrenamiento']
+__all__ = [
+    'render_modo_hoy',
+    'render_semana',
+    'render_perfil',
+    'render_entrenamiento',
+    'render_login'
+]
