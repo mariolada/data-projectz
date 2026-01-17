@@ -23,12 +23,32 @@ def save_pkce_pair(state: str, code_verifier: str) -> None:
 
 
 def get_code_verifier(state: str) -> Optional[str]:
-    """Recupera el code_verifier usando el state (SIN eliminarlo)."""
+    """
+    Recupera el code_verifier usando el state (SIN eliminarlo).
+    Intenta coincidencia exacta primero, luego parcial si es necesario.
+    """
+    if not state:
+        return None
+    
     db = next(get_db())
     try:
+        # Intento 1: coincidencia exacta
         rec = PKCEStateRepository.get_by_state(db, state)
         if rec:
             return rec.code_verifier
+        
+        # Intento 2: búsqueda con LIKE (en caso de URL encoding)
+        # Esto es para manejar casos donde el state se URL-encode
+        import urllib.parse
+        unquoted_state = urllib.parse.unquote(state)
+        if unquoted_state != state:
+            rec = PKCEStateRepository.get_by_state(db, unquoted_state)
+            if rec:
+                return rec.code_verifier
+        
+        return None
+    except Exception as e:
+        print(f"Error recuperando code_verifier: {e}")
         return None
     finally:
         db.close()

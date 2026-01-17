@@ -100,11 +100,22 @@ def _handle_oauth_callback(params):
     
     st.write("🔄 Procesando autenticación con Google...")
 
-    # Recuperar el code_verifier desde la BD usando el state
-    code_verifier = get_code_verifier(state) if state else None
+    # Primero intentar recuperar del estado de sesión (si aún está en memoria)
+    code_verifier = None
+    
+    if state and state == st.session_state.get("oauth_state"):
+        # El state coincide: usar el verifier de session_state
+        code_verifier = st.session_state.get("oauth_code_verifier")
+    else:
+        # Intentar recuperar desde la BD
+        code_verifier = get_code_verifier(state) if state else None
     
     if not code_verifier:
-        st.error("❌ Code verifier no encontrado. Reinicia el login.")
+        st.error(f"❌ Code verifier no encontrado. State recibido: {state[:20] if state else 'None'}...")
+        st.error("Esto puede ocurrir si:")
+        st.error("• Tu sesión expiró (espera 5 minutos e intenta de nuevo)")
+        st.error("• El navegador eliminó las cookies")
+        st.error("• Hay un problema con la base de datos")
         st.session_state.authenticated = False
         return False
 
@@ -198,7 +209,12 @@ def main():
             state, verifier = generate_state_and_verifier()
             st.session_state.oauth_state = state
             st.session_state.oauth_code_verifier = verifier
-            save_pkce_pair(state, verifier)
+            # Guardar inmediatamente en BD para mayor fiabilidad
+            try:
+                save_pkce_pair(state, verifier)
+            except Exception as e:
+                st.warning(f"⚠️ Aviso: No se pudo guardar estado PKCE. {str(e)}")
+                # Continuar de todas formas - usaremos session_state como fallback
         
         auth_url = build_authorization_url(
             st.session_state.oauth_state,
