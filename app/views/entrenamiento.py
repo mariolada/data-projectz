@@ -619,301 +619,303 @@ def render_entrenamiento() -> None:
         st.markdown('<div style="height:16px"></div>', unsafe_allow_html=True)
 
         # ABRE LA CARD PRINCIPAL - abarcar el contenido del entrenamiento
-        st.markdown('<div class="training-card card-primary">', unsafe_allow_html=True)
+        with st.container(border=False):
+            st.markdown('<style>.stContainer { background: rgba(11,14,17,0.65) !important; border: 1px solid rgba(255,255,255,0.04) !important; border-top: 2px solid rgba(0,255,176,0.5) !important; border-left: 1px solid rgba(0,255,176,0.1) !important; border-right: 1px solid rgba(0,255,176,0.1) !important; border-radius: 16px !important; padding: 28px !important; box-shadow: 0 8px 24px rgba(0,0,0,0.25) !important; }</style>', unsafe_allow_html=True)
 
-        with st.expander("📖 Guía RPE y RIR", expanded=False):
-            a, b = st.columns(2)
-            with a:
-                st.markdown(
-                    "**RPE (Percepción del Esfuerzo)**\n"
-                    "- **10**: Máximo esfuerzo\n"
-                    "- **9**: Muy alto\n"
-                    "- **8**: Alto\n"
-                    "- **7**: Moderado-alto\n"
-                    "- **6**: Moderado"
-                )
-            with b:
-                st.markdown(
-                    "**RIR (Reps en recámara)**\n"
-                    "- **0**: Fallo\n"
-                    "- **1**: 1 rep más\n"
-                    "- **2**: 2 reps más\n"
-                    "- **3**: 3+ reps más"
-                )
-
-        st.markdown('<div class="training-sep"></div>', unsafe_allow_html=True)
-
-        # Inicializar rows_data desde training_data
-        if st.session_state.training_data.empty:
-            rows_data: list[dict] = []
-            rows_to_delete: list[int] = []
-        else:
-            rows_data: list[dict] = st.session_state.training_data.to_dict('records')
-            rows_to_delete: list[int] = []
-            all_ex = get_all_exercises()
-
-            # Header "Excel" - Grid horizontal
-            header_html = '''
-            <div class="training-grid-header">
-                <div>#</div>
-                <div>Ejercicio</div>
-                <div>Series</div>
-                <div>Reps</div>
-                <div>Peso (kg)</div>
-                <div>RPE</div>
-                <div>RIR</div>
-                <div></div>
-            </div>
-            '''
-            st.markdown(header_html, unsafe_allow_html=True)
-
-            # Render rows
-            for i in range(len(rows_data)):
-                row = rows_data[i]
-
-                st.markdown(f'<div class="training-row">', unsafe_allow_html=True)
-
-                cols = st.columns([0.35, 3.2, 1.0, 1.0, 1.25, 0.95, 0.95, 0.52], gap="small")
-
-                with cols[0]:
-                    st.markdown(f"<div style='color:var(--muted);text-align:center;font-weight:700'>{i+1}</div>", unsafe_allow_html=True)
-
-                with cols[1]:
-                    opciones = [""] + all_ex + ["➕ Nuevo ejercicio..."]
-                    current_ex = _normalize_ex_name(row.get("exercise", ""))
-                    if current_ex and current_ex not in all_ex:
-                        opciones = ["", current_ex] + all_ex + ["➕ Nuevo ejercicio..."]
-                        default_idx = 1
-                    else:
-                        default_idx = opciones.index(current_ex) if current_ex in opciones else 0
-
-                    selected = st.selectbox(
-                        "Ejercicio",
-                        options=opciones,
-                        index=default_idx,
-                        key=f"ex_select_{i}",
-                        label_visibility="collapsed",
+            with st.expander("📖 Guía RPE y RIR", expanded=False):
+                a, b = st.columns(2)
+                with a:
+                    st.markdown(
+                        "**RPE (Percepción del Esfuerzo)**\n"
+                        "- **10**: Máximo esfuerzo\n"
+                        "- **9**: Muy alto\n"
+                        "- **8**: Alto\n"
+                        "- **7**: Moderado-alto\n"
+                        "- **6**: Moderado"
+                    )
+                with b:
+                    st.markdown(
+                        "**RIR (Reps en recámara)**\n"
+                        "- **0**: Fallo\n"
+                        "- **1**: 1 rep más\n"
+                        "- **2**: 2 reps más\n"
+                        "- **3**: 3+ reps más"
                     )
 
-                    if selected == "➕ Nuevo ejercicio...":
-                        st.text_input(
-                            "Nombre ejercicio",
-                            key=f"ex_new_{i}",
+            st.markdown('<div class="training-sep"></div>', unsafe_allow_html=True)
+
+            # Inicializar rows_data desde training_data
+            if st.session_state.training_data.empty:
+                rows_data: list[dict] = []
+                rows_to_delete: list[int] = []
+            else:
+                rows_data: list[dict] = st.session_state.training_data.to_dict('records')
+                rows_to_delete: list[int] = []
+                all_ex = get_all_exercises()
+
+                # Header "Excel" - Grid horizontal
+                header_html = '''
+                <div class="training-grid-header">
+                    <div>#</div>
+                    <div>Ejercicio</div>
+                    <div>Series</div>
+                    <div>Reps</div>
+                    <div>Peso (kg)</div>
+                    <div>RPE</div>
+                    <div>RIR</div>
+                    <div></div>
+                </div>
+                '''
+                st.markdown(header_html, unsafe_allow_html=True)
+
+                # Render rows
+                for i in range(len(rows_data)):
+                    row = rows_data[i]
+
+                    st.markdown(f'<div class="training-row">', unsafe_allow_html=True)
+
+                    cols = st.columns([0.35, 3.2, 1.0, 1.0, 1.25, 0.95, 0.95, 0.52], gap="small")
+
+                    with cols[0]:
+                        st.markdown(f"<div style='color:var(--muted);text-align:center;font-weight:700'>{i+1}</div>", unsafe_allow_html=True)
+
+                    with cols[1]:
+                        opciones = [""] + all_ex + ["➕ Nuevo ejercicio..."]
+                        current_ex = _normalize_ex_name(row.get("exercise", ""))
+                        if current_ex and current_ex not in all_ex:
+                            opciones = ["", current_ex] + all_ex + ["➕ Nuevo ejercicio..."]
+                            default_idx = 1
+                        else:
+                            default_idx = opciones.index(current_ex) if current_ex in opciones else 0
+
+                        selected = st.selectbox(
+                            "Ejercicio",
+                            options=opciones,
+                            index=default_idx,
+                            key=f"ex_select_{i}",
                             label_visibility="collapsed",
-                            placeholder="Escribe el nombre y Enter…",
-                            on_change=lambda idx=i: _save_new_exercise_from_row(idx),
                         )
-                        exercise = ""
-                    else:
-                        exercise = _normalize_ex_name(selected)
-                        rows_data[i]["exercise"] = exercise
 
-                with cols[2]:
-                    sets = st.number_input(
-                        "Series", min_value=1, max_value=30,
-                        value=int(row.get("sets", 3)), step=1,
-                        key=f"sets_{i}", label_visibility="collapsed"
-                    )
-                    rows_data[i]["sets"] = int(sets)
+                        if selected == "➕ Nuevo ejercicio...":
+                            st.text_input(
+                                "Nombre ejercicio",
+                                key=f"ex_new_{i}",
+                                label_visibility="collapsed",
+                                placeholder="Escribe el nombre y Enter…",
+                                on_change=lambda idx=i: _save_new_exercise_from_row(idx),
+                            )
+                            exercise = ""
+                        else:
+                            exercise = _normalize_ex_name(selected)
+                            rows_data[i]["exercise"] = exercise
 
-                with cols[3]:
-                    reps = st.number_input(
-                        "Reps", min_value=1, max_value=80,
-                        value=int(row.get("reps", 8)), step=1,
-                        key=f"reps_{i}", label_visibility="collapsed"
-                    )
-                    rows_data[i]["reps"] = int(reps)
+                    with cols[2]:
+                        sets = st.number_input(
+                            "Series", min_value=1, max_value=30,
+                            value=int(row.get("sets", 3)), step=1,
+                            key=f"sets_{i}", label_visibility="collapsed"
+                        )
+                        rows_data[i]["sets"] = int(sets)
 
-                with cols[4]:
-                    weight = st.number_input(
-                        "Peso", min_value=0.0, max_value=600.0,
-                        value=float(row.get("weight", 0.0)),
-                        step=2.5, format="%.1f",
-                        key=f"weight_{i}", label_visibility="collapsed"
-                    )
-                    rows_data[i]["weight"] = float(weight)
+                    with cols[3]:
+                        reps = st.number_input(
+                            "Reps", min_value=1, max_value=80,
+                            value=int(row.get("reps", 8)), step=1,
+                            key=f"reps_{i}", label_visibility="collapsed"
+                        )
+                        rows_data[i]["reps"] = int(reps)
 
-                with cols[5]:
-                    rpe = st.number_input(
-                        "RPE", min_value=1, max_value=10,
-                        value=int(row.get("rpe", 7)), step=1,
-                        key=f"rpe_{i}", label_visibility="collapsed"
-                    )
-                    rows_data[i]["rpe"] = int(rpe)
+                    with cols[4]:
+                        weight = st.number_input(
+                            "Peso", min_value=0.0, max_value=600.0,
+                            value=float(row.get("weight", 0.0)),
+                            step=2.5, format="%.1f",
+                            key=f"weight_{i}", label_visibility="collapsed"
+                        )
+                        rows_data[i]["weight"] = float(weight)
 
-                with cols[6]:
-                    rir = st.number_input(
-                        "RIR", min_value=0, max_value=6,
-                        value=int(row.get("rir", 2)), step=1,
-                        key=f"rir_{i}", label_visibility="collapsed"
-                    )
-                    rows_data[i]["rir"] = int(rir)
+                    with cols[5]:
+                        rpe = st.number_input(
+                            "RPE", min_value=1, max_value=10,
+                            value=int(row.get("rpe", 7)), step=1,
+                            key=f"rpe_{i}", label_visibility="collapsed"
+                        )
+                        rows_data[i]["rpe"] = int(rpe)
 
-                with cols[7]:
-                    if st.button("🗑️", key=f"del_{i}", help="Eliminar fila"):
-                        rows_to_delete.append(i)
+                    with cols[6]:
+                        rir = st.number_input(
+                            "RIR", min_value=0, max_value=6,
+                            value=int(row.get("rir", 2)), step=1,
+                            key=f"rir_{i}", label_visibility="collapsed"
+                        )
+                        rows_data[i]["rir"] = int(rir)
 
-                st.markdown("</div>", unsafe_allow_html=True)
+                    with cols[7]:
+                        if st.button("🗑️", key=f"del_{i}", help="Eliminar fila"):
+                            rows_to_delete.append(i)
 
-            # delete handling
-            if rows_to_delete:
-                rows_data = [r for idx, r in enumerate(rows_data) if idx not in rows_to_delete]
+                    st.markdown("</div>", unsafe_allow_html=True)
 
-        # Sync con session_state
-        st.session_state.training_data = pd.DataFrame(rows_data)
-        st.session_state.num_rows = len(rows_data)
+                # delete handling
+                if rows_to_delete:
+                    rows_data = [r for idx, r in enumerate(rows_data) if idx not in rows_to_delete]
 
-        # Add row button (siempre visible)
-        st.markdown('<div style="height:12px"></div>', unsafe_allow_html=True)
-        add_cols = st.columns([1.8, 6.2], gap="small")
-        with add_cols[0]:
-            if st.button("＋ Añadir fila", key="add_row", width="stretch"):
-                new_row = {
-                    "date": selected_date,
-                    "exercise": "",
-                    "sets": 3,
-                    "reps": 8,
-                    "weight": 0.0,
-                    "rpe": 7,
-                    "rir": 2
-                }
-                rows_data.append(new_row)
-                st.session_state.training_data = pd.DataFrame(rows_data)
-                st.session_state.num_rows = len(rows_data)
-                st.rerun()
-        with add_cols[1]:
-            st.caption("💡 Tip: usa Tab para moverte entre celdas")
+            # Sync con session_state
+            st.session_state.training_data = pd.DataFrame(rows_data)
+            st.session_state.num_rows = len(rows_data)
 
-        # CIERRA LA CARD PRINCIPAL
-        st.markdown("</div>", unsafe_allow_html=True)
+            # Add row button (siempre visible)
+            st.markdown('<div style="height:12px"></div>', unsafe_allow_html=True)
+            add_cols = st.columns([1.8, 6.2], gap="small")
+            with add_cols[0]:
+                if st.button("＋ Añadir fila", key="add_row", width="stretch"):
+                    new_row = {
+                        "date": selected_date,
+                        "exercise": "",
+                        "sets": 3,
+                        "reps": 8,
+                        "weight": 0.0,
+                        "rpe": 7,
+                        "rir": 2
+                    }
+                    rows_data.append(new_row)
+                    st.session_state.training_data = pd.DataFrame(rows_data)
+                    st.session_state.num_rows = len(rows_data)
+                    st.rerun()
+            with add_cols[1]:
+                st.caption("💡 Tip: usa Tab para moverte entre celdas")
 
     # ---------- Sidebar ----------
     with col_side:
-        st.markdown('<div class="training-card card-sticky">', unsafe_allow_html=True)
-        st.markdown('<span class="card-label">Resumen de Sesión</span>', unsafe_allow_html=True)
+        with st.container(border=False):
+            st.markdown('<style>.stContainer { background: rgba(11,14,17,0.65) !important; border: 1px solid rgba(255,255,255,0.04) !important; border-top: 2px solid rgba(0,255,176,0.2) !important; border-left: 1px solid rgba(0,255,176,0.05) !important; border-right: 1px solid rgba(0,255,176,0.05) !important; border-radius: 16px !important; padding: 20px !important; box-shadow: 0 8px 24px rgba(0,0,0,0.25) !important; position: sticky !important; top: 1.2rem !important; }</style>', unsafe_allow_html=True)
+            st.markdown('<span class="card-label">Resumen de Sesión</span>', unsafe_allow_html=True)
 
-        df_to_save = st.session_state.training_data.copy()
-        
-        # Verificar que el DataFrame no esté vacío y tenga la columna 'exercise'
-        if not df_to_save.empty and "exercise" in df_to_save.columns:
-            df_to_save["date"] = selected_date
-
-            # Filtrar filas "válidas"
-            df_to_save = df_to_save[
-                df_to_save["exercise"].notna()
-                & (df_to_save["exercise"].astype(str).str.strip() != "")
-                & (df_to_save["exercise"].astype(str).str.strip() != "➕ Nuevo ejercicio...")
-            ].copy()
-        else:
-            df_to_save = pd.DataFrame(columns=["date", "exercise", "sets", "reps", "weight", "rpe", "rir"])
-
-        if not df_to_save.empty and "sets" in df_to_save.columns:
-            vol = float((df_to_save["sets"] * df_to_save["reps"] * df_to_save["weight"]).sum())
-            st.markdown(f'<div class="summary-stat"><span class="summary-stat-label">Ejercicios</span><div class="summary-stat-value">{len(df_to_save)}</div></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="summary-stat"><span class="summary-stat-label">Series Totales</span><div class="summary-stat-value">{int(df_to_save["sets"].sum())}</div></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="summary-stat"><span class="summary-stat-label">Volumen</span><div class="summary-stat-value">{vol:,.0f}</div><div class="summary-stat-hint">kg</div></div>', unsafe_allow_html=True)
-            try:
-                e1rm_top = float((df_to_save["weight"] * (1 + df_to_save["reps"] / 30.0)).max())
-                st.markdown(f'<div class="summary-stat"><span class="summary-stat-label">e1RM Máx</span><div class="summary-stat-value">{e1rm_top:.1f}</div><div class="summary-stat-hint">kg</div></div>', unsafe_allow_html=True)
-            except Exception:
-                pass
-
-            if "rpe" in df_to_save.columns and df_to_save["rpe"].notna().any():
-                st.markdown(
-                    f'<div class="summary-stat"><span class="summary-stat-label">RPE Promedio</span><div class="summary-stat-value">{df_to_save["rpe"].mean():.1f}</div><div class="summary-stat-hint">/10</div></div>',
-                    unsafe_allow_html=True
-                )
-            if "rir" in df_to_save.columns and df_to_save["rir"].notna().any():
-                st.markdown(
-                    f'<div class="summary-stat"><span class="summary-stat-label">RIR Promedio</span><div class="summary-stat-value">{df_to_save["rir"].mean():.1f}</div><div class="summary-stat-hint">reps</div></div>',
-                    unsafe_allow_html=True
-                )
-        else:
-            st.info("Añade al menos un ejercicio para ver el resumen.")
-        
-        st.markdown('<div class="training-sep"></div>', unsafe_allow_html=True)
-        
-        # Guardar
-        save_clicked = st.button(
-            "💾 GUARDAR ENTRENAMIENTO",
-            type="primary",
-            width="stretch",
-            key="save_training_primary"
-        )
-        st.caption("Se guardará con fecha y nombre de sesión (opcional).")
-
-        if save_clicked:
-            # Filtrar filas con ejercicio
-            df_valid = st.session_state.training_data.copy()
-            if "exercise" in df_valid.columns:
-                df_valid = df_valid[
-                    df_valid["exercise"].notna()
-                    & (df_valid["exercise"].astype(str).str.strip() != "")
-                    & (df_valid["exercise"].astype(str).str.strip() != "➕ Nuevo ejercicio...")
-                ].copy()
+            df_to_save = st.session_state.training_data.copy()
             
-            if df_valid.empty:
-                st.warning("Añade al menos un ejercicio.")
+            # Verificar que el DataFrame no esté vacío y tenga la columna 'exercise'
+            if not df_to_save.empty and "exercise" in df_to_save.columns:
+                df_to_save["date"] = selected_date
+
+                # Filtrar filas "válidas"
+                df_to_save = df_to_save[
+                    df_to_save["exercise"].notna()
+                    & (df_to_save["exercise"].astype(str).str.strip() != "")
+                    & (df_to_save["exercise"].astype(str).str.strip() != "➕ Nuevo ejercicio...")
+                ].copy()
             else:
-                is_valid, errors = validate_exercises(df_valid)
-                if not is_valid:
-                    for e in errors:
-                        st.error(e)
-                else:
-                    name_to_save = str(session_name).strip() or f"Entrenamiento - {selected_date.strftime('%d/%m/%Y')}"
-                    with loading("Guardando..."):
-                        df_out = df_valid.copy()
-                        df_out["date"] = selected_date
-                        df_out["session_name"] = name_to_save
+                df_to_save = pd.DataFrame(columns=["date", "exercise", "sets", "reps", "weight", "rpe", "rir"])
 
-                        # Persistimos ejercicios por si acaso
-                        for ex in df_out["exercise"].dropna().astype(str).tolist():
-                            add_exercise_to_bank(ex)
+            if not df_to_save.empty and "sets" in df_to_save.columns:
+                vol = float((df_to_save["sets"] * df_to_save["reps"] * df_to_save["weight"]).sum())
+                st.markdown(f'<div class="summary-stat"><span class="summary-stat-label">Ejercicios</span><div class="summary-stat-value">{len(df_to_save)}</div></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="summary-stat"><span class="summary-stat-label">Series Totales</span><div class="summary-stat-value">{int(df_to_save["sets"].sum())}</div></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="summary-stat"><span class="summary-stat-label">Volumen</span><div class="summary-stat-value">{vol:,.0f}</div><div class="summary-stat-hint">kg</div></div>', unsafe_allow_html=True)
+                try:
+                    e1rm_top = float((df_to_save["weight"] * (1 + df_to_save["reps"] / 30.0)).max())
+                    st.markdown(f'<div class="summary-stat"><span class="summary-stat-label">e1RM Máx</span><div class="summary-stat-value">{e1rm_top:.1f}</div><div class="summary-stat-hint">kg</div></div>', unsafe_allow_html=True)
+                except Exception:
+                    pass
 
-                        ok = save_training(df_out, selected_date)
-
-                    if ok:
-                        st.success(f"✅ Guardado: {name_to_save}")
-                        st.balloons()
-
-        st.markdown('<div class="training-sep"></div>', unsafe_allow_html=True)
-
-        # Sesiones recientes
-        st.markdown('<span class="card-label">Sesiones Recientes</span>', unsafe_allow_html=True)
-        df_hist = load_existing_training()
-        recent = _recent_sessions_summary(df_hist, limit=10)
-
-        if recent.empty:
-            st.markdown(f"<div style='color:var(--muted);text-align:center;padding:12px;font-size:0.9rem;'>Sin sesiones recientes.</div>", unsafe_allow_html=True)
-        else:
-            for idx, r in recent.iterrows():
-                d = r["date"]
-                name = str(r.get("session_name", "")).strip()
-                title = name if name else f"Sesión {d.strftime('%d/%m/%Y')}"
-                vol = r.get("vol", 0.0)
-                rpe_mean = r.get("rpe_mean", float("nan"))
-
-                row = st.columns([3.2, 1.2], gap="small")
-                with row[0]:
+                if "rpe" in df_to_save.columns and df_to_save["rpe"].notna().any():
                     st.markdown(
-                        f"**{d.strftime('%d/%m/%Y')} — {title}**  \n"
-                        f"<span style='color:rgba(232,255,243,.66)'>Vol: {vol:,.0f} kg"
-                        + (f" | RPE: {rpe_mean:.1f}" if pd.notna(rpe_mean) else "")
-                        + "</span>",
+                        f'<div class="summary-stat"><span class="summary-stat-label">RPE Promedio</span><div class="summary-stat-value">{df_to_save["rpe"].mean():.1f}</div><div class="summary-stat-hint">/10</div></div>',
                         unsafe_allow_html=True
                     )
-                with row[1]:
-                    if st.button("Cargar", width="stretch", key=f"load_{idx}_{d}"):
-                        # Solo actualiza la variable lógica, no la del widget
-                        st.session_state.training_date = d
-                        st.session_state.training_data = _session_rows(df_hist, d)
-                        st.session_state.num_rows = max(1, len(st.session_state.training_data))
+                if "rir" in df_to_save.columns and df_to_save["rir"].notna().any():
+                    st.markdown(
+                        f'<div class="summary-stat"><span class="summary-stat-label">RIR Promedio</span><div class="summary-stat-value">{df_to_save["rir"].mean():.1f}</div><div class="summary-stat-hint">reps</div></div>',
+                        unsafe_allow_html=True
+                    )
+            else:
+                st.info("Añade al menos un ejercicio para ver el resumen.")
+            
+            st.markdown('<div class="training-sep"></div>', unsafe_allow_html=True)
+            
+            # Guardar
+            save_clicked = st.button(
+                "💾 GUARDAR ENTRENAMIENTO",
+                type="primary",
+                width="stretch",
+                key="save_training_primary"
+            )
+            st.caption("Se guardará con fecha y nombre de sesión (opcional).")
+
+            if save_clicked:
+                # Filtrar filas con ejercicio
+                df_valid = st.session_state.training_data.copy()
+                if "exercise" in df_valid.columns:
+                    df_valid = df_valid[
+                        df_valid["exercise"].notna()
+                        & (df_valid["exercise"].astype(str).str.strip() != "")
+                        & (df_valid["exercise"].astype(str).str.strip() != "➕ Nuevo ejercicio...")
+                    ].copy()
+                
+                if df_valid.empty:
+                    st.warning("Añade al menos un ejercicio.")
+                else:
+                    is_valid, errors = validate_exercises(df_valid)
+                    if not is_valid:
+                        for e in errors:
+                            st.error(e)
+                    else:
+                        name_to_save = str(session_name).strip() or f"Entrenamiento - {selected_date.strftime('%d/%m/%Y')}"
+                        with loading("Guardando..."):
+                            df_out = df_valid.copy()
+                            df_out["date"] = selected_date
+                            df_out["session_name"] = name_to_save
+
+                            # Persistimos ejercicios por si acaso
+                            for ex in df_out["exercise"].dropna().astype(str).tolist():
+                                add_exercise_to_bank(ex)
+
+                            ok = save_training(df_out, selected_date)
+
+                        if ok:
+                            st.success(f"✅ Guardado: {name_to_save}")
+                            st.balloons()
+
+            st.markdown('<div class="training-sep"></div>', unsafe_allow_html=True)
+
+            # Sesiones recientes
+            st.markdown('<span class="card-label">Sesiones Recientes</span>', unsafe_allow_html=True)
+            df_hist = load_existing_training()
+            recent = _recent_sessions_summary(df_hist, limit=10)
+
+            if recent.empty:
+                st.markdown(f"<div style='color:var(--muted);text-align:center;padding:12px;font-size:0.9rem;'>Sin sesiones recientes.</div>", unsafe_allow_html=True)
+            else:
+                for idx, r in recent.iterrows():
+                    d = r["date"]
+                    name = str(r.get("session_name", "")).strip()
+                    title = name if name else f"Sesión {d.strftime('%d/%m/%Y')}"
+                    vol = r.get("vol", 0.0)
+                    rpe_mean = r.get("rpe_mean", float("nan"))
+
+                    row = st.columns([3.2, 1.2], gap="small")
+                    with row[0]:
+                        st.markdown(
+                            f"**{d.strftime('%d/%m/%Y')} — {title}**  \n"
+                            f"<span style='color:rgba(232,255,243,.66)'>Vol: {vol:,.0f} kg"
+                            + (f" | RPE: {rpe_mean:.1f}" if pd.notna(rpe_mean) else "")
+                            + "</span>",
+                            unsafe_allow_html=True
+                        )
+                    with row[1]:
+                        if st.button("Cargar", width="stretch", key=f"load_{idx}_{d}"):
+                            # Solo actualiza la variable lógica, no la del widget
+                            st.session_state.training_date = d
+                            st.session_state.training_data = _session_rows(df_hist, d)
+                            st.session_state.num_rows = max(1, len(st.session_state.training_data))
+
+                            # Sync banco ejercicios con esa sesión
+                            for ex in st.session_state.training_data["exercise"].dropna().astype(str).tolist():
+                                add_exercise_to_bank(ex)
+
+                            st.rerun()
 
                         # Sync banco ejercicios con esa sesión
                         for ex in st.session_state.training_data["exercise"].dropna().astype(str).tolist():
                             add_exercise_to_bank(ex)
 
-                        st.rerun()
-
-
-        st.markdown("</div>", unsafe_allow_html=True)
+                            st.rerun()
