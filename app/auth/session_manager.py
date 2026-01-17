@@ -104,3 +104,11 @@ def save_gender(raw_session_token: str, gender: str) -> bool:
         return result is not None
     finally:
         db.close()
+
+
+def get_gender(raw_session_token: str) -> Optional[str]:
+    """Recupera el género guardado para la sesión actual."""
+    session = restore_session(raw_session_token)
+    if session:
+        return session.gender
+    return None

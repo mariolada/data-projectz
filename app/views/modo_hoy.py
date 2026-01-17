@@ -210,7 +210,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
             st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
 
             # --- RECUPERACIÓN (compacto) ---
-            render_quick_mode_section_header("Recuperación", "😴")
+            render_quick_mode_section_header("Recuperación", "")
 
             with st.container(border=True):
                 col_r1, col_r2, col_r3 = st.columns([1, 1, 1])
@@ -248,7 +248,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                     nap_mins = 0  # En modo rápido no se pregunta siesta
 
             # --- ESTADO (compacto) ---
-            render_quick_mode_section_header("Cómo estás ahora", "💪")
+            render_quick_mode_section_header("Cómo estás ahora", "")
 
             with st.container(border=True):
                 # Input dominante: Intuición
@@ -375,6 +375,28 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                 sick_level = 2 if sick_flag else 0
                 session_goal = "fuerza"
                 time_available = 60
+
+            # CICLO MENSTRUAL (modo rápido)
+            user_gender = st.session_state.get('user_gender', None)
+            menstrual_cycle_data = None
+            
+            if user_gender == "mujer":
+                st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
+                from ui.profile_helpers import render_menstrual_cycle_questionnaire
+                
+                with st.container(border=True):
+                    st.markdown("""
+                    <div style='background:rgba(217, 71, 239, 0.08);border:1px solid rgba(217, 71, 239, 0.25);
+                    border-radius:12px;padding:16px;margin-bottom:16px;'>
+                        <div style='color:#D947EF;font-size:0.9rem;font-weight:600;'>Ciclo Menstrual</div>
+                        <div style='color:#9CA3AF;font-size:0.85rem;margin-top:6px;'>
+                        Esta información se usará para ajustar tu readiness según tu fase del ciclo.
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    menstrual_cycle_data = render_menstrual_cycle_questionnaire()
+                    st.session_state['menstrual_cycle_data'] = menstrual_cycle_data
 
         # =========================================================================
         # MODO PRECISO: Wizard de 3 pasos
@@ -785,7 +807,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
 
         if show_submit:
             submitted = st.button(
-                "🎯 CALCULAR READINESS & PLAN",
+                "CALCULAR READINESS & PLAN",
                 width="stretch",
                 key="submit_readiness",
                 type="primary",
@@ -795,7 +817,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
 
 
     # Cheat sheet de métricas clave (ayuda rápida)
-    with st.expander("📘 ¿Qué significa cada métrica?"):
+    with st.expander("¿Qué significa cada métrica?"):
         st.markdown(
             """
 **Volumen**: trabajo total (sets × reps × carga); sube lento, no de golpe.

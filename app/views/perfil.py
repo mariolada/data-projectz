@@ -401,9 +401,17 @@ def render_perfil(df_daily: pd.DataFrame, session_token: str = None):
             
             st.divider()
             
-            # Selector de género
+            # Cargar género guardado de la base de datos
+            saved_gender = None
+            if session_token:
+                try:
+                    from auth.session_manager import get_gender
+                    saved_gender = get_gender(session_token)
+                except:
+                    pass
+            
             st.markdown("**¿Cuál es tu género?**")
-            gender = render_gender_selection()
+            gender = render_gender_selection(saved_gender=saved_gender)
             st.session_state['user_gender'] = gender
             
             render_gender_note(gender)

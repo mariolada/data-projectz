@@ -40,15 +40,25 @@ def render_user_profile_header(display_name: str, email: str, profile_picture: s
         st.markdown(f"Correo: {email}")
 
 
-def render_gender_selection() -> str:
+def render_gender_selection(saved_gender: str = None) -> str:
     """Renderiza selector de género con UI amigable."""
     st.markdown(f"### Información Personal")
     st.markdown("Esta información personaliza tus métricas de readiness.")
     st.markdown("")
     
+    # Determinar índice inicial basado en género guardado
+    index = 0
+    if saved_gender:
+        saved_gender_lower = saved_gender.lower()
+        if saved_gender_lower == "mujer":
+            index = 1
+        elif saved_gender_lower == "hombre":
+            index = 0
+    
     gender = st.radio(
         "¿Cuál es tu género?",
         ["Hombre", "Mujer"],
+        index=index,
         horizontal=True,
         help="Esto afecta cómo interpretamos factores de recuperación y performance."
     )
