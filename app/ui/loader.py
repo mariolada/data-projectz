@@ -271,7 +271,7 @@ def hide_loader():
     st.markdown("<style>.loader-overlay { display: none !important; }</style>", unsafe_allow_html=True)
 
 @contextmanager
-def loading(message: str = "Cargando...", compact: bool = False, show_bar: bool = True):
+def loading(message: str = "Cargando...", compact: bool = False, show_bar: bool = True, min_display_time: float = 0.3):
     """
     Context manager para mostrar loader durante una operación.
     
@@ -284,13 +284,21 @@ def loading(message: str = "Cargando...", compact: bool = False, show_bar: bool 
         message: Texto a mostrar
         compact: Si True, usa versión compacta
         show_bar: Si True, muestra barra de progreso
+        min_display_time: Tiempo mínimo (en segundos) que el loader debe mostrarse
     """
+    import time
+    start_time = time.time()
     placeholder = st.empty()
+    
     try:
         with placeholder.container():
             st.markdown(LOADER_CSS + _get_loader_html(message, compact, show_bar), unsafe_allow_html=True)
         yield
     finally:
+        # Asegurar que el loader se muestre al menos min_display_time segundos
+        elapsed = time.time() - start_time
+        if elapsed < min_display_time:
+            time.sleep(min_display_time - elapsed)
         placeholder.empty()
 
 @contextmanager  
@@ -306,6 +314,19 @@ def loading_status(message: str = "Cargando..."):
     with st.status(message, expanded=False) as status:
         yield status
         status.update(label="Completado", state="complete", expanded=False)
+
+@contextmanager
+def loading_spinner(message: str = "Cargando..."):
+    """
+    Versión usando st.spinner nativo de Streamlit con texto personalizado.
+    Más confiable para operaciones síncronas rápidas.
+    
+    Uso:
+        with loading_spinner("Procesando..."):
+            # operación
+    """
+    with st.spinner(message):
+        yield
 
 # Mensajes predefinidos para diferentes operaciones
 LOADING_MESSAGES = {
