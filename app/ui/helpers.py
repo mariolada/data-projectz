@@ -1575,55 +1575,55 @@ def render_live_summary(recovery: dict, state: dict, flags: dict,
     
     html = (
         f'<div style="background:linear-gradient(135deg,rgba(20,18,24,0.98),rgba(26,24,30,0.95));'
-        f'border-radius:16px;padding:16px 20px;margin-bottom:20px;'
+        f'border-radius:16px;padding:12px 16px;margin-bottom:16px;'
         f'border:1px solid rgba(255,255,255,0.08);'
         f'box-shadow:0 4px 20px rgba(0,0,0,0.3);">'
         
-        f'<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1.5px;'
-        f'color:#666;margin-bottom:12px;font-weight:600;">Resumen en vivo</div>'
+        f'<div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:1.2px;'
+        f'color:#666;margin-bottom:8px;font-weight:600;">Resumen en vivo</div>'
         
-        f'<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">'
+        f'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">'
         
         # Recuperación
         f'<div style="text-align:center;flex:1;">'
-        f'<div style="font-size:0.7rem;color:#888;margin-bottom:4px;">Recuperación</div>'
-        f'<div style="display:flex;align-items:center;justify-content:center;gap:6px;">'
-        f'<span style="font-size:1.1rem;">{recovery["emoji"]}</span>'
-        f'<span style="color:{rec_color};font-weight:600;font-size:0.9rem;">{recovery["label"]}</span>'
+        f'<div style="font-size:0.65rem;color:#888;margin-bottom:3px;">Recuperación</div>'
+        f'<div style="display:flex;align-items:center;justify-content:center;gap:4px;">'
+        f'<span style="font-size:1rem;">{recovery["emoji"]}</span>'
+        f'<span style="color:{rec_color};font-weight:600;font-size:0.85rem;">{recovery["label"]}</span>'
         f'</div>'
         f'</div>'
         
         # Divider
-        f'<div style="width:1px;height:32px;background:rgba(255,255,255,0.1);"></div>'
+        f'<div style="width:1px;height:28px;background:rgba(255,255,255,0.1);"></div>'
         
         # Estado
         f'<div style="text-align:center;flex:1;">'
-        f'<div style="font-size:0.7rem;color:#888;margin-bottom:4px;">Estado</div>'
-        f'<div style="display:flex;align-items:center;justify-content:center;gap:6px;">'
-        f'<span style="font-size:1.1rem;">{state["emoji"]}</span>'
-        f'<span style="color:{state_color};font-weight:600;font-size:0.9rem;">{state["label"]}</span>'
+        f'<div style="font-size:0.65rem;color:#888;margin-bottom:3px;">Estado</div>'
+        f'<div style="display:flex;align-items:center;justify-content:center;gap:4px;">'
+        f'<span style="font-size:1rem;">{state["emoji"]}</span>'
+        f'<span style="color:{state_color};font-weight:600;font-size:0.85rem;">{state["label"]}</span>'
         f'</div>'
         f'</div>'
         
         # Divider
-        f'<div style="width:1px;height:32px;background:rgba(255,255,255,0.1);"></div>'
+        f'<div style="width:1px;height:28px;background:rgba(255,255,255,0.1);"></div>'
         
         # Flags
         f'<div style="text-align:center;flex:1;">'
-        f'<div style="font-size:0.7rem;color:#888;margin-bottom:4px;">Flags</div>'
-        f'<div style="display:flex;align-items:center;justify-content:center;gap:6px;">'
-        f'<span style="font-size:1.1rem;">{flags["emoji"]}</span>'
-        f'<span style="color:{flags_color};font-weight:600;font-size:0.9rem;">{flags["label"]}</span>'
+        f'<div style="font-size:0.65rem;color:#888;margin-bottom:3px;">Flags</div>'
+        f'<div style="display:flex;align-items:center;justify-content:center;gap:4px;">'
+        f'<span style="font-size:1rem;">{flags["emoji"]}</span>'
+        f'<span style="color:{flags_color};font-weight:600;font-size:0.85rem;">{flags["label"]}</span>'
         f'</div>'
         f'</div>'
         
         # Divider
-        f'<div style="width:1px;height:32px;background:rgba(255,255,255,0.1);"></div>'
+        f'<div style="width:1px;height:28px;background:rgba(255,255,255,0.1);"></div>'
         
         # Readiness estimado
         f'<div style="text-align:center;flex:1.2;">'
-        f'<div style="font-size:0.7rem;color:#888;margin-bottom:4px;">Readiness est.</div>'
-        f'<div style="color:{ready_color};font-weight:700;font-size:1.3rem;">{ready_display}</div>'
+        f'<div style="font-size:0.65rem;color:#888;margin-bottom:3px;">Readiness est.</div>'
+        f'<div style="color:{ready_color};font-weight:700;font-size:1.2rem;">{ready_display}</div>'
         f'</div>'
         
         f'</div>'
@@ -1664,11 +1664,11 @@ def render_wizard_progress(current_step: int, total_steps: int = 3):
         
         html += (
             f'<div style="text-align:center;">'
-            f'<div style="width:32px;height:32px;border-radius:50%;'
+            f'<div style="width:28px;height:28px;border-radius:50%;'
             f'background:{bg};border:2px solid {border};'
             f'display:flex;align-items:center;justify-content:center;'
-            f'color:{text_color};font-weight:600;font-size:0.9rem;margin:0 auto 4px;">{step_num}</div>'
-            f'<div style="font-size:0.7rem;color:{label_color};white-space:nowrap;">{step_name}</div>'
+            f'color:{text_color};font-weight:600;font-size:0.85rem;margin:0 auto 3px;">{step_num}</div>'
+            f'<div style="font-size:0.65rem;color:{label_color};white-space:nowrap;">{step_name}</div>'
             f'</div>'
         )
         
@@ -1677,7 +1677,7 @@ def render_wizard_progress(current_step: int, total_steps: int = 3):
             line_color = '#50C878' if step_num < current_step else 'rgba(255,255,255,0.15)'
             html += (
                 f'<div style="flex:1;max-width:60px;height:2px;background:{line_color};'
-                f'margin:0 4px;margin-bottom:20px;"></div>'
+                f'margin:0 4px;margin-bottom:16px;"></div>'
             )
 
     html += '</div></div>'
@@ -1688,11 +1688,11 @@ def render_step_header(step_num: int, title: str, subtitle: str):
     """Renderiza el header de un paso del wizard."""
     accent = '#4ECDC4' if step_num == 1 else '#B266FF' if step_num == 2 else '#E05555'
     html = (
-        f'<div class="mh-card mh-card-left" style="border-left-color:{accent};margin-bottom:16px;">'
-        f'<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'
-        f'<span style="padding:4px 10px;border-radius:6px;'
+        f'<div class="mh-card mh-card-left" style="border-left-color:{accent};margin-bottom:12px;">'
+        f'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'
+        f'<span style="padding:3px 8px;border-radius:6px;'
         f'background:rgba(255,255,255,0.02);border:1px solid {accent}40;color:{accent};'
-        f'font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;">PASO {step_num}</span>'
+        f'font-size:0.70rem;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;">PASO {step_num}</span>'
         f'<span style="color:#f0f0f0;font-size:1.05rem;font-weight:700;">{title}</span>'
         f'</div>'
         f'<div class="mh-muted" style="font-size:0.85rem;">{subtitle}</div>'

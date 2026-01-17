@@ -207,7 +207,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
         # MODO RÁPIDO: Vista compacta en 1 pantalla
         # =========================================================================
         if quick_mode:
-            st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='margin-top:12px'></div>", unsafe_allow_html=True)
 
             # --- RECUPERACIÓN (compacto) ---
             render_quick_mode_section_header("Recuperación", "")
@@ -402,7 +402,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
         # MODO PRECISO: Wizard de 3 pasos
         # =========================================================================
         else:
-            st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='margin-top:12px'></div>", unsafe_allow_html=True)
 
             # Wizard progress bar
             render_wizard_progress(st.session_state.wizard_step)
@@ -482,7 +482,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                 menstrual_cycle_data = None
                 
                 if user_gender == "mujer":
-                    st.markdown("<div style='margin-top:32px'></div>", unsafe_allow_html=True)
+                    st.markdown("<div style='margin-top:12px'></div>", unsafe_allow_html=True)
                     from ui.profile_helpers import render_menstrual_cycle_questionnaire
                     
                     with st.container(border=True):
@@ -500,7 +500,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                         st.session_state['menstrual_cycle_data'] = menstrual_cycle_data
 
                 # Botón siguiente
-                st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
+                st.markdown("<div style='margin-top:16px'></div>", unsafe_allow_html=True)
                 if st.button("Siguiente → Estado", width="stretch", type="primary", key="wiz_next_1"):
                     st.session_state.mood_sleep_h = sleep_h
                     st.session_state.mood_sleep_q = sleep_q
@@ -604,7 +604,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                 render_status_badge("Estado", state_status)
 
                 # Botones navegación
-                st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
+                st.markdown("<div style='margin-top:16px'></div>", unsafe_allow_html=True)
                 col_nav1, col_nav2 = st.columns(2)
                 with col_nav1:
                     if st.button("← Volver", width="stretch", key="wiz_back_2"):
@@ -746,7 +746,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
         # =========================================================================
         # RESUMEN EN VIVO (siempre visible arriba del botón)
         # =========================================================================
-        st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top:12px'></div>", unsafe_allow_html=True)
 
         # Calcular estados para resumen
         recovery_status = _get_recovery_status(sleep_h, sleep_q, sleep_disruptions)

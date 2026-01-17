@@ -564,8 +564,9 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     background: linear-gradient(135deg, var(--mh-panel), var(--mh-panel2)) !important;
     border: 1px solid var(--mh-border) !important;
     border-radius: 14px !important;
-    padding: 14px 16px !important;
+    padding: 10px 14px !important;
     box-shadow: 0 2px 14px rgba(0,0,0,0.32) !important;
+    margin: 6px 0 !important;
 }
 
 /* =====================================================
@@ -612,15 +613,16 @@ div[data-testid="stMarkdownContainer"] div {
 .mh-chip {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
+    gap: 6px;
+    padding: 4px 8px;
     border-radius: 999px;
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     font-weight: 650;
     letter-spacing: 0.01em;
     border: 1px solid rgba(255,255,255,0.08);
     background: rgba(255,255,255,0.03);
     color: rgba(230,230,230,0.92);
+    margin: 2px 0;
 }
 .mh-chip strong { font-weight: 800; }
 .mh-chip-green { border-color: rgba(0,208,132,0.30); color: #00D084; background: rgba(0,208,132,0.08); }
@@ -632,11 +634,12 @@ div[data-testid="stMarkdownContainer"] div {
     display: flex;
     justify-content: space-between;
     gap: 10px;
-    font-size: 0.72rem;
+    font-size: 0.70rem;
     color: rgba(156,163,175,0.85);
-    margin-top: -6px;
-    padding: 0 2px 6px 2px;
+    margin-top: -8px;
+    padding: 0 2px 2px 2px;
     user-select: none;
+    line-height: 1.2;
 }
 .mh-scale span:nth-child(2) { opacity: 0.85; }
 .mh-scale span:last-child { text-align: right; }
@@ -645,9 +648,10 @@ div[data-testid="stMarkdownContainer"] div {
 .mh-card {
     background: linear-gradient(135deg, rgba(22,22,28,0.95), rgba(28,26,32,0.90));
     border-radius: 12px;
-    padding: 16px 20px;
+    padding: 12px 16px;
     border: 1px solid rgba(255,255,255,0.05);
     box-shadow: 0 2px 12px rgba(0,0,0,0.30);
+    margin: 4px 0;
 }
 .mh-card-left {
     border-left: 3px solid rgba(255,255,255,0.12);
@@ -693,7 +697,8 @@ div[data-testid="stRadio"] label {
 
 /* Slider surface + handle */
 div[data-testid="stSlider"] div[data-baseweb="slider"] {
-    padding: 8px 2px !important;
+    padding: 6px 2px !important;
+    margin: 2px 0 !important;
 }
 div[data-testid="stSlider"] div[data-baseweb="slider"] div[role="slider"] {
     box-shadow: 0 0 0 2px rgba(255,255,255,0.15) !important;
