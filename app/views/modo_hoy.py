@@ -255,7 +255,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                 with st.container(border=True):
                     st.markdown(
                         '<div style="color:#4ECDC4;font-size:0.8rem;font-weight:650;margin-bottom:8px;">'
-                        '⭐ TU INTUICIÓN HOY <span style="color:#9CA3AF; font-weight:600;">(input principal)</span>'
+                        'TU INTUICIÓN HOY <span style="color:#9CA3AF; font-weight:600;">(input principal)</span>'
                         '</div>',
                         unsafe_allow_html=True
                     )
@@ -321,49 +321,49 @@ def render_modo_hoy(df_daily: pd.DataFrame):
 
             # Label simple para el expander (no acepta HTML)
             if flag_count == 0:
-                flags_label = "✅ ¿Algo fuera de lo normal? (Sin alertas)"
+                flags_label = "Algo fuera de lo normal? (Sin alertas)"
             elif flag_count == 1:
-                flags_label = "⚠️ ¿Algo fuera de lo normal? (1 alerta)"
+                flags_label = "Algo fuera de lo normal? (1 alerta)"
             else:
-                flags_label = f"🔴 ¿Algo fuera de lo normal? ({flag_count} alertas)"
+                flags_label = f"Algo fuera de lo normal? ({flag_count} alertas)"
 
             with st.expander(flags_label, expanded=False):
                 col_f1, col_f2 = st.columns(2)
 
                 with col_f1:
                     alcohol = st.checkbox(
-                        "🍺 Alcohol anoche",
+                        "Alcohol anoche",
                         value=st.session_state.get('mood_alcohol', False),
                         key="quick_alcohol"
                     )
                     if alcohol:
-                        st.caption("↳ Impacto: recuperación -5 a -15")
+                        st.caption("Impacto: recuperación -5 a -15")
 
                     caffeine = st.selectbox(
-                        "☕ Cafeína (últimas 6h)",
+                        "Cafeína (últimas 6h)",
                         [0, 1, 2, 3],
                         index=st.session_state.get('mood_caffeine', 0),
                         key="quick_caffeine"
                     )
                     if caffeine >= 2:
-                        st.caption("↳ Puede enmascarar fatiga real")
+                        st.caption("Puede enmascarar fatiga real")
 
                 with col_f2:
                     sick_flag = st.checkbox(
-                        "🤒 Enfermo/resfriado",
+                        "Enfermo/resfriado",
                         value=st.session_state.get('mood_sick_flag', False),
                         key="quick_sick"
                     )
                     if sick_flag:
-                        st.caption("↳ Impacto: -20 a -40 readiness")
+                        st.caption("Impacto: -20 a -40 readiness")
 
                     last_hard = st.checkbox(
-                        "💥 Último entreno muy duro",
+                        "Último entreno muy duro",
                         value=st.session_state.get('mood_last_hard', False),
                         key="quick_lasthard"
                     )
                     if last_hard:
-                        st.caption("↳ Posible fatiga residual")
+                        st.caption("Posible fatiga residual")
 
                 # En modo rápido, dolor y otros son simplificados
                 pain_flag = False
@@ -455,6 +455,28 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                 recovery_status = _get_recovery_status(sleep_h, sleep_q, sleep_disruptions)
                 render_status_badge("Recuperación", recovery_status)
 
+                # CICLO MENSTRUAL (solo en modo preciso, en Paso 1)
+                user_gender = st.session_state.get('user_gender', None)
+                menstrual_cycle_data = None
+                
+                if user_gender == "mujer":
+                    st.markdown("<div style='margin-top:32px'></div>", unsafe_allow_html=True)
+                    from ui.profile_helpers import render_menstrual_cycle_questionnaire
+                    
+                    with st.container(border=True):
+                        st.markdown("""
+                        <div style='background:rgba(217, 71, 239, 0.08);border:1px solid rgba(217, 71, 239, 0.25);
+                        border-radius:12px;padding:16px;margin-bottom:16px;'>
+                            <div style='color:#D947EF;font-size:0.9rem;font-weight:600;'>Ciclo Menstrual</div>
+                            <div style='color:#9CA3AF;font-size:0.85rem;margin-top:6px;'>
+                            Esta información se usará para ajustar tu readiness según tu fase del ciclo.
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        menstrual_cycle_data = render_menstrual_cycle_questionnaire()
+                        st.session_state['menstrual_cycle_data'] = menstrual_cycle_data
+
                 # Botón siguiente
                 st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
                 if st.button("Siguiente → Estado", width="stretch", type="primary", key="wiz_next_1"):
@@ -476,7 +498,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                     '<div style="background:rgba(78,205,196,0.08);border:1px solid rgba(78,205,196,0.25);'
                     'border-radius:12px;padding:20px;margin-bottom:20px;">'
                     '<div style="color:#4ECDC4;font-size:0.85rem;font-weight:600;margin-bottom:12px;">'
-                    '⭐ TU INTUICIÓN — El input más importante</div>',
+                    'TU INTUICIÓN — El input más importante</div>',
                     unsafe_allow_html=True
                 )
                 perceived_readiness = st.slider(
@@ -592,7 +614,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                     # Alcohol
                     with st.container(border=True):
                         alcohol = st.checkbox(
-                            "🍺 Alcohol anoche",
+                            "Alcohol anoche",
                             value=st.session_state.get('mood_alcohol', False),
                             key="wiz_alcohol"
                         )
@@ -602,7 +624,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                     # Cafeína
                     with st.container(border=True):
                         caffeine = st.selectbox(
-                            "☕ Cafeína (últimas 6h)",
+                            "Cafeína (últimas 6h)",
                             [0, 1, 2, 3],
                             index=st.session_state.get('mood_caffeine', 0),
                             key="wiz_caffeine",
@@ -614,7 +636,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                     # Enfermedad
                     with st.container(border=True):
                         sick_flag = st.checkbox(
-                            "🤒 Enfermo/resfriado",
+                            "Enfermo/resfriado",
                             value=st.session_state.get('mood_sick_flag', False),
                             key="wiz_sick"
                         )
@@ -635,7 +657,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                     # Último entreno duro
                     with st.container(border=True):
                         last_hard = st.checkbox(
-                            "💥 Último entreno muy exigente",
+                            "Último entreno muy exigente",
                             value=st.session_state.get('mood_last_hard', False),
                             key="wiz_lasthard",
                             help="Alta intensidad/volumen en últimas 48h"
@@ -646,7 +668,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                     # Dolor localizado
                     with st.container(border=True):
                         pain_flag = st.checkbox(
-                            "🩹 Dolor localizado",
+                            "Dolor localizado",
                             value=st.session_state.get('mood_pain_flag', False),
                             key="wiz_pain"
                         )
@@ -698,33 +720,6 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                     if st.button("← Volver", width="stretch", key="wiz_back_3"):
                         st.session_state.wizard_step = 2
                         st.rerun()
-
-        # =========================================================================
-        # CICLO MENSTRUAL (si es mujer)
-        # =========================================================================
-        # Verificar si el usuario es mujer
-        user_gender = st.session_state.get('user_gender', None)
-        menstrual_cycle_data = None
-        
-        if user_gender == "mujer":
-            st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
-            
-            # Importar el componente de cuestionario
-            from ui.profile_helpers import render_menstrual_cycle_questionnaire
-            
-            with st.container(border=True):
-                st.markdown("""
-                <div style='background:rgba(217, 71, 239, 0.08);border:1px solid rgba(217, 71, 239, 0.25);
-                border-radius:12px;padding:16px;margin-bottom:16px;'>
-                    <div style='color:#D947EF;font-size:0.9rem;font-weight:600;'>Ciclo Menstrual</div>
-                    <div style='color:#9CA3AF;font-size:0.85rem;margin-top:6px;'>
-                    Esta información se usará para ajustar tu readiness según tu fase del ciclo.
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                menstrual_cycle_data = render_menstrual_cycle_questionnaire()
-                st.session_state['menstrual_cycle_data'] = menstrual_cycle_data
 
         # =========================================================================
         # RESUMEN EN VIVO (siempre visible arriba del botón)
@@ -1107,7 +1102,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                         today_save, sleep_h, sleep_q, fatigue, soreness, stress, motivation,
                         pain_flag, pain_location, readiness_instant
                     )
-                    st.success(f"✅ Guardado para {today_save}")
+                    st.success(f"Guardado para {today_save}")
                     st.info("💡 **Próximo paso:** ejecuta el pipeline para que se regenere el histórico con estos datos.")
                     st.session_state.mood_calculated = False  # Reset after save
         
