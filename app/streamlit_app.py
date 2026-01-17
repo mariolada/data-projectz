@@ -252,11 +252,15 @@ def main():
     df_metrics['date'] = pd.to_datetime(df_metrics['date']).dt.date
     df_recommendations['date'] = pd.to_datetime(df_recommendations['date']).dt.date
     
-    if df_exercises is not None:
+    if df_exercises is not None and 'date' in df_exercises.columns:
         df_exercises['date'] = pd.to_datetime(df_exercises['date']).dt.date
     
     if df_weekly is not None:
-        df_weekly['date'] = pd.to_datetime(df_weekly['date']).dt.date
+        # weekly.csv usa 'week_start' en lugar de 'date'
+        if 'week_start' in df_weekly.columns:
+            df_weekly['week_start'] = pd.to_datetime(df_weekly['week_start']).dt.date
+        elif 'date' in df_weekly.columns:
+            df_weekly['date'] = pd.to_datetime(df_weekly['date']).dt.date
 
     # Eliminar columnas duplicadas
     cols_to_drop = [c for c in ['readiness_score', 'recommendation', 'reason', 'action_intensity', 'reason_codes']
