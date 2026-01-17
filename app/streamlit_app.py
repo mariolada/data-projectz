@@ -364,7 +364,7 @@ def main():
                 # Profile Picture in sidebar (left column)
                 if st.session_state.get('profile_picture_url'):
                     st.sidebar.markdown("---")
-                    st.sidebar.markdown("<div style='text-align: center;'><strong>👤 Perfil</strong></div>", unsafe_allow_html=True)
+                    st.sidebar.markdown("<div style='text-align: center;'><strong>Perfil</strong></div>", unsafe_allow_html=True)
                     st.sidebar.image(st.session_state.profile_picture_url, width=120, use_container_width=False)
                     if st.session_state.get('display_name'):
                         st.sidebar.caption(f"<div style='text-align: center;'>{st.session_state.display_name}</div>", unsafe_allow_html=True)
@@ -372,19 +372,19 @@ def main():
                 # ALERTS
                 alerts = []
                 if get_anti_fatigue_flag(df_daily, selected_date):
-                    alerts.append("⚠️ **Consecutivos de alta exigencia**: considera descanso parcial hoy")
+                    alerts.append("Consecutivos de alta exigencia: considera descanso parcial hoy")
                 if pd.notna(r.get('sleep_hours', None)) and r['sleep_hours'] < 6.5:
-                    alerts.append("😴 **Sueño bajo**: reduce volumen hoy")
+                    alerts.append("Sueño bajo: reduce volumen hoy")
                 if pd.notna(r.get('acwr_7_28', None)) and r['acwr_7_28'] > 1.5:
-                    alerts.append("⚡ **Carga aguda muy alta**: evita máximos hoy")
+                    alerts.append("Carga aguda muy alta: evita máximos hoy")
                 
                 if alerts:
-                    st.markdown("### ⚠️ Alertas")
+                    st.markdown("### Alertas")
                     for alert in alerts:
                         st.warning(alert)
                 
                 # READINESS WITH ZONE - Mejorado con cards
-                st.markdown("### 📊 Métricas Clave")
+                st.markdown("### Métricas Clave")
                 col1, col2, col3, col4 = st.columns([1.2, 1, 1, 1])
                 
                 with col1:
@@ -420,7 +420,7 @@ def main():
                 st.info(f"{conf_emoji} **Confianza del modelo:** {conf_text}")
                 
                 # RECOMMENDATION - Mejorado
-                render_section_title("💡 Recomendación", accent="#FFB81C")
+                render_section_title("Recomendación", accent="#FFB81C")
                 reco = r.get('recommendation', 'N/D')
                 action = r.get('action_intensity', 'N/D')
                 
@@ -453,7 +453,7 @@ def main():
                 if df_exercises is not None:
                     df_lifts = load_daily_exercise_for_date(daily_ex_path, selected_date)
                     if not df_lifts.empty:
-                        render_section_title("🏋️ Qué hacer hoy", accent="#00D084")
+                        render_section_title("Qué hacer hoy", accent="#00D084")
                         st.write("**Lifts clave - plan accionable:**")
                         lift_recs = get_lift_recommendations(df_lifts, readiness, zone)
                         for rec in lift_recs:

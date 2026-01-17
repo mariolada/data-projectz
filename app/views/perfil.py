@@ -389,7 +389,7 @@ def render_perfil(df_daily: pd.DataFrame, session_token: str = None):
     st.markdown("</div>", unsafe_allow_html=True)
     
     # ============ PROFILE INFO + GENDER CONFIG ============
-    with st.expander("👤 Configuración de Perfil", expanded=False):
+    with st.expander("Configuración de Perfil", expanded=False):
         col_profile = st.columns(1)[0]
         with col_profile:
             # Obtener info del usuario actual
@@ -397,7 +397,7 @@ def render_perfil(df_daily: pd.DataFrame, session_token: str = None):
             user_email = st.session_state.get('user_email', 'no-email@example.com')
             
             st.markdown(f"### {display_name}")
-            st.caption(f"📧 {user_email}")
+            st.caption(f"Correo: {user_email}")
             
             st.divider()
             
@@ -409,19 +409,19 @@ def render_perfil(df_daily: pd.DataFrame, session_token: str = None):
             render_gender_note(gender)
             
             # Botón de guardar género
-            if st.button("💾 Guardar Género", key="save_gender", use_container_width=True):
+            if st.button("Guardar Género", key="save_gender", use_container_width=True):
                 if session_token:
                     from auth.session_manager import save_gender
                     try:
                         success = save_gender(session_token, gender)
                         if success:
-                            st.success("✅ Género guardado correctamente")
+                            st.success("Género guardado correctamente")
                         else:
-                            st.error("❌ Error al guardar género")
+                            st.error("Error al guardar género")
                     except Exception as e:
-                        st.error(f"❌ Error: {str(e)}")
+                        st.error(f"Error: {str(e)}")
                 else:
-                    st.warning("⚠️ No se pudo guardar (sesión no disponible)")
+                    st.warning("No se pudo guardar (sesión no disponible)")
     
     # Cargar datos
     with loading("Cargando perfil..."):

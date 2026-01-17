@@ -716,7 +716,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                 st.markdown("""
                 <div style='background:rgba(217, 71, 239, 0.08);border:1px solid rgba(217, 71, 239, 0.25);
                 border-radius:12px;padding:16px;margin-bottom:16px;'>
-                    <div style='color:#D947EF;font-size:0.9rem;font-weight:600;'>🔄 Ciclo Menstrual</div>
+                    <div style='color:#D947EF;font-size:0.9rem;font-weight:600;'>Ciclo Menstrual</div>
                     <div style='color:#9CA3AF;font-size:0.85rem;margin-top:6px;'>
                     Esta información se usará para ajustar tu readiness según tu fase del ciclo.
                     </div>
