@@ -362,7 +362,7 @@ def render_mini_card(title: str, content: str):
     )
 
 
-def render_perfil(df_daily: pd.DataFrame):
+def render_perfil(df_daily: pd.DataFrame, session_token: str = None):
     """
     Renderiza Perfil Personal con layout en 7 cards coherentes.
     
@@ -404,12 +404,50 @@ def render_perfil(df_daily: pd.DataFrame):
             st.session_state['user_gender'] = gender
             
             # Si es mujer, mostrar cuestionario de ciclo menstrual
+            cycle_data = None
             if gender == "mujer":
                 st.divider()
                 cycle_data = render_menstrual_cycle_questionnaire()
                 st.session_state['menstrual_cycle_data'] = cycle_data
             
             render_gender_note(gender)
+            
+            # Botones de guardar
+            st.divider()
+            col_save1, col_save2 = st.columns(2)
+            
+            with col_save1:
+                if st.button("💾 Guardar Género", key="save_gender", use_container_width=True):
+                    if session_token:
+                        from auth.session_manager import save_gender
+                        try:
+                            success = save_gender(session_token, gender)
+                            if success:
+                                st.success("✅ Género guardado correctamente")
+                            else:
+                                st.error("❌ Error al guardar género")
+                        except Exception as e:
+                            st.error(f"❌ Error: {str(e)}")
+                    else:
+                        st.warning("⚠️ No se pudo guardar (sesión no disponible)")
+            
+            with col_save2:
+                if gender == "mujer" and cycle_data:
+                    if st.button("💾 Guardar Ciclo", key="save_cycle", use_container_width=True):
+                        if session_token:
+                            from auth.session_manager import save_menstrual_cycle_data
+                            import json
+                            try:
+                                cycle_json = json.dumps(cycle_data)
+                                success = save_menstrual_cycle_data(session_token, cycle_json)
+                                if success:
+                                    st.success("✅ Datos del ciclo guardados correctamente")
+                                else:
+                                    st.error("❌ Error al guardar ciclo")
+                            except Exception as e:
+                                st.error(f"❌ Error: {str(e)}")
+                        else:
+                            st.warning("⚠️ No se pudo guardar (sesión no disponible)")
     
     # Cargar datos
     with loading("Cargando perfil..."):

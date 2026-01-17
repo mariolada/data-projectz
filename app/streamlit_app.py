@@ -43,6 +43,8 @@ from auth.session_manager import (
     save_pkce_pair,
     get_code_verifier,
     delete_pkce_state,
+    save_menstrual_cycle_data,
+    save_gender,
 )
 from database.connection import init_db  # Inicializar BD
 
@@ -71,6 +73,15 @@ def _restore_session_from_query():
             st.session_state.display_name = rec.display_name
             st.session_state.profile_picture_url = rec.profile_picture_url  # Restaurar foto
             st.session_state.user_gender = rec.gender  # Restaurar género
+            
+            # Restaurar datos del ciclo menstrual si existen
+            if rec.menstrual_cycle_data:
+                import json
+                try:
+                    st.session_state.menstrual_cycle_data = json.loads(rec.menstrual_cycle_data)
+                except:
+                    st.session_state.menstrual_cycle_data = None
+            
             return True
         else:
             # Limpiar query params si la sesión es inválida
@@ -210,6 +221,8 @@ def main():
     # Load main data files
     df_metrics = None
     df_recommendations = None
+    df_exercises = None
+    df_weekly = None
     
     with loading("Cargando datos..."):
         try:
@@ -223,10 +236,27 @@ def main():
         except FileNotFoundError:
             st.warning("❌ Falta recommendations_daily.csv. Ejecuta `decision_engine` primero.")
             st.stop()
+        
+        # Intentar cargar datos opcionales
+        try:
+            df_exercises = load_csv(daily_ex_path)
+        except FileNotFoundError:
+            df_exercises = None
+        
+        try:
+            df_weekly = load_csv(weekly_path)
+        except FileNotFoundError:
+            df_weekly = None
 
     # Preparar fechas
     df_metrics['date'] = pd.to_datetime(df_metrics['date']).dt.date
     df_recommendations['date'] = pd.to_datetime(df_recommendations['date']).dt.date
+    
+    if df_exercises is not None:
+        df_exercises['date'] = pd.to_datetime(df_exercises['date']).dt.date
+    
+    if df_weekly is not None:
+        df_weekly['date'] = pd.to_datetime(df_weekly['date']).dt.date
 
     # Eliminar columnas duplicadas
     cols_to_drop = [c for c in ['readiness_score', 'recommendation', 'reason', 'action_intensity', 'reason_codes']
@@ -327,32 +357,53 @@ def main():
                 readiness = r.get('readiness_score', None)
                 zone, emoji, color = get_readiness_zone(readiness)
                 
+                # Profile Picture in sidebar (left column)
+                if st.session_state.get('profile_picture_url'):
+                    st.sidebar.markdown("---")
+                    st.sidebar.markdown("<div style='text-align: center;'><strong>👤 Perfil</strong></div>", unsafe_allow_html=True)
+                    st.sidebar.image(st.session_state.profile_picture_url, width=120, use_container_width=False)
+                    if st.session_state.get('display_name'):
+                        st.sidebar.caption(f"<div style='text-align: center;'>{st.session_state.display_name}</div>", unsafe_allow_html=True)
+                
                 # ALERTS
                 alerts = []
                 if get_anti_fatigue_flag(df_daily, selected_date):
                     alerts.append("⚠️ **Consecutivos de alta exigencia**: considera descanso parcial hoy")
                 if pd.notna(r.get('sleep_hours', None)) and r['sleep_hours'] < 6.5:
-                    alerts.append(" **Sueño bajo**: reduce volumen hoy")
+                    alerts.append("😴 **Sueño bajo**: reduce volumen hoy")
                 if pd.notna(r.get('acwr_7_28', None)) and r['acwr_7_28'] > 1.5:
-                    alerts.append(" **Carga aguda muy alta**: evita máximos hoy")
+                    alerts.append("⚡ **Carga aguda muy alta**: evita máximos hoy")
                 
-                for alert in alerts:
-                    st.warning(alert)
+                if alerts:
+                    st.markdown("### ⚠️ Alertas")
+                    for alert in alerts:
+                        st.warning(alert)
                 
-                # READINESS WITH ZONE
-                col1, col2, col3, col4 = st.columns([1.5, 1.2, 1.2, 1.2])
+                # READINESS WITH ZONE - Mejorado con cards
+                st.markdown("### 📊 Métricas Clave")
+                col1, col2, col3, col4 = st.columns([1.2, 1, 1, 1])
                 
                 with col1:
                     readiness_text = f"{emoji} {int(readiness) if pd.notna(readiness) else 'N/D'}/100"
-                    st.markdown(f"### {readiness_text}")
-                    st.markdown(f"*{zone}*")
+                    st.markdown(f"""
+<div style='
+    background: linear-gradient(135deg, rgba(178, 102, 255, 0.15), rgba(0, 208, 132, 0.05));
+    border: 1px solid rgba(178, 102, 255, 0.3);
+    border-radius: 8px;
+    padding: 14px;
+    text-align: center;
+'>
+    <div style='font-size: 1.8em; font-weight: bold; color: #B266FF;'>{readiness_text}</div>
+    <div style='font-size: 0.85em; color: #9CA3AF; margin-top: 4px;'>{zone}</div>
+</div>
+""", unsafe_allow_html=True)
                 
                 perf = r.get('performance_index', None)
                 acwr = r.get('acwr_7_28', None)
                 sleep_h = r.get('sleep_hours', None)
                 
                 with col2:
-                    st.metric("Performance", f"{round(perf, 3)}" if pd.notna(perf) else "—")
+                    st.metric("Rendimiento", f"{round(perf, 2)}" if pd.notna(perf) else "—")
                 with col3:
                     days_avail = get_days_until_acwr(df_daily, selected_date)
                     acwr_display = format_acwr_display(acwr, days_avail)
@@ -364,17 +415,29 @@ def main():
                 conf_text, conf_emoji = get_confidence_level(df_daily, selected_date)
                 st.info(f"{conf_emoji} **Confianza del modelo:** {conf_text}")
                 
-                # RECOMMENDATION
-                render_section_title("Recomendación", accent="#FFB81C")
+                # RECOMMENDATION - Mejorado
+                render_section_title("💡 Recomendación", accent="#FFB81C")
                 reco = r.get('recommendation', 'N/D')
                 action = r.get('action_intensity', 'N/D')
-                st.markdown(f"### {reco} — {action}")
+                
+                st.markdown(f"""
+<div style='
+    background: linear-gradient(135deg, rgba(255, 184, 28, 0.1), rgba(255, 184, 28, 0.05));
+    border-left: 4px solid #FFB81C;
+    border-radius: 4px;
+    padding: 12px;
+    margin-bottom: 16px;
+'>
+    <div style='font-size: 1.3em; font-weight: bold; color: #FFB81C;'>{reco}</div>
+    <div style='color: #E0E0E0; margin-top: 4px;'>Intensidad: <strong>{action}</strong></div>
+</div>
+""", unsafe_allow_html=True)
                 
                 # REASON CODES AS BULLETS
                 reason_codes = r.get('reason_codes', '')
                 reasons = format_reason_codes(reason_codes)
                 if reasons:
-                    st.write("**Por qué:**")
+                    st.write("**Razones:**")
                     for reason in reasons:
                         st.write(f"• {reason}")
                 
@@ -386,7 +449,7 @@ def main():
                 if df_exercises is not None:
                     df_lifts = load_daily_exercise_for_date(daily_ex_path, selected_date)
                     if not df_lifts.empty:
-                        render_section_title("Qué hacer hoy", accent="#00D084")
+                        render_section_title("🏋️ Qué hacer hoy", accent="#00D084")
                         st.write("**Lifts clave - plan accionable:**")
                         lift_recs = get_lift_recommendations(df_lifts, readiness, zone)
                         for rec in lift_recs:
@@ -557,7 +620,7 @@ def main():
     
     # ============== PERFIL PERSONAL VIEW ==============
     elif view_mode == "Perfil Personal":
-        render_perfil(df_daily)
+        render_perfil(df_daily, session_token=st.session_state.get('session_token'))
 
 
 if __name__ == '__main__':

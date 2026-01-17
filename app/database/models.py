@@ -75,6 +75,7 @@ class AuthSession(Base):
     display_name = Column(String, nullable=True)
     profile_picture_url = Column(String, nullable=True)  # URL de foto de Google
     gender = Column(String, nullable=True)             # 'male', 'female', 'other'
+    menstrual_cycle_data = Column(Text, nullable=True)  # JSON: día del ciclo, síntomas, etc.
     session_token_hash = Column(String, nullable=False, unique=True)
     refresh_token = Column(Text, nullable=True)
     access_token = Column(Text, nullable=True)

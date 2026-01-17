@@ -84,3 +84,23 @@ def drop_session(raw_session_token: str):
         AuthSessionRepository.delete(db, raw_session_token)
     finally:
         db.close()
+
+
+def save_menstrual_cycle_data(raw_session_token: str, cycle_data_json: str) -> bool:
+    """Guarda los datos del ciclo menstrual para la sesión actual."""
+    db = next(get_db())
+    try:
+        result = AuthSessionRepository.update_menstrual_cycle_data(db, raw_session_token, cycle_data_json)
+        return result is not None
+    finally:
+        db.close()
+
+
+def save_gender(raw_session_token: str, gender: str) -> bool:
+    """Guarda el género para la sesión actual."""
+    db = next(get_db())
+    try:
+        result = AuthSessionRepository.update_gender(db, raw_session_token, gender)
+        return result is not None
+    finally:
+        db.close()

@@ -1,5 +1,5 @@
 """
-Script de migración para agregar columnas profile_picture_url y gender a auth_sessions
+Script de migración para agregar columnas profile_picture_url, gender y menstrual_cycle_data a auth_sessions
 """
 import sqlite3
 from pathlib import Path
@@ -37,6 +37,15 @@ def migrate_auth_sessions():
         print("✅ Columna gender agregada")
     else:
         print("✓ Columna gender ya existe")
+    
+    # Agregar menstrual_cycle_data si no existe
+    if 'menstrual_cycle_data' not in columns:
+        print("Agregando columna menstrual_cycle_data...")
+        cursor.execute("ALTER TABLE auth_sessions ADD COLUMN menstrual_cycle_data TEXT")
+        changes_made = True
+        print("✅ Columna menstrual_cycle_data agregada")
+    else:
+        print("✓ Columna menstrual_cycle_data ya existe")
     
     if changes_made:
         conn.commit()

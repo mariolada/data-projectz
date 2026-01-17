@@ -276,6 +276,7 @@ class AuthSessionRepository:
         access_expires_at: datetime = None,
         profile_picture_url: str = None,
         gender: str = None,
+        menstrual_cycle_data: str = None,
     ) -> AuthSession:
         session_hash = AuthSessionRepository._hash_token(raw_session_token)
         session_expires_at = datetime.utcnow() + timedelta(days=AuthSessionRepository.SESSION_TTL_DAYS)
@@ -293,11 +294,36 @@ class AuthSessionRepository:
             session_expires_at=session_expires_at,
             profile_picture_url=profile_picture_url,
             gender=gender,
+            menstrual_cycle_data=menstrual_cycle_data,
         )
         db.add(rec)
         db.commit()
         db.refresh(rec)
         return rec
+
+    @staticmethod
+    def update_menstrual_cycle_data(db: Session, raw_session_token: str, cycle_data_json: str):
+        """Actualiza los datos del ciclo menstrual para una sesión"""
+        session_hash = AuthSessionRepository._hash_token(raw_session_token)
+        rec = db.query(AuthSession).filter(AuthSession.session_token_hash == session_hash).first()
+        if rec:
+            rec.menstrual_cycle_data = cycle_data_json
+            db.commit()
+            db.refresh(rec)
+            return rec
+        return None
+
+    @staticmethod
+    def update_gender(db: Session, raw_session_token: str, gender: str):
+        """Actualiza el género para una sesión"""
+        session_hash = AuthSessionRepository._hash_token(raw_session_token)
+        rec = db.query(AuthSession).filter(AuthSession.session_token_hash == session_hash).first()
+        if rec:
+            rec.gender = gender
+            db.commit()
+            db.refresh(rec)
+            return rec
+        return None
 
     @staticmethod
     def get_by_session_token(db: Session, raw_session_token: str) -> Optional[AuthSession]:
