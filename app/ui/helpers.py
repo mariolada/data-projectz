@@ -1475,11 +1475,11 @@ def _get_recovery_status(sleep_h: float, sleep_q: int, disruptions: bool = False
     score = max(0, min(100, score))
     
     if score >= 65:
-        return {'label': 'Buena', 'level': 'ok', 'emoji': '✅', 'score': score}
+        return {'label': 'Buena', 'level': 'ok', 'emoji': '', 'score': score}
     elif score >= 40:
-        return {'label': 'Media', 'level': 'mid', 'emoji': '🟡', 'score': score}
+        return {'label': 'Media', 'level': 'mid', 'emoji': '', 'score': score}
     else:
-        return {'label': 'Mala', 'level': 'low', 'emoji': '🔴', 'score': score}
+        return {'label': 'Mala', 'level': 'low', 'emoji': '', 'score': score}
 
 
 def _get_state_status(perceived: int, fatigue: int, stress: int, energy: int = None) -> dict:
@@ -1504,11 +1504,11 @@ def _get_state_status(perceived: int, fatigue: int, stress: int, energy: int = N
     score = max(0, min(100, score + 40))  # Offset para centrar
     
     if score >= 65:
-        return {'label': 'Fresco', 'level': 'ok', 'emoji': '💪', 'score': score}
+        return {'label': 'Fresco', 'level': 'ok', 'emoji': '', 'score': score}
     elif score >= 40:
-        return {'label': 'Normal', 'level': 'mid', 'emoji': '🟡', 'score': score}
+        return {'label': 'Normal', 'level': 'mid', 'emoji': '', 'score': score}
     else:
-        return {'label': 'Tocado', 'level': 'low', 'emoji': '⚠️', 'score': score}
+        return {'label': 'Tocado', 'level': 'low', 'emoji': '', 'score': score}
 
 
 def _count_flags(alcohol: bool, caffeine: int, pain: bool, sick: bool, 
@@ -1537,11 +1537,11 @@ def _count_flags(alcohol: bool, caffeine: int, pain: bool, sick: bool,
         active.append('last_hard')
     
     if count == 0:
-        return {'label': '0', 'level': 'ok', 'emoji': '✅', 'count': count, 'active': active}
+        return {'label': '0', 'level': 'ok', 'emoji': '', 'count': count, 'active': active}
     elif count == 1:
-        return {'label': '1', 'level': 'mid', 'emoji': '⚠️', 'count': count, 'active': active}
+        return {'label': '1', 'level': 'mid', 'emoji': '', 'count': count, 'active': active}
     else:
-        return {'label': f'{count}+', 'level': 'low', 'emoji': '🔴', 'count': count, 'active': active}
+        return {'label': f'{count}+', 'level': 'low', 'emoji': '', 'count': count, 'active': active}
 
 
 def render_live_summary(recovery: dict, state: dict, flags: dict, 
@@ -1580,7 +1580,7 @@ def render_live_summary(recovery: dict, state: dict, flags: dict,
         f'box-shadow:0 4px 20px rgba(0,0,0,0.3);">'
         
         f'<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1.5px;'
-        f'color:#666;margin-bottom:12px;font-weight:600;">📊 Resumen en vivo</div>'
+        f'color:#666;margin-bottom:12px;font-weight:600;">Resumen en vivo</div>'
         
         f'<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">'
         
