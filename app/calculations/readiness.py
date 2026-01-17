@@ -444,9 +444,15 @@ def calculate_injury_risk_score_v2(
 
 def generate_actionable_plan_v2(
     readiness, pain_flag, pain_zone, pain_severity, pain_type,
-    fatigue, soreness, stiffness, sick_level, session_goal, fatigue_analysis
+    fatigue, soreness, stiffness, sick_level, session_goal, fatigue_analysis,
+    weekly_volume=None
 ):
-    """Versión mejorada: genera plan ultra-específico con pain_zone y fatigue_type."""
+    """
+    Versión mejorada: genera plan ultra-específico con pain_zone y fatigue_type.
+    
+    Args:
+        weekly_volume: volumen total de la semana (kg). Si es None o 0, se asume sin entrenamientos.
+    """
     
     plan = []
     rules = []
@@ -464,6 +470,9 @@ def generate_actionable_plan_v2(
         plan.append(f"⚠️ Malestar leve detectado (nivel {sick_level}/5)")
         plan.append("Considera deload o descanso si empeora")
     
+    # Verificar si hay falta de entrenamientos en la semana (weekly_volume muy bajo o nulo)
+    has_no_training_this_week = weekly_volume is None or weekly_volume < 100
+    
     if readiness >= 80:
         zone_display = "🟢 ALTA"
         reco = "Push day - busca PRs"
@@ -475,10 +484,24 @@ def generate_actionable_plan_v2(
         intensity_rir = "RIR 2–3"
         volume_adjust = "Volumen estándar"
     else:
+        # READINESS BAJO: considerar si hay entrenamientos en la semana
         zone_display = "🔴 BAJA"
-        reco = "Deload - reduce carga"
-        intensity_rir = "RIR 3–5"
-        volume_adjust = "-20% sets"
+        
+        if has_no_training_this_week:
+            # Sin entrenamientos en la semana + readiness bajo = entrenar suave (mejor que descanso total)
+            reco = "Entrenar SUAVE - mantén el movimiento"
+            intensity_rir = "RIR 5–7 (muy ligero)"
+            volume_adjust = "-40% sets (volumen mínimo)"
+            plan.append("⚠️ **Contexto**: Sin entrenamientos registrados esta semana.")
+            plan.append("🎯 **En lugar de descanso total**, una sesión muy suave puede ayudarte a:")
+            plan.append("   • Activar el sistema nervioso sin fatigarlo más")
+            plan.append("   • Mantener la conexión mente-músculo")
+            plan.append("   • Facilitar recuperación mejor que inmovilidad total")
+        else:
+            # Hay entrenamientos recientes + readiness bajo = verdadero deload
+            reco = "Deload - reduce carga"
+            intensity_rir = "RIR 3–5"
+            volume_adjust = "-20% sets"
     
     plan.append(f"**Zona**: {zone_display}")
     plan.append(f"**Recomendación base**: {reco}")

@@ -1023,10 +1023,27 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                 days_high_strain=0
             )
             
-            # Generate plan - ahora con pain_zone, pain_type, sick_level
+            # Calcular volumen de la semana (últimos 7 días)
+            today = pd.to_datetime('today').normalize()
+            week_start = today - pd.Timedelta(days=6)  # Últimos 7 días incluido hoy
+            
+            # Convertir df_daily['date'] a datetime si no lo es
+            if 'date' in df_daily.columns:
+                df_daily_dates = pd.to_datetime(df_daily['date'])
+                df_week = df_daily[(df_daily_dates >= week_start) & (df_daily_dates <= today)]
+            else:
+                df_week = pd.DataFrame()
+            
+            # Calcular volumen total de la semana
+            weekly_volume = 0.0
+            if 'volume' in df_week.columns:
+                weekly_volume = float(df_week['volume'].sum()) if len(df_week) > 0 else 0.0
+            
+            # Generate plan - ahora con pain_zone, pain_type, sick_level y weekly_volume
             zone_display, plan, rules = generate_actionable_plan_v2(
                 readiness_instant, pain_flag, pain_zone, pain_severity, pain_type, 
-                fatigue, soreness, stiffness, sick_level, session_goal, fatigue_analysis
+                fatigue, soreness, stiffness, sick_level, session_goal, fatigue_analysis,
+                weekly_volume=weekly_volume
             )
         
         # Display results - TWO MODES
