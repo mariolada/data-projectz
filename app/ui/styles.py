@@ -596,9 +596,9 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     background: linear-gradient(135deg, var(--mh-panel), var(--mh-panel2)) !important;
     border: 1px solid var(--mh-border) !important;
     border-radius: 14px !important;
-    padding: 8px 12px !important;
+    padding: 6px 10px !important;
     box-shadow: 0 2px 14px rgba(0,0,0,0.32) !important;
-    margin: 4px 0 !important;
+    margin: 3px 0 !important;
 }
 
 /* =====================================================
@@ -668,7 +668,7 @@ div[data-testid="stMarkdownContainer"] div {
     gap: 10px;
     font-size: 0.70rem;
     color: rgba(156,163,175,0.85);
-    margin-top: -10px;
+    margin-top: -12px;
     padding: 0 2px 0 2px;
     user-select: none;
     line-height: 1.2;
@@ -680,7 +680,7 @@ div[data-testid="stMarkdownContainer"] div {
 .mh-card {
     background: linear-gradient(135deg, rgba(22,22,28,0.95), rgba(28,26,32,0.90));
     border-radius: 12px;
-    padding: 10px 14px;
+    padding: 8px 12px;
     border: 1px solid rgba(255,255,255,0.05);
     box-shadow: 0 2px 12px rgba(0,0,0,0.30);
     margin: 3px 0;
@@ -729,8 +729,8 @@ div[data-testid="stRadio"] label {
 
 /* Slider surface + handle */
 div[data-testid="stSlider"] div[data-baseweb="slider"] {
-    padding: 6px 2px !important;
-    margin: 2px 0 !important;
+    padding: 4px 2px !important;
+    margin: 1px 0 !important;
 }
 div[data-testid="stSlider"] div[data-baseweb="slider"] div[role="slider"] {
     box-shadow: 0 0 0 2px rgba(255,255,255,0.15) !important;
@@ -753,8 +753,8 @@ label, .stMarkdown, p {
 .mode-toggle-container {
     background: rgba(178, 102, 255, 0.08);
     border-radius: 16px;
-    padding: 8px;
-    margin: 20px 0;
+    padding: 6px 8px;
+    margin: 10px 0 8px;
     border: 2px solid rgba(178, 102, 255, 0.3);
     box-shadow: 0 0 20px rgba(178, 102, 255, 0.15);
 }
@@ -763,8 +763,8 @@ label, .stMarkdown, p {
 .input-section {
     background: rgba(255, 255, 255, 0.03);
     border-radius: 12px;
-    padding: 20px;
-    margin: 16px 0;
+    padding: 12px 14px;
+    margin: 8px 0;
     border-left: 4px solid;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     transition: all 0.3s ease;
@@ -898,12 +898,12 @@ HERO_HTML = """
 
 # Header para Modo Hoy
 MODE_TODAY_HEADER = """
-<div style='text-align:center;margin:20px 0 40px'>
+<div style='text-align:center;margin:12px 0 20px'>
     <h1 style='font-size:2.5rem;font-weight:800;background:linear-gradient(90deg,#00D084,#4ECDC4);
     -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px'>
         Ready Check
     </h1>
-    <p style='color:#B266FF;font-size:1.1rem;font-weight:600'>
+    <p style='color:#B266FF;font-size:1.05rem;font-weight:600'>
         Tu puntuación y plan personalizado en segundos
     </p>
 </div>
