@@ -98,8 +98,6 @@ def _handle_oauth_callback(params):
     if not code:
         return False
     
-    st.write("🔄 Procesando autenticación con Google...")
-
     # Primero intentar recuperar del estado de sesión (si aún está en memoria)
     code_verifier = None
     
@@ -120,9 +118,7 @@ def _handle_oauth_callback(params):
         return False
 
     try:
-        st.write("📡 Intercambiando código por token...")
         token = exchange_code_for_token(code, code_verifier)
-        st.write("👤 Obteniendo información del usuario...")
         userinfo = fetch_userinfo(token.get("access_token"))
     except Exception as e:
         st.error(f"❌ Error intercambiando el código: {str(e)}")
@@ -135,7 +131,6 @@ def _handle_oauth_callback(params):
     profile_picture = userinfo.get("picture", None)  # URL de foto de perfil de Google
 
     try:
-        st.write("💾 Guardando sesión...")
         session_token = create_persistent_session(
             provider="google",
             user_id=user_sub,
@@ -164,8 +159,6 @@ def _handle_oauth_callback(params):
     if state:
         delete_pkce_state(state)
 
-    st.write(f"✅ Autenticación exitosa para {display_name}")
-    
     return True
 
 
@@ -228,6 +221,10 @@ def main():
     inject_loader_css()
     inject_hero(st)
     inject_sidebar_premium_css()  # Nuevo: estilos premium del sidebar
+    
+    # Inyectar CSS de Lottie loaders
+    from ui.lottie_loader import inject_lottie_loader_css, lottie_loading
+    inject_lottie_loader_css()
 
     daily_path = Path("data/processed/daily.csv")
     reco_path = Path("data/processed/recommendations_daily.csv")
@@ -240,7 +237,7 @@ def main():
     df_exercises = None
     df_weekly = None
     
-    with loading("Cargando datos..."):
+    with lottie_loading("Cargando datos del sistema...", animation_type='load'):
         try:
             df_metrics = load_csv(daily_path)
         except FileNotFoundError:

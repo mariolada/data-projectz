@@ -15,6 +15,7 @@ import pandas as pd
 import streamlit as st
 
 from ui.loader import loading
+from ui.lottie_loader import lottie_loading
 from database.connection import get_db, init_db
 from database.repositories import TrainingRepository, ExerciseRepository
 
@@ -579,6 +580,8 @@ def render_entrenamiento() -> None:
         unsafe_allow_html=True
     )
 
+    st.markdown('<div class="fade-in">', unsafe_allow_html=True)
+
     # ---------- Header ----------
     st.markdown('<div class="training-title">Entrenamiento</div>', unsafe_allow_html=True)
     st.markdown(
@@ -860,7 +863,7 @@ def render_entrenamiento() -> None:
                             st.error(e)
                     else:
                         name_to_save = str(session_name).strip() or f"Entrenamiento - {selected_date.strftime('%d/%m/%Y')}"
-                        with loading("Guardando..."):
+                        with lottie_loading("Guardando entrenamiento en la base de datos...", animation_type='save'):
                             df_out = df_valid.copy()
                             df_out["date"] = selected_date
                             df_out["session_name"] = name_to_save
@@ -872,8 +875,10 @@ def render_entrenamiento() -> None:
                             ok = save_training(df_out, selected_date)
 
                         if ok:
+                            st.markdown('<div class="fade-fast">', unsafe_allow_html=True)
                             st.success(f"✅ Guardado: {name_to_save}")
                             st.balloons()
+                            st.markdown('</div>', unsafe_allow_html=True)
 
             st.markdown('<div class="training-sep"></div>', unsafe_allow_html=True)
 
@@ -914,8 +919,4 @@ def render_entrenamiento() -> None:
 
                             st.rerun()
 
-                        # Sync banco ejercicios con esa sesión
-                        for ex in st.session_state.training_data["exercise"].dropna().astype(str).tolist():
-                            add_exercise_to_bank(ex)
-
-                            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)

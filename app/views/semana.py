@@ -23,6 +23,7 @@ from charts.daily_charts import (
 )
 from ui.components import render_section_title
 from ui.loader import loading
+from ui.lottie_loader import lottie_loading
 from ui.styles import inject_main_css
 
 # Import desde src (estos se añaden al path en streamlit_app.py)
@@ -756,11 +757,13 @@ def render_semana(df_daily: pd.DataFrame, df_weekly: pd.DataFrame) -> None:
         st.error("❌ weekly.csv no tiene la columna 'week_start'.")
         return
 
+    st.markdown('<div class="fade-in">', unsafe_allow_html=True)
+
     df_weekly = df_weekly.copy()
     df_weekly["week_start"] = pd.to_datetime(df_weekly["week_start"], errors="coerce").dt.normalize()
     df_weekly = df_weekly.dropna(subset=["week_start"]).sort_values("week_start")
 
-    with loading("Cargando semana...", compact=True):
+    with lottie_loading("Cargando datos semanales...", animation_type='load', compact=True):
         ctx = _compute_week_context(df_weekly)
         week_row = _safe_week_row(df_weekly, ctx.week_start)
         df_week_days = _filter_daily_for_week(df_daily if df_daily is not None else pd.DataFrame(), ctx)
@@ -778,3 +781,5 @@ def render_semana(df_daily: pd.DataFrame, df_weekly: pd.DataFrame) -> None:
         _render_multiweek_trends(df_weekly)
 
     _render_suggested_sequence(df_week_days, kpis, df_weekly)
+
+    st.markdown('</div>', unsafe_allow_html=True)

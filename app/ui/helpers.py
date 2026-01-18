@@ -1138,31 +1138,26 @@ def render_insights_stack(sleep_responsive: bool, readiness: int, p50: float, p7
 def render_notes_compact(notes: list):
     """
     Renderiza notas del análisis de forma compacta.
-    Primera nota visible, resto en expander.
+    Todas las notas visibles en línea.
     """
     if not notes:
         return
-    
-    # Primera nota siempre visible
-    first_note = notes[0] if notes else ""
-    remaining = notes[1:] if len(notes) > 1 else []
-    
+
+    notes_html = "".join(
+        f'<div style="display:flex;align-items:flex-start;gap:8px;">'
+        f'<span style="color:#50C878;font-size:0.9rem;">✓</span>'
+        f'<span style="color:#a0a0a0;font-size:0.82rem;line-height:1.5;">{note}</span>'
+        f'</div>'
+        for note in notes
+    )
+
     html = (
         f'<div style="margin-top:12px;padding:10px 14px;background:rgba(80,200,120,0.06);'
         f'border-radius:8px;border-left:2px solid #50C87880;">'
-        f'<div style="display:flex;align-items:flex-start;gap:8px;">'
-        f'<span style="color:#50C878;font-size:0.9rem;">✓</span>'
-        f'<span style="color:#a0a0a0;font-size:0.82rem;line-height:1.5;">{first_note}</span>'
-        f'</div>'
+        f'{notes_html}'
         f'</div>'
     )
     st.markdown(html, unsafe_allow_html=True)
-    
-    # Resto en expander si hay más
-    if remaining:
-        with st.expander(f"Ver {len(remaining)} nota(s) más"):
-            for note in remaining:
-                st.caption(f"• {note}")
 
 
 def render_readiness_hero(readiness: int, zone_label: str, confidence: str = "medium"):

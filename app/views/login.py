@@ -139,6 +139,16 @@ def _inject_login_css():
             color: {TEXT_MAIN};
             font-size: 13px;
         }}
+        .fade-in {{
+            opacity: 0;
+            transform: translateY(6px);
+            animation: fadeInUp 220ms ease-out both;
+            will-change: opacity, transform;
+        }}
+        @keyframes fadeInUp {{
+            from {{ opacity: 0; transform: translateY(6px); }}
+            to   {{ opacity: 1; transform: translateY(0); }}
+        }}
         </style>
         """,
         unsafe_allow_html=True,
@@ -167,7 +177,7 @@ def render_login(providers=("google",), auth_url: str = None):
     # Marker to scope CSS to this block (for width/centering)
     st.markdown("<div id='login-shell-marker'></div>", unsafe_allow_html=True)
     with st.container():
-        st.markdown("<div class='login-card-shell'>", unsafe_allow_html=True)
+        st.markdown("<div class='login-card-shell fade-in'>", unsafe_allow_html=True)
 
         st.markdown("<div class='login-icon'>✦</div>", unsafe_allow_html=True)
         st.markdown("<div class='login-title'>Accede a tu panel</div>", unsafe_allow_html=True)

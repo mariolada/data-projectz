@@ -27,6 +27,38 @@ MAIN_CSS = """
                     linear-gradient(180deg, #0b0e14 0%, #07090f 80%);
         color: var(--text);
     }
+
+    /* Fade-in transitions (subtle, premium) */
+    .fade-in {
+        opacity: 0;
+        transform: translateY(6px);
+        animation: fadeInUp 220ms ease-out both;
+        will-change: opacity, transform;
+    }
+    .fade-fast {
+        opacity: 0;
+        transform: translateY(4px);
+        animation: fadeInUp 180ms ease-out both;
+        will-change: opacity, transform;
+    }
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    /* Global fade-in for rerendered content */
+    .stAppViewContainer, .main .block-container {
+        animation: fadeInUp 220ms ease-out both;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .fade-in, .fade-fast {
+            animation: none !important;
+            opacity: 1 !important;
+            transform: none !important;
+        }
+        .stAppViewContainer, .main .block-container {
+            animation: none !important;
+        }
+    }
     
     /* Hero */
     .hero {
@@ -564,9 +596,9 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     background: linear-gradient(135deg, var(--mh-panel), var(--mh-panel2)) !important;
     border: 1px solid var(--mh-border) !important;
     border-radius: 14px !important;
-    padding: 10px 14px !important;
+    padding: 8px 12px !important;
     box-shadow: 0 2px 14px rgba(0,0,0,0.32) !important;
-    margin: 6px 0 !important;
+    margin: 4px 0 !important;
 }
 
 /* =====================================================
@@ -636,8 +668,8 @@ div[data-testid="stMarkdownContainer"] div {
     gap: 10px;
     font-size: 0.70rem;
     color: rgba(156,163,175,0.85);
-    margin-top: -8px;
-    padding: 0 2px 2px 2px;
+    margin-top: -10px;
+    padding: 0 2px 0 2px;
     user-select: none;
     line-height: 1.2;
 }
@@ -648,10 +680,10 @@ div[data-testid="stMarkdownContainer"] div {
 .mh-card {
     background: linear-gradient(135deg, rgba(22,22,28,0.95), rgba(28,26,32,0.90));
     border-radius: 12px;
-    padding: 12px 16px;
+    padding: 10px 14px;
     border: 1px solid rgba(255,255,255,0.05);
     box-shadow: 0 2px 12px rgba(0,0,0,0.30);
-    margin: 4px 0;
+    margin: 3px 0;
 }
 .mh-card-left {
     border-left: 3px solid rgba(255,255,255,0.12);

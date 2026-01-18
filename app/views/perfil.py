@@ -7,6 +7,7 @@ import pandas as pd
 
 from ui.components import render_section_title
 from ui.loader import loading
+from ui.lottie_loader import lottie_loading
 from data.loaders import load_user_profile
 from calculations.readiness import generate_personalized_insights
 from ui.profile_helpers import render_gender_selection, render_gender_note
@@ -377,6 +378,8 @@ def render_perfil(df_daily: pd.DataFrame, session_token: str = None):
     8. Card 7: Ver más (expandible)
     """
     inject_profile_css()
+
+    st.markdown('<div class="fade-in">', unsafe_allow_html=True)
     
     # ============ HEADER ============
     st.markdown("<div class='profile-header'>", unsafe_allow_html=True)
@@ -432,7 +435,7 @@ def render_perfil(df_daily: pd.DataFrame, session_token: str = None):
                     st.warning("No se pudo guardar (sesión no disponible)")
     
     # Cargar datos
-    with loading("Cargando perfil..."):
+    with lottie_loading("Cargando tu perfil personalizado...", animation_type='profile'):
         baselines = calculate_personal_baselines(df_daily)
         user_profile = load_user_profile()
         adjustment_factors = user_profile.get('adjustment_factors', {})
@@ -725,3 +728,5 @@ def render_perfil(df_daily: pd.DataFrame, session_token: str = None):
             """,
             unsafe_allow_html=True
         )
+
+    st.markdown('</div>', unsafe_allow_html=True)

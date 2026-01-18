@@ -9,6 +9,7 @@ import datetime
 from ui.styles import inject_mode_today_css, inject_mode_today_header
 from ui.components import render_section_title
 from ui.loader import loading
+from ui.lottie_loader import lottie_loading
 from ui.helpers import (
     render_badge, render_card, clean_line,
     get_sleep_hours_level, get_sleep_quality_level,
@@ -61,78 +62,11 @@ def render_modo_hoy(df_daily: pd.DataFrame):
     # Inyectar CSS y Header del Modo Hoy
     inject_mode_today_css(st)
     inject_mode_today_header(st)
+
+    st.markdown('<div class="fade-in">', unsafe_allow_html=True)
     
     # === CARGAR PERFIL PERSONALIZADO ===
     user_profile = load_user_profile()
-    
-    # Mostrar insights personalizados si hay
-    if user_profile.get('insights') and user_profile['data_quality'].get('total_days', 0) > 7:
-        with st.expander("Tu Perfil Personal", expanded=False):
-            col_arch, col_sleep = st.columns(2)
-            
-            with col_arch:
-                archetype = user_profile.get('archetype', {})
-                if archetype.get('confidence', 0) > 0.5:
-                    st.markdown(f"**Arquetipo:** {archetype.get('archetype', '?').upper()}")
-                    st.caption(f"{archetype.get('reason', '')}")
-                    st.caption(f"Confianza: {archetype.get('confidence', 0):.0%}")
-            
-            with col_sleep:
-                sleep_resp = user_profile.get('sleep_responsiveness', {})
-                if sleep_resp.get('sleep_responsive') is not None:
-                    # Mostrar nivel basado en strength del análisis
-                    strength = sleep_resp.get('strength', 'unknown')
-                    strength_labels = {
-                        'none': 'Bajo',
-                        'weak': 'Débil', 
-                        'moderate': 'Moderado',
-                        'strong': 'Alto',
-                        'unknown': 'Desconocido'
-                    }
-                    st.markdown(f"**Impacto del sueño:** {strength_labels.get(strength, 'Desconocido')}")
-                    st.caption(f"Correlación: {sleep_resp.get('correlation', 0):.2f}")
-            
-            # Mostrar insights clave
-            st.markdown("**Insights:**")
-            for insight in user_profile.get('insights', []):
-                st.write(f"• {insight}")
-            
-            # Mostrar adjustment factors
-            factors = user_profile.get('adjustment_factors', {})
-            if factors:
-                st.markdown("**Factores de personalización:**")
-                col_f1, col_f2, col_f3 = st.columns(3)
-                with col_f1:
-                    st.metric("Sleep Weight", f"{factors.get('sleep_weight', 0.25):.2f}", 
-                             delta=f"{factors.get('sleep_weight', 0.25) - 0.25:+.2f} vs default")
-                with col_f2:
-                    st.metric("Performance Weight", f"{factors.get('performance_weight', 0.25):.2f}",
-                             delta=f"{factors.get('performance_weight', 0.25) - 0.25:+.2f} vs default")
-                with col_f3:
-                    st.metric("Fatigue Sensitivity", f"{factors.get('fatigue_sensitivity', 1.0):.2f}x",
-                             delta=f"{factors.get('fatigue_sensitivity', 1.0) - 1.0:+.2f}x vs normal")
-                
-                # Expander explicativo
-                with st.expander("¿Qué significan estos factores?"):
-                    st.markdown("""
-**Sleep Weight** (Peso del sueño)
-- Valor por defecto: 0.25
-- Cuánto influye el sueño en tu cálculo de readiness
-- Si es **mayor** que 0.25: el sueño te afecta más que a la media, priorízalo
-- Si es **menor** que 0.25: el sueño no es tu factor clave, otros aspectos te impactan más
-
-**Performance Weight** (Peso del rendimiento)
-- Valor por defecto: 0.25  
-- Cuánto pesa tu tendencia de rendimiento reciente (subiendo/bajando)
-- Si es **mayor**: tu progresión es muy predecible, aprovecha rachas buenas
-- Si es **menor**: tu rendimiento fluctúa por otros factores
-
-**Fatigue Sensitivity** (Sensibilidad a la fatiga)
-- Valor por defecto: 1.0x
-- Cómo te afecta la fatiga acumulada (RIR bajo, esfuerzo alto)
-- Si es **mayor que 1.0x**: eres muy sensible, respeta los deloads
-- Si es **menor que 1.0x**: toleras bien la fatiga, puedes sostener cargas altas
-                    """)
     
     # =============================================================
     # QUESTIONNAIRE WRAPPER (single card with green left accent line)
@@ -152,22 +86,13 @@ def render_modo_hoy(df_daily: pd.DataFrame):
         ''', unsafe_allow_html=True)
 
         # === MODE TOGGLE (PILL STYLE) ===
-        col_toggle, col_reset = st.columns([4, 1])
-        with col_toggle:
-            mode = st.radio(
-                "Modo",
-                ["Rápido", "Preciso"],
-                horizontal=True,
-                label_visibility="collapsed",
-                key="mode_toggle"
-            )
-
-        with col_reset:
-            if st.button("🔄"):
-                for key in list(st.session_state.keys()):
-                    if key.startswith('mood_'):
-                        del st.session_state[key]
-                st.rerun()
+        mode = st.radio(
+            "Modo",
+            ["Rápido", "Preciso"],
+            horizontal=True,
+            label_visibility="collapsed",
+            key="mode_toggle"
+        )
 
         quick_mode = mode == "Rápido"
 
@@ -816,23 +741,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
             submitted = False
 
 
-    # Cheat sheet de métricas clave (ayuda rápida)
-    with st.expander("¿Qué significa cada métrica?"):
-        st.markdown(
-            """
-**Volumen**: trabajo total (sets × reps × carga); sube lento, no de golpe.
-
-**Readiness (0-100)**: disponibilidad hoy; >80 empuja, 65-79 normal, <50 descarga.
-
-**ACWR (7d/28d)**: carga aguda vs crónica; 0.8-1.3 rango seguro, >1.5 ojo con fatiga.
-
-**Monotonía**: media/variación del volumen semanal; >2 indica poca variación (más riesgo).
-
-**Strain**: volumen × monotonía; alto strain = más estrés sistémico, pide recuperación.
-
-**Performance Index (≈1.00)**: rendimiento relativo vs tu baseline; 1.01+ mejora, <0.98 posible fatiga.
-            """
-        )
+    # Cheat sheet de métricas clave eliminada por petición del usuario
     
     # Persist inputs immediately on button click
     if submitted:
@@ -933,7 +842,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
         st.markdown("<div style='margin:40px 0 20px'></div>", unsafe_allow_html=True)
         
         # === PERSONALIZATION ENGINE: Baselines + adjustment factors ===
-        with loading("Calculando readiness..."):
+        with lottie_loading("Calculando tu readiness personalizado...", animation_type='calculate'):
             baselines = calculate_personal_baselines(df_daily)
             user_profile = load_user_profile()
             adjustment_factors = user_profile.get('adjustment_factors', {})
@@ -955,21 +864,6 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                 adjustment_factors=adjustment_factors,
                 df_daily=df_daily
             )
-            
-            # DEBUG: Mostrar breakdown detallado
-            with st.expander("🔍 DEBUG: Breakdown detallado del cálculo", expanded=False):
-                st.write("**Readiness final:**", readiness_instant)
-                st.write("**Percepción component:**", f"{readiness_breakdown.get('perceived_component', 0):.1f} pts")
-                st.write("**Components:**")
-                for key, val in readiness_breakdown.get('components', {}).items():
-                    st.write(f"  - {key}: {val:.1f} pts")
-                st.write("**Adjustments:**")
-                for key, val in readiness_breakdown.get('context_adjustments', {}).items():
-                    st.write(f"  - {key}: {val:.1f} pts")
-                if readiness_breakdown.get('notes'):
-                    st.write("**Notas:**")
-                    for note in readiness_breakdown['notes']:
-                        st.write(f"  - {note}")
             
             # === AJUSTE POR CICLO MENSTRUAL (si es mujer) ===
             menstrual_adjustment = None
@@ -1046,6 +940,8 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                 weekly_volume=weekly_volume
             )
         
+        st.markdown('<div class="fade-fast">', unsafe_allow_html=True)
+
         # Display results - TWO MODES
         st.markdown("---")
         
@@ -1197,3 +1093,7 @@ def render_modo_hoy(df_daily: pd.DataFrame):
                 acwr_chart = chart_data.set_index('date')['acwr_7_28']
                 fig = create_acwr_chart(acwr_chart, "ACWR (Carga)")
                 st.plotly_chart(fig)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
