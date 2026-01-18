@@ -62,34 +62,33 @@ MAIN_CSS = """
     
     /* Hero */
     .hero {
-        background: linear-gradient(135deg, rgba(178, 102, 255, 0.12), rgba(0, 208, 132, 0.08));
-        border: 1px solid rgba(178, 102, 255, 0.25);
-        border-radius: 12px;
-        padding: 18px 20px;
-        margin-bottom: 18px;
+        background: rgba(12, 14, 20, 0.92);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 14px;
+        padding: 18px 22px;
+        margin-bottom: 16px;
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 16px;
-        box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+        box-shadow: 0 6px 22px rgba(0,0,0,0.35);
     }
     .hero h1 {
         font-family: 'Orbitron', sans-serif;
         color: var(--text);
-        text-shadow: 0 0 16px rgba(178, 102, 255, 0.25);
         margin: 0;
-        font-size: 2.1em;
-        letter-spacing: 0.04em;
+        font-size: 2.0em;
+        letter-spacing: 0.03em;
     }
     .hero .eyebrow {
         text-transform: uppercase;
-        color: var(--muted);
-        letter-spacing: 0.2em;
-        font-size: 0.8em;
-        margin: 0 0 4px 0;
+        color: rgba(180, 190, 200, 0.7);
+        letter-spacing: 0.18em;
+        font-size: 0.75em;
+        margin: 0 0 6px 0;
     }
     .hero .sub {
-        color: var(--muted);
+        color: rgba(170, 175, 185, 0.85);
         margin: 6px 0 0 0;
     }
     .hero .badge-row {
@@ -98,19 +97,21 @@ MAIN_CSS = """
         flex-wrap: wrap;
     }
     .badge {
-        padding: 6px 10px;
-        border-radius: 999px;
-        font-size: 0.85em;
+        padding: 7px 12px;
+        border-radius: 10px;
+        font-size: 0.78em;
         font-weight: 700;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
-        color: #0b0e11;
-        background: linear-gradient(135deg, var(--green), #00c070);
-        box-shadow: 0 0 14px rgba(0, 208, 132, 0.3);
+        color: rgba(235,235,235,0.95);
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.08);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.25);
     }
-    .badge.purple { background: linear-gradient(135deg, var(--purple), #8f4dff); color: #f8f8ff; box-shadow: 0 0 14px rgba(178, 102, 255, 0.35); }
-    .badge.coral { background: linear-gradient(135deg, var(--coral), #ff7f7f); color: #fff; box-shadow: 0 0 14px rgba(255, 107, 107, 0.35); }
-    .badge.aqua { background: linear-gradient(135deg, var(--aqua), #27d7c4); color: #0b0e11; box-shadow: 0 0 14px rgba(78, 205, 196, 0.35); }
+    .badge.purple { background: rgba(178, 102, 255, 0.14); border-color: rgba(178, 102, 255, 0.35); }
+    .badge.coral { background: rgba(255, 107, 107, 0.16); border-color: rgba(255, 107, 107, 0.35); }
+    .badge.aqua { background: rgba(78, 205, 196, 0.14); border-color: rgba(78, 205, 196, 0.35); }
+    .badge.green { background: rgba(0, 208, 132, 0.14); border-color: rgba(0, 208, 132, 0.35); }
     
     /* Section titles */
     .section-title {
@@ -883,13 +884,13 @@ div[data-testid="stExpander"] summary {
 HERO_HTML = """
 <div class="hero">
     <div>
-        <p class="eyebrow">Adventure Mode</p>
-        <h1>Trainer — Readiness</h1>
-        <p class="sub">Decide tu plan del día con las mismas vibes que las gráficas.</p>
+        <p class="eyebrow">Toberu</p>
+        <h1>Toberu — Vuela más alto</h1>
+        <p class="sub">Readiness diario con enfoque minimalista.</p>
     </div>
     <div class="badge-row">
         <span class="badge purple">Readiness</span>
-        <span class="badge">Volumen</span>
+        <span class="badge green">Volumen</span>
         <span class="badge aqua">Sueño</span>
         <span class="badge coral">ACWR</span>
     </div>
@@ -898,14 +899,14 @@ HERO_HTML = """
 
 # Header para Modo Hoy
 MODE_TODAY_HEADER = """
-<div style='text-align:center;margin:12px 0 20px'>
-    <h1 style='font-size:2.5rem;font-weight:800;background:linear-gradient(90deg,#00D084,#4ECDC4);
-    -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px'>
-        Ready Check
+<div style='text-align:center;margin:12px 0 18px'>
+    <h1 style='font-size:2.35rem;font-weight:700;color:#E7E9EE;margin:0 0 6px'>
+        Toberu Check
     </h1>
-    <p style='color:#B266FF;font-size:1.05rem;font-weight:600'>
-        Tu puntuación y plan personalizado en segundos
+    <p style='color:rgba(200,206,214,0.8);font-size:0.98rem;font-weight:500;margin:0'>
+        Vuela más alto con tu puntuación y plan personalizado
     </p>
+    <div style='width:48px;height:2px;background:rgba(78,205,196,0.5);margin:12px auto 0;border-radius:999px;'></div>
 </div>
 """
 

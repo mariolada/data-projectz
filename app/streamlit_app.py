@@ -163,7 +163,7 @@ def _handle_oauth_callback(params):
 
 
 def main():
-    st.set_page_config(page_title="Trainer Readiness Dashboard", layout="wide")
+    st.set_page_config(page_title="Toberu — Vuela más alto", layout="wide")
     
     # Inicializar base de datos (crea tablas si no existen)
     init_db()
